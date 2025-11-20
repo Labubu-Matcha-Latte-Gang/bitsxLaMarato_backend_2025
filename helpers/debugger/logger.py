@@ -10,25 +10,77 @@ class AbstractLogger(ABC):
 
     @abstractmethod
     def log(self, message: str, level: LogType = LogType.INFO, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
+        """
+        Logs a message with the given level, module, metadata, and optional error.
+        Args:
+            message (str): The log message.
+            level (LogType, optional): The log level. Defaults to LogType.INFO.
+            module (str | None, optional): The module where the log is generated. Defaults to None.
+            metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
+            error (Exception | None, optional): An optional exception to log. Defaults to None.
+        """
         raise NotImplementedError("Subclasses must implement this method")
     
     def info(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None):
+        """
+        Logs an informational message.
+        Args:
+            message (str): The log message.
+            module (str | None, optional): The module where the log is generated. Defaults to None.
+            metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
+        """
         return self.log(message, LogType.INFO, module, metadata)
     
     def warning(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None):
+        """
+        Logs a warning message.
+        Args:
+            message (str): The log message.
+            module (str | None, optional): The module where the log is generated. Defaults to None.
+            metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
+        """
         return self.log(message, LogType.WARNING, module, metadata)
     
     def error(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
+        """
+        Logs an error message.
+        Args:
+            message (str): The log message.
+            module (str | None, optional): The module where the log is generated. Defaults to None.
+            metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
+            error (Exception | None, optional): An optional exception to log. Defaults to None.
+        """
         return self.log(message, LogType.ERROR, module, metadata, error)
     
     def debug(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None):
+        """
+        Logs a debug message.
+        Args:
+            message (str): The log message.
+            module (str | None, optional): The module where the log is generated. Defaults to None.
+            metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
+        """
         return self.log(message, LogType.DEBUG, module, metadata)
     
     def __call__(self, message: str, level: LogType = LogType.INFO, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
+        """
+        Allows the logger instance to be called like a function to log messages.
+        Args:
+            message (str): The log message.
+            level (LogType, optional): The log level. Defaults to LogType.INFO.
+            module (str | None, optional): The module where the log is generated. Defaults to None.
+            metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
+            error (Exception | None, optional): An optional exception to log. Defaults to None.
+        """
         return self.log(message, level, module, metadata, error)
     
     @classmethod
     def get_instance(cls) -> 'AbstractLogger':
+        """
+        Returns the singleton instance of the logger.
+        Returns:
+            AbstractLogger: The singleton logger instance.
+        """
         if cls.__instance is None:
             cls.__instance = Logger()
         return cls.__instance
