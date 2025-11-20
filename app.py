@@ -8,6 +8,9 @@ from sqlalchemy.engine import URL
 
 from db import create_db
 
+from resources.health import blp as HealthBlueprint
+from resources.version import blp as VersionBlueprint
+
 def create_app(settings_module: str = 'globals') -> Flask:
     """
     Creates a new instace of Flask application.
@@ -95,6 +98,8 @@ def create_app(settings_module: str = 'globals') -> Flask:
     api.spec.options["security"] = [{"jwt": []}]
 
     # HTTP routes
+    api.register_blueprint(HealthBlueprint, url_prefix=getApiPrefix('health'))
+    api.register_blueprint(VersionBlueprint, url_prefix=app.config['VERSION_ENDPOINT'])
 
     with app.app_context():
         db = create_db(app)
