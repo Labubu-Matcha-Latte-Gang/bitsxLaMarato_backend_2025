@@ -1,5 +1,4 @@
 import traceback
-from flask_jwt_extended import jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
 from flask import current_app as app, Response
