@@ -6,6 +6,8 @@ This module initializes the SQLAlchemy database instance and connects it to the 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
+from helpers.debugger.logger import AbstractLogger
+
 db = SQLAlchemy()
 
 def create_db(app:Flask) -> SQLAlchemy:
@@ -16,5 +18,10 @@ def create_db(app:Flask) -> SQLAlchemy:
     Returns:
         SQLAlchemy: The SQLAlchemy database instance connected to the Flask application.
     """
-    db.init_app(app)
-    return db
+    try:
+        db.init_app(app)
+        return db
+    except Exception as e:
+        logger = AbstractLogger.get_instance()
+        logger.error("Failed to initialize database", module="db", error=e)
+        raise
