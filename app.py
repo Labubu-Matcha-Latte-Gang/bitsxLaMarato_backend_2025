@@ -4,6 +4,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate, upgrade as alembic_upgrade
 from flask_smorest import Api
+from sqlalchemy.engine import URL
 
 from db import create_db
 
@@ -18,13 +19,39 @@ def create_app(settings_module: str = 'globals') -> Flask:
     
     app.config.from_object(settings_module)
 
-    DB_USER = app.config['DB_USER']
-    DB_PASSWORD = app.config['DB_PASSWORD']
-    DB_HOST = app.config['DB_HOST']
-    DB_PORT = app.config['DB_PORT']
-    DB_NAME = app.config['DB_NAME']
+    DB_USER = app.config.get('DB_USER')
+    DB_PASSWORD = app.config.get('DB_PASSWORD')
+    DB_HOST = app.config.get('DB_HOST')
+    DB_PORT = app.config.get('DB_PORT')
+    DB_NAME = app.config.get('DB_NAME')
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    required_db_fields = {
+        "DB_USER": DB_USER,
+        "DB_HOST": DB_HOST,
+        "DB_NAME": DB_NAME,
+    }
+    missing_db_fields = [key for key, value in required_db_fields.items() if value is None]
+    if missing_db_fields:
+        raise RuntimeError(
+            f"Missing database configuration for: {', '.join(missing_db_fields)}. "
+            "Set them in your environment variables or settings module."
+        )
+
+    try:
+        db_port = int(DB_PORT) if DB_PORT is not None else 5432
+    except (TypeError, ValueError):
+        raise RuntimeError(f"Invalid DB_PORT value: {DB_PORT!r}. It must be an integer.")
+
+    db_url = URL.create(
+        drivername="postgresql+psycopg2",
+        username=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=db_port,
+        database=DB_NAME,
+    )
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url.render_as_string(hide_password=False)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         "pool_pre_ping": True,

@@ -10,6 +10,7 @@ DEFAULT_API_TITLE = 'Labubu API'
 DEFAULT_SWAGGER_URL = '/api-docs'
 DEFAULT_DEBUG = False
 DEFAULT_PORT = 5000
+DEFAULT_DB_PORT = 5432
 
 #------------------------------
 
@@ -24,7 +25,7 @@ DEBUG = str(os.getenv('DEBUG', DEFAULT_DEBUG)).lower() in ('t', 'true', '1', 'y'
 PORT = int(os.getenv('PORT', DEFAULT_PORT))
 HOST_NAME = os.getenv('HOST_NAME', f'http://localhost:{PORT}')
 DB_NAME = os.getenv('DB_NAME')
-DB_PORT = os.getenv('DB_PORT')
+DB_PORT = int(os.getenv('DB_PORT', DEFAULT_DB_PORT))
 DB_HOST = os.getenv('DB_HOST')
 DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_USER = os.getenv('DB_USER')
