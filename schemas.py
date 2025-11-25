@@ -23,3 +23,16 @@ class PatientRegisterSchema(UserRegisterSchema):
 class DoctorRegisterSchema(UserRegisterSchema):
     """Schema for doctor registration data."""
     patients = fields.List(fields.Email(), required=False, metadata={"description": "List of patient emails associated with the doctor."})
+
+class UserLoginSchema(Schema):
+    """
+    Schema for user login data.
+    """
+    email = fields.Email(required=True, metadata={"description": "The email address of the user."})
+    password = fields.String(required=True, load_only=True, metadata={"description": "The password for the user."})
+
+class UserLoginResponseSchema(Schema):
+    """
+    Schema for user login response data.
+    """
+    access_token = fields.String(required=True, metadata={"description": "Authentication token for the user."})

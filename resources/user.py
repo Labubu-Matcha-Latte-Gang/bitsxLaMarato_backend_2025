@@ -1,14 +1,14 @@
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import Response
+from flask import Response, jsonify
 
 from db import db
 from helpers.debugger.logger import AbstractLogger
-from helpers.exceptions.user_exceptions import UserAlreadyExistsException
+from helpers.exceptions.user_exceptions import UserAlreadyExistsException, InvalidCredentialsException
 from models.patient import Patient
 from models.user import User
 from models.doctor import Doctor
-from schemas import PatientRegisterSchema, DoctorRegisterSchema
+from schemas import PatientRegisterSchema, DoctorRegisterSchema, UserLoginSchema, UserLoginResponseSchema
 
 blp = Blueprint('user', __name__, description='User related operations')
 
@@ -144,4 +144,40 @@ class DoctorRegister(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Doctor register failed", module="DoctorRegister", error=e)
+            abort(500, message=str(e))
+
+@blp.route('/login')
+class UserLogin(MethodView):
+    """
+    User Login Endpoint
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @blp.arguments(UserLoginSchema, location='json')
+    @blp.response(200, schema=UserLoginResponseSchema, description="User successfully logged in")
+    @blp.response(400, description="Bad Request")
+    @blp.response(401, description="Unauthorized")
+    @blp.response(422, description="Unprocessable Entity")
+    @blp.response(500, description="Internal Server Error")
+    def post(self, data: dict) -> Response:
+        """Login a user"""
+        try:
+            user:User|None = User.query.get(data['email'])
+            if user and user.check_password(data['password']):
+                access_token = user.generate_jwt()
+                return {"access_token": access_token}, 200
+            else:
+                raise InvalidCredentialsException("Invalid email or password.")
+        except KeyError as e:
+            self.logger.error("User login failed due to missing field", module="UserLogin", error=e)
+            abort(400, message=f"Missing field: {str(e)}")
+        except InvalidCredentialsException as e:
+            self.logger.error("User login failed: Invalid credentials", module="UserLogin", metadata={"email": data['email']}, error=e)
+            abort(401, message=str(e))
+        except ValueError as e:
+            self.logger.error("User login failed: Value Error", module="UserLogin", error=e)
+            abort(422, message=str(e))
+        except Exception as e:
+            self.logger.error("User login failed", module="UserLogin", error=e)
             abort(500, message=str(e))
