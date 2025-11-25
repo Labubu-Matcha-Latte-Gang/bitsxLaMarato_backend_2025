@@ -1,10 +1,11 @@
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
 from flask import Response, jsonify
 
 from db import db
 from helpers.debugger.logger import AbstractLogger
-from helpers.exceptions.user_exceptions import UserAlreadyExistsException, InvalidCredentialsException
+from helpers.exceptions.user_exceptions import UserAlreadyExistsException, InvalidCredentialsException, UserNotFoundException
 from models.patient import Patient
 from models.user import User
 from models.doctor import Doctor
@@ -163,6 +164,7 @@ class UserLogin(MethodView):
     def post(self, data: dict) -> Response:
         """Login a user"""
         try:
+            self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
             user:User|None = User.query.get(data['email'])
             if user and user.check_password(data['password']):
                 access_token = user.generate_jwt()
@@ -180,4 +182,33 @@ class UserLogin(MethodView):
             abort(422, message=str(e))
         except Exception as e:
             self.logger.error("User login failed", module="UserLogin", error=e)
+            abort(500, message=str(e))
+
+@blp.route('')
+class UserCRUD(MethodView):
+    """
+    User CRUD Endpoint
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @jwt_required()
+    @blp.response(200, description="My user information retrieved successfully.")
+    @blp.response(401, description="Missing or invalid JWT.")
+    @blp.response(404, description="User not found.")
+    @blp.response(500, description="Internal Server Error")
+    def get(self):
+        """Get my user information."""
+        try:
+            self.logger.info("Fetching user information", module="UserCRUD")
+            email:str = get_jwt_identity()
+            user:User|None = User.query.get(email)
+            if not user:
+                raise UserNotFoundException("User not found.")
+            return jsonify(user.to_dict()), 200
+        except UserNotFoundException as e:
+            self.logger.error("User not found", module="UserCRUD", error=e)
+            abort(404, message=str(e))
+        except Exception as e:
+            self.logger.error("Fetching user information failed", module="UserCRUD", error=e)
             abort(500, message=str(e))
