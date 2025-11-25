@@ -49,3 +49,35 @@ class User(db.Model):
         """
         expires = expiration or timedelta(weeks=4)
         return create_access_token(identity=self.email, expires_delta=expires)
+    
+    def get_email(self) -> str:
+        """
+        Get the user's email
+        Returns:
+            str: The user's email
+        """
+        return self.email
+    
+    def get_name(self) -> str:
+        """
+        Get the user's name
+        Returns:
+            str: The user's name
+        """
+        return self.name
+    
+    def get_surname(self) -> str:
+        """
+        Get the user's surname
+        Returns:
+            str: The user's surname
+        """
+        return self.surname
+    
+    def set_password(self, new_password: str) -> None:
+        """
+        Set a new password for the user
+        Args:
+            new_password (str): The new password to set
+        """
+        self.password = self.hash_password(new_password)
