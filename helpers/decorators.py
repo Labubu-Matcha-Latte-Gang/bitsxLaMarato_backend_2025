@@ -21,7 +21,10 @@ def roles_required(roles: Sequence[UserRole]):
             if not user:
                 abort(401, message="Invalid authentication token.")
 
-            role = user.get_role_instance().get_role()
+            role_instance = user.get_role_instance()
+            if role_instance is None:
+                abort(403, message="You do not have the required role to access this resource.")
+            role = role_instance.get_role()
             if role not in roles:
                 abort(403, message="You do not have the required role to access this resource.")
             
