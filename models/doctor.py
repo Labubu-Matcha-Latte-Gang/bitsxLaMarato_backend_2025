@@ -33,6 +33,12 @@ class Doctor(db.Model):
         if patient in self.patients:
             self.patients.remove(patient)
 
+    def remove_all_patients(self) -> None:
+        """
+        Remove all patients from this doctor
+        """
+        self.patients.clear()
+
     def get_user(self) -> User:
         """
         Get the associated User object
