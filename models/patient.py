@@ -175,3 +175,19 @@ class Patient(db.Model):
             new_weight_kg (float | None): The new weight in kilograms to set
         """
         self.weight_kg = new_weight_kg
+
+    def to_dict(self) -> dict:
+        """
+        Convert the Patient object to a dictionary
+        Returns:
+            dict: A dictionary representation of the Patient object
+        """
+        return {
+            "ailments": self.ailments,
+            "gender": self.gender,
+            "age": self.age,
+            "treatments": self.treatments,
+            "height_cm": self.height_cm,
+            "weight_kg": self.weight_kg,
+            "doctors": [doctor.get_email() for doctor in self.doctors]
+        }

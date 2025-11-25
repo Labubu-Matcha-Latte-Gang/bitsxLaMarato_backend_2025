@@ -30,3 +30,11 @@ class Admin(db.Model):
         """
         user = self.get_user()
         user.set_email(new_email)
+
+    def to_dict(self) -> dict:
+        """
+        Convert the Admin object to a dictionary
+        Returns:
+            dict: A dictionary representation of the Admin object
+        """
+        return {}

@@ -134,3 +134,23 @@ class User(db.Model):
             new_surname (str): The new surname to set
         """
         self.surname = new_surname
+
+    def to_dict(self) -> dict:
+        """
+        Convert the user to a dictionary representation
+        Returns:
+            dict: The dictionary representation of the user
+        """
+        role = self.get_role_instance()
+        if role is None:
+            return {
+                "email": self.email,
+                "name": self.name,
+                "surname": self.surname
+            }
+        return {
+            "email": self.email,
+            "name": self.name,
+            "surname": self.surname,
+            "role": role.to_dict()
+        }
