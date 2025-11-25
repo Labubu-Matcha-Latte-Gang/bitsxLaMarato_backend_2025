@@ -56,3 +56,11 @@ class Patient(db.Model):
         """
         user = self.get_user()
         user.set_email(new_email)
+
+    def set_ailments(self, new_ailments: str | None) -> None:
+        """
+        Set new ailments for the patient
+        Args:
+            new_ailments (str | None): The new ailments to set
+        """
+        self.ailments = new_ailments

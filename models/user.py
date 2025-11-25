@@ -114,3 +114,19 @@ class User(db.Model):
         role_instance = self.get_role_instance()
         if role_instance:
             role_instance.email = new_email
+
+    def set_name(self, new_name: str) -> None:
+        """
+        Set a new name for the user
+        Args:
+            new_name (str): The new name to set
+        """
+        self.name = new_name
+
+    def set_surname(self, new_surname: str) -> None:
+        """
+        Set a new surname for the user
+        Args:
+            new_surname (str): The new surname to set
+        """
+        self.surname = new_surname
