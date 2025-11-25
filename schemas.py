@@ -1,6 +1,12 @@
 from marshmallow import Schema, fields
 from helpers.enums.gender import Gender
 
+class PatientEmailPathSchema(Schema):
+    """
+    Schema for retrieving patient data by email via the URL path.
+    """
+    email = fields.Email(required=True, metadata={"description": "Patient email to retrieve data for."})
+
 class UserRegisterSchema(Schema):
     """
     Schema for user registration data.

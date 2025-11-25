@@ -2,6 +2,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
 from flask import Response, jsonify
+from werkzeug.exceptions import HTTPException
 
 from db import db
 from helpers.debugger.logger import AbstractLogger
@@ -9,7 +10,9 @@ from helpers.exceptions.user_exceptions import UserAlreadyExistsException, Inval
 from models.patient import Patient
 from models.user import User
 from models.doctor import Doctor
-from schemas import PatientRegisterSchema, DoctorRegisterSchema, UserLoginSchema, UserLoginResponseSchema
+from schemas import PatientRegisterSchema, DoctorRegisterSchema, UserLoginSchema, UserLoginResponseSchema, PatientEmailPathSchema
+from helpers.decorators import roles_required
+from helpers.enums.user_role import UserRole
 
 blp = Blueprint('user', __name__, description='User related operations')
 
@@ -211,4 +214,55 @@ class UserCRUD(MethodView):
             abort(404, message=str(e))
         except Exception as e:
             self.logger.error("Fetching user information failed", module="UserCRUD", error=e)
+            abort(500, message=str(e))
+
+@blp.route('/<string:email>')
+class PatientData(MethodView):
+    """
+    Patient data access endpoint for admins and authorized doctors.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.ADMIN, UserRole.DOCTOR])
+    @blp.arguments(PatientEmailPathSchema, location="path")
+    @blp.response(200, description="Patient information retrieved successfully.")
+    @blp.response(400, description="Bad Request")
+    @blp.response(401, description="Missing or invalid JWT.")
+    @blp.response(403, description="Forbidden")
+    @blp.response(404, description="Patient not found.")
+    @blp.response(500, description="Internal Server Error")
+    def get(self, path_args: dict):
+        """Get patient information by email for admins or assigned doctors."""
+        patient_email = None
+        try:
+            patient_email = path_args.get('email')
+
+            self.logger.info(
+                "Fetching patient information",
+                module="PatientData",
+                metadata={"patient_email": patient_email}
+            )
+
+            patient: Patient | None = Patient.query.get(patient_email)
+            if not patient:
+                raise UserNotFoundException("Patient not found.")
+
+            current_user_email: str = get_jwt_identity()
+            current_user: User | None = User.query.get(current_user_email)
+            if not current_user:
+                abort(401, message="Invalid authentication token.")
+
+            role_instance = current_user.get_role_instance()
+            if isinstance(role_instance, Doctor) and patient not in role_instance.patients:
+                abort(403, message="You do not have permission to access this patient's data.")
+
+            return jsonify(patient.get_user().to_dict()), 200
+        except UserNotFoundException as e:
+            self.logger.error("Patient not found", module="PatientData", metadata={"patient_email": patient_email}, error=e)
+            abort(404, message=str(e))
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            self.logger.error("Fetching patient information failed", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(500, message=str(e))
