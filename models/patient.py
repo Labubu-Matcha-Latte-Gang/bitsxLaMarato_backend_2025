@@ -11,8 +11,8 @@ class Patient(db.Model):
     gender = db.Column(db.Enum(Gender), nullable=False)
     age = db.Column(db.Integer, nullable=False)
     treatments = db.Column(db.String(2048), nullable=True)
-    height_cm = db.Column(db.Float, nullable=True)
-    weight_kg = db.Column(db.Float, nullable=True)
+    height_cm = db.Column(db.Float, nullable=False)
+    weight_kg = db.Column(db.Float, nullable=False)
     user = db.relationship('User', back_populates='patient', uselist=False)
     doctors: list = db.relationship(
         'Doctor',
@@ -109,3 +109,67 @@ class Patient(db.Model):
             new_gender (Gender): The new gender to set
         """
         self.gender = new_gender
+
+    def get_age(self) -> int:
+        """
+        Get the patient's age
+        Returns:
+            int: The patient's age
+        """
+        return self.age
+    
+    def set_age(self, new_age: int) -> None:
+        """
+        Set a new age for the patient
+        Args:
+            new_age (int): The new age to set
+        """
+        self.age = new_age
+
+    def get_treatments(self) -> str | None:
+        """
+        Get the patient's treatments
+        Returns:
+            str | None: The patient's treatments
+        """
+        return self.treatments
+    
+    def set_treatments(self, new_treatments: str | None) -> None:
+        """
+        Set new treatments for the patient
+        Args:
+            new_treatments (str | None): The new treatments to set
+        """
+        self.treatments = new_treatments
+
+    def get_height_cm(self) -> float | None:
+        """
+        Get the patient's height in centimeters
+        Returns:
+            float | None: The patient's height in centimeters
+        """
+        return self.height_cm
+    
+    def set_height_cm(self, new_height_cm: float | None) -> None:
+        """
+        Set a new height in centimeters for the patient
+        Args:
+            new_height_cm (float | None): The new height in centimeters to set
+        """
+        self.height_cm = new_height_cm
+
+    def get_weight_kg(self) -> float | None:
+        """
+        Get the patient's weight in kilograms
+        Returns:
+            float | None: The patient's weight in kilograms
+        """
+        return self.weight_kg
+    
+    def set_weight_kg(self, new_weight_kg: float | None) -> None:
+        """
+        Set a new weight in kilograms for the patient
+        Args:
+            new_weight_kg (float | None): The new weight in kilograms to set
+        """
+        self.weight_kg = new_weight_kg
