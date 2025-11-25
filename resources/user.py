@@ -55,6 +55,8 @@ class PatientRegister(MethodView):
             patient = Patient(**patient_payload)
             db.session.add(patient)
             db.session.commit()
+
+            return Response(status=201)
         except KeyError as e:
             self.logger.error("Patient register failed due to missing field", module="PatientRegister", error=e)
             abort(400, message=f"Missing field: {str(e)}")
