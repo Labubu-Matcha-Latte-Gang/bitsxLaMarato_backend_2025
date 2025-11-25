@@ -2,8 +2,9 @@ from db import db
 
 from helpers.enums.user_role import UserRole
 from models.associations import DoctorPatientAssociation
+from models.interfaces import IUserRole
 
-class Doctor(db.Model):
+class Doctor(db.Model, IUserRole):
     __tablename__ = 'doctors'
 
     email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
@@ -51,6 +52,12 @@ class Doctor(db.Model):
         """
         for patient in list(self.patients):
             self.remove_patients({patient})
+
+    def remove_all_associations(self) -> None:
+        """
+        Remove all associations with patients
+        """
+        self.remove_all_patients()
 
     def get_user(self):
         """
@@ -102,3 +109,19 @@ class Doctor(db.Model):
             UserRole: The role of this user
         """
         return UserRole.DOCTOR
+
+    def set_properties(self, data: dict) -> None:
+        """
+        Set multiple properties of the doctor from a dictionary
+        Args:
+            data (dict): A dictionary containing the properties to set
+        """
+        if 'patients' in data:
+            new_patients = data.get('patients') or {}
+            self.add_patients(new_patients)
+    
+    def doctor_of_this_patient(self, patient) -> bool:
+        """
+        Check if this doctor is associated with the given patient.
+        """
+        return patient in self.patients

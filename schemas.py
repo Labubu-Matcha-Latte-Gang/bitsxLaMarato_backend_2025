@@ -24,6 +24,38 @@ class UserResponseSchema(Schema):
         },
     )
 
+class UserUpdateSchema(Schema):
+    """
+    Schema for full user updates (PUT).
+    """
+    name = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "Updated name of the user."})
+    surname = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "Updated surname of the user."})
+    password = fields.String(required=False, load_only=True, metadata={"description": "New password for the user."})
+    ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
+    gender = fields.Enum(Gender, required=False, metadata={"description": "Patient gender."})
+    age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
+    treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient treatments."})
+    height_cm = fields.Float(required=False, allow_none=False, metadata={"description": "Patient height in centimeters."})
+    weight_kg = fields.Float(required=False, allow_none=False, metadata={"description": "Patient weight in kilograms."})
+    doctors = fields.List(fields.Email(), required=False, metadata={"description": "List of doctor emails for the patient."})
+    patients = fields.List(fields.Email(), required=False, metadata={"description": "List of patient emails for the doctor."})
+
+class UserPartialUpdateSchema(Schema):
+    """
+    Schema for partial user updates (PATCH).
+    """
+    name = fields.String(required=False, validate=lambda s: len(s) <= 80, metadata={"description": "Updated name of the user."})
+    surname = fields.String(required=False, validate=lambda s: len(s) <= 80, metadata={"description": "Updated surname of the user."})
+    password = fields.String(required=False, load_only=True, metadata={"description": "New password for the user."})
+    ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
+    gender = fields.Enum(Gender, required=False, metadata={"description": "Patient gender."})
+    age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
+    treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient treatments."})
+    height_cm = fields.Float(required=False, allow_none=False, metadata={"description": "Patient height in centimeters."})
+    weight_kg = fields.Float(required=False, allow_none=False, metadata={"description": "Patient weight in kilograms."})
+    doctors = fields.List(fields.Email(), required=False, metadata={"description": "List of doctor emails for the patient."})
+    patients = fields.List(fields.Email(), required=False, metadata={"description": "List of patient emails for the doctor."})
+
 class UserRegisterSchema(Schema):
     """
     Schema for user registration data.

@@ -6,7 +6,8 @@ from werkzeug.exceptions import HTTPException
 
 from db import db
 from helpers.debugger.logger import AbstractLogger
-from helpers.exceptions.user_exceptions import UserAlreadyExistsException, InvalidCredentialsException, UserNotFoundException
+from helpers.exceptions.user_exceptions import UnauthorizedAccessException, UserAlreadyExistsException, InvalidCredentialsException, UserNotFoundException
+from models.admin import Admin
 from models.patient import Patient
 from models.user import User
 from models.doctor import Doctor
@@ -17,6 +18,8 @@ from schemas import (
     UserLoginResponseSchema,
     PatientEmailPathSchema,
     UserResponseSchema,
+    UserUpdateSchema,
+    UserPartialUpdateSchema,
 )
 from helpers.decorators import roles_required
 from helpers.enums.user_role import UserRole
@@ -223,6 +226,141 @@ class UserCRUD(MethodView):
             self.logger.error("Fetching user information failed", module="UserCRUD", error=e)
             abort(500, message=str(e))
 
+    @jwt_required()
+    @blp.arguments(UserUpdateSchema, location='json')
+    @blp.response(200, schema=UserResponseSchema, description="User information updated successfully.")
+    @blp.response(400, description="Bad Request")
+    @blp.response(401, description="Missing or invalid JWT.")
+    @blp.response(404, description="User not found.")
+    @blp.response(500, description="Internal Server Error")
+    def put(self, data: dict):
+        """Replace user information (name, surname, and optionally password)."""
+        try:
+            email: str = get_jwt_identity()
+            user: User | None = User.query.get(email)
+            if not user:
+                raise UserNotFoundException("User not found.")
+
+            update_fields = [field for field in data.keys() if field != "password"]
+            self.logger.info(
+                "Updating user information (PUT)",
+                module="UserCRUD",
+                metadata={"email": email, "fields_updated": update_fields}
+            )
+
+            user.set_properties(data)
+
+            doctor_emails:list[str] = data.get('doctors') or []
+            new_doctors = {Doctor.query.get(email) for email in doctor_emails}
+            data['doctors'] = new_doctors
+
+            patient_emails:list[str] = data.get('patients') or []
+            new_patients = {Patient.query.get(email) for email in patient_emails}
+            data['patients'] = new_patients
+
+            role_instance = user.get_role_instance()
+            if role_instance:
+                role_instance.remove_all_associations()
+                role_instance.set_properties(data)
+
+            db.session.commit()
+            return jsonify(user.to_dict()), 200
+        except UserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("User not found", module="UserCRUD", error=e)
+            abort(404, message=str(e))
+        except HTTPException as e:
+            db.session.rollback()
+            raise e
+        except Exception as e:
+            db.session.rollback()
+            self.logger.error("Updating user information failed", module="UserCRUD", error=e)
+            abort(500, message=str(e))
+
+    @jwt_required()
+    @blp.arguments(UserPartialUpdateSchema, location='json')
+    @blp.response(200, schema=UserResponseSchema, description="User information partially updated successfully.")
+    @blp.response(400, description="Bad Request")
+    @blp.response(401, description="Missing or invalid JWT.")
+    @blp.response(404, description="User not found.")
+    @blp.response(500, description="Internal Server Error")
+    def patch(self, data: dict):
+        """Partially update user information (name, surname, or password)."""
+        try:
+            if not data:
+                abort(400, message="No data provided for update.")
+
+            email: str = get_jwt_identity()
+            user: User | None = User.query.get(email)
+            if not user:
+                raise UserNotFoundException("User not found.")
+
+            update_fields = [field for field in data.keys() if field != "password"]
+            self.logger.info(
+                "Updating user information (PATCH)",
+                module="UserCRUD",
+                metadata={"email": email, "fields_updated": update_fields}
+            )
+
+            user.set_properties(data)
+
+            doctor_emails:list[str] = data.get('doctors') or []
+            new_doctors = {Doctor.query.get(email) for email in doctor_emails}
+            data['doctors'] = new_doctors
+
+            patient_emails:list[str] = data.get('patients') or []
+            new_patients = {Patient.query.get(email) for email in patient_emails}
+            data['patients'] = new_patients
+
+            role_instance = user.get_role_instance()
+            if role_instance:
+                role_instance.set_properties(data)
+
+            db.session.commit()
+            return jsonify(user.to_dict()), 200
+        except UserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("User not found", module="UserCRUD", error=e)
+            abort(404, message=str(e))
+        except HTTPException as e:
+            db.session.rollback()
+            raise e
+        except Exception as e:
+            db.session.rollback()
+            self.logger.error("Partially updating user information failed", module="UserCRUD", error=e)
+            abort(500, message=str(e))
+
+    @jwt_required()
+    @blp.response(204, description="User deleted successfully.")
+    @blp.response(401, description="Missing or invalid JWT.")
+    @blp.response(404, description="User not found.")
+    @blp.response(500, description="Internal Server Error")
+    def delete(self):
+        """Delete the authenticated user."""
+        try:
+            email: str = get_jwt_identity()
+            user: User | None = User.query.get(email)
+            if not user:
+                raise UserNotFoundException("User not found.")
+
+            self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
+
+            role_instance = user.get_role_instance()
+            role_instance.remove_all_associations()
+
+            db.session.delete(user)
+            db.session.commit()
+
+            return Response(status=204)
+        except UserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("User not found", module="UserCRUD", error=e)
+            abort(404, message=str(e))
+        except Exception as e:
+            db.session.rollback()
+            self.logger.error("Deleting user failed", module="UserCRUD", error=e)
+            abort(500, message=str(e))
+
 @blp.route('/<string:email>')
 class PatientData(MethodView):
     """
@@ -260,15 +398,21 @@ class PatientData(MethodView):
             if not current_user:
                 abort(401, message="Invalid authentication token.")
 
-            role_instance = current_user.get_role_instance()
-            if isinstance(role_instance, Doctor) and patient not in role_instance.patients:
+            role_instance:Admin|Doctor|None = current_user.get_role_instance()
+            if not role_instance:
+                raise UnauthorizedAccessException("User has no role assigned.")
+            if not role_instance.doctor_of_this_patient(patient):
                 abort(403, message="You do not have permission to access this patient's data.")
 
             return jsonify(patient.get_user().to_dict()), 200
+        except UnauthorizedAccessException as e:
+            self.logger.error("Unauthorized access attempt", module="PatientData", metadata={"patient_email": patient_email}, error=e)
+            abort(403, message=str(e))
         except UserNotFoundException as e:
             self.logger.error("Patient not found", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(404, message=str(e))
         except HTTPException as e:
+            self.logger.error("HTTP exception occurred", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             raise e
         except Exception as e:
             self.logger.error("Fetching patient information failed", module="PatientData", metadata={"patient_email": patient_email}, error=e)

@@ -9,3 +9,7 @@ class InvalidCredentialsException(Exception):
 class UserNotFoundException(Exception):
     """Exception raised when a user is not found."""
     pass
+
+class UnauthorizedAccessException(Exception):
+    """Exception raised when a user tries to access a resource they are not authorized for."""
+    pass

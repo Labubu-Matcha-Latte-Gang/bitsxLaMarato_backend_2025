@@ -1,3 +1,4 @@
+from models.interfaces import IUserRole
 from models.patient import Patient
 from models.doctor import Doctor
 from models.admin import Admin
@@ -90,11 +91,11 @@ class User(db.Model):
         """
         self.password = self.hash_password(new_password)
 
-    def get_role_instance(self) -> Patient | Doctor | Admin | None:
+    def get_role_instance(self) -> IUserRole | None:
         """
         Get the role instance associated with the user
         Returns:
-            Patient | Doctor | Admin | None: The associated role instance or None if no role is assigned
+            IUserRole | None: The associated role instance or None if no role is assigned
         """
         if self.patient:
             return self.patient
@@ -154,3 +155,18 @@ class User(db.Model):
             "surname": self.surname,
             "role": role.to_dict()
         }
+    
+    def set_properties(self, data: dict) -> None:
+        """
+        Set multiple properties of the user from a dictionary
+        Args:
+            data (dict): A dictionary containing the properties to set
+        """
+        if 'email' in data:
+            self.set_email(data['email'])
+        if 'name' in data:
+            self.set_name(data['name'])
+        if 'surname' in data:
+            self.set_surname(data['surname'])
+        if 'password' in data:
+            self.set_password(data['password'])

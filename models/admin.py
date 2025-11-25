@@ -1,7 +1,8 @@
 from db import db
 from helpers.enums.user_role import UserRole
+from models.interfaces import IUserRole
 
-class Admin(db.Model):
+class Admin(db.Model, IUserRole):
     __tablename__ = 'admins'
 
     email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
@@ -47,3 +48,23 @@ class Admin(db.Model):
             UserRole: The role of this user
         """
         return UserRole.ADMIN
+
+    def doctor_of_this_patient(self, patient) -> bool:
+        """
+        Admins are allowed to access any patient.
+        """
+        return True
+    
+    def remove_all_associations(self) -> None:
+        """
+        Remove all associations with other entities
+        """
+        return  # No associations to remove for Admin at this time
+    
+    def set_properties(self, data: dict) -> None:
+        """
+        Set multiple properties of the admin from a dictionary
+        Args:
+            data (dict): A dictionary containing the properties to set
+        """
+        return  # No additional properties to set for Admin at this time
