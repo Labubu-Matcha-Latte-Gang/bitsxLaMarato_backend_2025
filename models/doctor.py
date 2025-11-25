@@ -30,3 +30,20 @@ class Doctor(db.Model):
             list: The doctor's patients
         """
         return self.patients
+    
+    def get_email(self) -> str:
+        """
+        Get the doctor's email
+        Returns:
+            str: The doctor's email
+        """
+        return self.email
+    
+    def set_email(self, new_email: str) -> None:
+        """
+        Set a new email for the doctor
+        Args:
+            new_email (str): The new email to set
+        """
+        user = self.get_user()
+        user.set_email(new_email)

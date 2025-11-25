@@ -103,3 +103,14 @@ class User(db.Model):
         if self.admin:
             return self.admin
         return None
+    
+    def set_email(self, new_email: str) -> None:
+        """
+        Set a new email for the user
+        Args:
+            new_email (str): The new email to set
+        """
+        self.email = new_email
+        role_instance = self.get_role_instance()
+        if role_instance:
+            role_instance.email = new_email

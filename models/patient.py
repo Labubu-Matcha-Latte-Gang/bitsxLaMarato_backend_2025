@@ -39,3 +39,20 @@ class Patient(db.Model):
             list: The patient's doctors
         """
         return self.doctors
+    
+    def get_email(self) -> str:
+        """
+        Get the patient's email
+        Returns:
+            str: The patient's email
+        """
+        return self.email
+    
+    def set_email(self, new_email: str) -> None:
+        """
+        Set a new email for the patient
+        Args:
+            new_email (str): The new email to set
+        """
+        user = self.get_user()
+        user.set_email(new_email)
