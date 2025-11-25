@@ -1,18 +1,26 @@
+from models.patient import Patient
+from models.doctor import Doctor
+from models.admin import Admin
+
 from db import db
 import bcrypt
 from flask_jwt_extended import create_access_token
 from datetime import timedelta
 
+
 class User(db.Model):
     __tablename__ = 'users'
-    
     email = db.Column(db.String(120), primary_key=True)
     password = db.Column(db.String(128), nullable=False)
     name = db.Column(db.String(80), nullable=False)
     surname = db.Column(db.String(80), nullable=False)
 
+    patient: Patient | None = db.relationship('Patient', back_populates='user', uselist=False, cascade='all, delete-orphan')
+    doctor: Doctor | None = db.relationship('Doctor', back_populates='user', uselist=False, cascade='all, delete-orphan')
+    admin: Admin | None = db.relationship('Admin', back_populates='user', uselist=False, cascade='all, delete-orphan')
+
     def __repr__(self):
-        return f"<User {self.name} {self.surname}, with email {self.email}>"
+        return f"<User {self.name} {self.surname}, email {self.email}>"
     
     @staticmethod
     def hash_password(password: str) -> str:
@@ -81,3 +89,17 @@ class User(db.Model):
             new_password (str): The new password to set
         """
         self.password = self.hash_password(new_password)
+
+    def get_role_instance(self) -> Patient | Doctor | Admin | None:
+        """
+        Get the role instance associated with the user
+        Returns:
+            Patient | Doctor | Admin | None: The associated role instance or None if no role is assigned
+        """
+        if self.patient:
+            return self.patient
+        if self.doctor:
+            return self.doctor
+        if self.admin:
+            return self.admin
+        return None
