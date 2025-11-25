@@ -1,12 +1,14 @@
 from db import db
 
 from models.associations import DoctorPatientAssociation
+from helpers.enums.gender import Gender
 
 class Patient(db.Model):
     __tablename__ = 'patients'
 
     email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
     ailments = db.Column(db.String(1024), nullable=True)
+    gender = db.Column(db.Enum(Gender), nullable=False)
     user = db.relationship('User', back_populates='patient', uselist=False)
     doctors: list = db.relationship(
         'Doctor',
@@ -87,3 +89,19 @@ class Patient(db.Model):
             new_ailments (str | None): The new ailments to set
         """
         self.ailments = new_ailments
+
+    def get_gender(self) -> Gender:
+        """
+        Get the patient's gender
+        Returns:
+            Gender: The patient's gender
+        """
+        return self.gender
+    
+    def set_gender(self, new_gender: Gender) -> None:
+        """
+        Set a new gender for the patient
+        Args:
+            new_gender (Gender): The new gender to set
+        """
+        self.gender = new_gender
