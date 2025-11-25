@@ -1,14 +1,13 @@
 from db import db
 
-from models.user import User
 from models.associations import DoctorPatientAssociation
 
 class Patient(db.Model):
     __tablename__ = 'patients'
 
-    email = db.Column(db.String(120), db.ForeignKey('users.email'), primary_key=True)
+    email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
     ailments = db.Column(db.String(1024), nullable=True)
-    user: User = db.relationship('User', back_populates='patient', uselist=False)
+    user = db.relationship('User', back_populates='patient', uselist=False)
     doctors: list = db.relationship(
         'Doctor',
         secondary=DoctorPatientAssociation.__table__,
@@ -40,7 +39,7 @@ class Patient(db.Model):
         """
         self.doctors.clear()
 
-    def get_user(self) -> User:
+    def get_user(self):
         """
         Get the associated User object
         Returns:

@@ -111,9 +111,13 @@ class User(db.Model):
             new_email (str): The new email to set
         """
         self.email = new_email
-        role_instance = self.get_role_instance()
-        if role_instance:
-            role_instance.email = new_email
+
+        if self.patient:
+            self.patient.email = new_email
+        if self.doctor:
+            self.doctor.email = new_email
+        if self.admin:
+            self.admin.email = new_email
 
     def set_name(self, new_name: str) -> None:
         """
