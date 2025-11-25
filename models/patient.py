@@ -7,9 +7,10 @@ class Patient(db.Model):
     __tablename__ = 'patients'
 
     email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
-    ailments = db.Column(db.String(1024), nullable=True)
+    ailments = db.Column(db.String(2048), nullable=True)
     gender = db.Column(db.Enum(Gender), nullable=False)
     age = db.Column(db.Integer, nullable=False)
+    treatments = db.Column(db.String(2048), nullable=True)
     user = db.relationship('User', back_populates='patient', uselist=False)
     doctors: list = db.relationship(
         'Doctor',
