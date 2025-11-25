@@ -7,6 +7,7 @@ from helpers.debugger.logger import AbstractLogger
 from helpers.exceptions.user_exceptions import UserAlreadyExistsException
 from models.patient import Patient
 from models.user import User
+from models.doctor import Doctor
 from schemas import PatientRegisterSchema
 
 blp = Blueprint('user', __name__, description='User related operations')
@@ -42,6 +43,7 @@ class PatientRegister(MethodView):
             }
             user = User(**user_payload)
 
+            doctors = {Doctor.query.get(email) for email in data.get('doctors', [])}
             patient = Patient(
                 ailments=data.get('ailments'),
                 gender=data['gender'],
@@ -51,6 +53,7 @@ class PatientRegister(MethodView):
                 weight_kg=data['weight_kg'],
                 user=user,
             )
+            patient.add_doctors(doctors)
 
             db.session.add(user)
             db.session.add(patient)

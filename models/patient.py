@@ -21,23 +21,25 @@ class Patient(db.Model):
         lazy=True,
     )
 
-    def add_doctor(self, doctor) -> None:
+    def add_doctors(self, doctors:set) -> None:
         """
-        Add a doctor to this patient if not already present
+        Add doctors to this patient if not already present
         Args:
-            doctor (Doctor): The doctor to add
+            doctors (set[Doctor]): The doctors to add
         """
-        if doctor not in self.doctors:
-            self.doctors.append(doctor)
+        for doctor in doctors:
+            if doctor is not None and doctor not in self.doctors:
+                self.doctors.append(doctor)
 
-    def remove_doctor(self, doctor) -> None:
+    def remove_doctors(self, doctors:set) -> None:
         """
-        Remove a doctor from this patient if present
+        Remove doctors from this patient if present
         Args:
-            doctor (Doctor): The doctor to remove
+            doctors (set[Doctor]): The doctor to remove
         """
-        if doctor in self.doctors:
-            self.doctors.remove(doctor)
+        for doctor in doctors:
+            if doctor in self.doctors:
+                self.doctors.remove(doctor)
 
     def remove_all_doctors(self) -> None:
         """
