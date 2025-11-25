@@ -11,6 +11,8 @@ class Patient(db.Model):
     gender = db.Column(db.Enum(Gender), nullable=False)
     age = db.Column(db.Integer, nullable=False)
     treatments = db.Column(db.String(2048), nullable=True)
+    height_cm = db.Column(db.Float, nullable=True)
+    weight_kg = db.Column(db.Float, nullable=True)
     user = db.relationship('User', back_populates='patient', uselist=False)
     doctors: list = db.relationship(
         'Doctor',
