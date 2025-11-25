@@ -1,5 +1,6 @@
 from db import db
 
+from helpers.enums.user_role import UserRole
 from models.associations import DoctorPatientAssociation
 
 class Doctor(db.Model):
@@ -82,3 +83,11 @@ class Doctor(db.Model):
         return {
             "patients": [patient.get_email() for patient in self.patients]
         }
+    
+    def get_role(self) -> UserRole:
+        """
+        Get the role of this user
+        Returns:
+            UserRole: The role of this user
+        """
+        return UserRole.DOCTOR

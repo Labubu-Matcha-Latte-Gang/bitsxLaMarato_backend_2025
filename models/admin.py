@@ -1,4 +1,5 @@
 from db import db
+from helpers.enums.user_role import UserRole
 
 class Admin(db.Model):
     __tablename__ = 'admins'
@@ -38,3 +39,11 @@ class Admin(db.Model):
             dict: A dictionary representation of the Admin object
         """
         return {}
+    
+    def get_role(self) -> UserRole:
+        """
+        Get the role of this user
+        Returns:
+            UserRole: The role of this user
+        """
+        return UserRole.ADMIN
