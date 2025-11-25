@@ -18,3 +18,4 @@ class PatientRegisterSchema(UserRegisterSchema):
     treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "The treatments of the patient."})
     height_cm = fields.Float(required=True, allow_none=False, metadata={"description": "The height of the patient in centimeters."})
     weight_kg = fields.Float(required=True, allow_none=False, metadata={"description": "The weight of the patient in kilograms."})
+    doctors = fields.List(fields.Email(), required=False, metadata={"description": "List of doctor emails associated with the patient."})
