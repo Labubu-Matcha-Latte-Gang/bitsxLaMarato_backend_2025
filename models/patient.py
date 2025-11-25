@@ -22,35 +22,42 @@ class Patient(db.Model):
         lazy=True,
     )
 
-    def add_doctors(self, doctors:set) -> None:
+    def add_doctors(self, doctors:set, sync_with_doctor: bool = True) -> None:
         """
         Add doctors to this patient if not already present
         Args:
             doctors (set[Doctor]): The doctors to add
+            sync_with_doctor (bool): Whether to update the doctor side as well
         """
         for doctor in doctors:
-            if doctor is not None and doctor not in self.doctors:
-                doctor.add_patients({self})
+            if doctor is None:
+                continue
+            if doctor not in self.doctors:
                 self.doctors.append(doctor)
+            if sync_with_doctor and self not in doctor.patients:
+                doctor.add_patients({self}, sync_with_patient=False)
 
-    def remove_doctors(self, doctors:set) -> None:
+    def remove_doctors(self, doctors:set, sync_with_doctor: bool = True) -> None:
         """
         Remove doctors from this patient if present
         Args:
             doctors (set[Doctor]): The doctor to remove
+            sync_with_doctor (bool): Whether to update the doctor side as well
         """
         for doctor in doctors:
+            if doctor is None:
+                continue
             if doctor in self.doctors:
-                doctor.remove_patients({self})
                 self.doctors.remove(doctor)
+            if sync_with_doctor and self in doctor.patients:
+                doctor.remove_patients({self}, sync_with_patient=False)
 
     def remove_all_doctors(self) -> None:
         """
         Remove all doctors from this patient
         """
-        self.doctors.clear()
-        for doctor in self.doctors:
-            doctor.remove_patients({self})
+        for doctor in list(self.doctors):
+            self.remove_doctors({doctor})
 
     def get_user(self):
         """
