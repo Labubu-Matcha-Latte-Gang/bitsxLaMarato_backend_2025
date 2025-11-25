@@ -30,6 +30,7 @@ class Patient(db.Model):
         """
         for doctor in doctors:
             if doctor is not None and doctor not in self.doctors:
+                doctor.add_patients({self})
                 self.doctors.append(doctor)
 
     def remove_doctors(self, doctors:set) -> None:
@@ -40,6 +41,7 @@ class Patient(db.Model):
         """
         for doctor in doctors:
             if doctor in self.doctors:
+                doctor.remove_patients({self})
                 self.doctors.remove(doctor)
 
     def remove_all_doctors(self) -> None:
@@ -47,6 +49,8 @@ class Patient(db.Model):
         Remove all doctors from this patient
         """
         self.doctors.clear()
+        for doctor in self.doctors:
+            doctor.remove_patients({self})
 
     def get_user(self):
         """
