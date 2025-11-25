@@ -15,6 +15,24 @@ class Doctor(db.Model):
         lazy=True,
     )
 
+    def add_patient(self, patient) -> None:
+        """
+        Add a patient to this doctor if not already present
+        Args:
+            patient (Patient): The patient to add
+        """
+        if patient not in self.patients:
+            self.patients.append(patient)
+
+    def remove_patient(self, patient) -> None:
+        """
+        Remove a patient from this doctor if present
+        Args:
+            patient (Patient): The patient to remove
+        """
+        if patient in self.patients:
+            self.patients.remove(patient)
+
     def get_user(self) -> User:
         """
         Get the associated User object
