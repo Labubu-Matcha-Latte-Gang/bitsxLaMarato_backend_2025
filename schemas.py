@@ -19,3 +19,7 @@ class PatientRegisterSchema(UserRegisterSchema):
     height_cm = fields.Float(required=True, allow_none=False, metadata={"description": "The height of the patient in centimeters."})
     weight_kg = fields.Float(required=True, allow_none=False, metadata={"description": "The weight of the patient in kilograms."})
     doctors = fields.List(fields.Email(), required=False, metadata={"description": "List of doctor emails associated with the patient."})
+
+class DoctorRegisterSchema(UserRegisterSchema):
+    """Schema for doctor registration data."""
+    patients = fields.List(fields.Email(), required=False, metadata={"description": "List of patient emails associated with the doctor."})
