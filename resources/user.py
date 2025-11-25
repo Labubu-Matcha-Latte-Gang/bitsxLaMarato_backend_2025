@@ -10,7 +10,14 @@ from helpers.exceptions.user_exceptions import UserAlreadyExistsException, Inval
 from models.patient import Patient
 from models.user import User
 from models.doctor import Doctor
-from schemas import PatientRegisterSchema, DoctorRegisterSchema, UserLoginSchema, UserLoginResponseSchema, PatientEmailPathSchema
+from schemas import (
+    PatientRegisterSchema,
+    DoctorRegisterSchema,
+    UserLoginSchema,
+    UserLoginResponseSchema,
+    PatientEmailPathSchema,
+    UserResponseSchema,
+)
 from helpers.decorators import roles_required
 from helpers.enums.user_role import UserRole
 
@@ -196,7 +203,7 @@ class UserCRUD(MethodView):
     logger = AbstractLogger.get_instance()
 
     @jwt_required()
-    @blp.response(200, description="My user information retrieved successfully.")
+    @blp.response(200, schema=UserResponseSchema, description="My user information retrieved successfully.")
     @blp.response(401, description="Missing or invalid JWT.")
     @blp.response(404, description="User not found.")
     @blp.response(500, description="Internal Server Error")
@@ -226,7 +233,7 @@ class PatientData(MethodView):
 
     @roles_required([UserRole.ADMIN, UserRole.DOCTOR])
     @blp.arguments(PatientEmailPathSchema, location="path")
-    @blp.response(200, description="Patient information retrieved successfully.")
+    @blp.response(200, schema=UserResponseSchema, description="Patient information retrieved successfully.")
     @blp.response(400, description="Bad Request")
     @blp.response(401, description="Missing or invalid JWT.")
     @blp.response(403, description="Forbidden")

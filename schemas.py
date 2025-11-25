@@ -7,6 +7,23 @@ class PatientEmailPathSchema(Schema):
     """
     email = fields.Email(required=True, metadata={"description": "Patient email to retrieve data for."})
 
+class UserResponseSchema(Schema):
+    """
+    Schema for user data responses (includes role-specific info when present).
+    """
+    email = fields.Email(required=True, metadata={"description": "User email."})
+    name = fields.String(required=True, metadata={"description": "User name."})
+    surname = fields.String(required=True, metadata={"description": "User surname."})
+    role = fields.Dict(
+        required=False,
+        metadata={
+            "description": (
+                "Role-specific data. For patients: ailments, gender, age, treatments, height_cm, weight_kg, "
+                "doctors (emails). For doctors: patients (emails). For admins: empty object."
+            )
+        },
+    )
+
 class UserRegisterSchema(Schema):
     """
     Schema for user registration data.
