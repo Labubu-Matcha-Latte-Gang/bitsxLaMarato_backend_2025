@@ -23,7 +23,7 @@ def roles_required(roles: Sequence[UserRole]):
 
             role_instance = user.get_role_instance()
             if role_instance is None:
-                abort(403, message="You do not have the required role to access this resource.")
+                abort(403, message="You do not have the required role to access this resource because you have no role assigned.")
             role = role_instance.get_role()
             if role not in roles:
                 abort(403, message="You do not have the required role to access this resource.")
