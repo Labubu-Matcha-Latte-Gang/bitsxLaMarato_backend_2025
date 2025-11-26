@@ -23,4 +23,4 @@ jobs:
           context: .
           push: true
 
-          tags: :latest
+          tags: kireee/api-bitsxlamarato:latest
