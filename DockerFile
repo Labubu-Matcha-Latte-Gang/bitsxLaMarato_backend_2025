@@ -21,5 +21,4 @@ COPY . .
 EXPOSE 5000
 
 # 8. Comando para iniciar la app usando Gunicorn
-# "app:app" significa: busca el archivo 'app.py' y dentro la variable 'app'
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
