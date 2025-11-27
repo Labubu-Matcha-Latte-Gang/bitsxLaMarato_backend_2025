@@ -7,6 +7,7 @@ from db import db
 import bcrypt
 from flask_jwt_extended import create_access_token
 from datetime import timedelta
+from helpers.exceptions.user_exceptions import UserRoleConflictException
 
 
 class User(db.Model):
@@ -24,6 +25,21 @@ class User(db.Model):
     def __repr__(self):
         return f"<User {self.name} {self.surname}, email {self.email}>"
     
+    def get_roles(self) -> list[IUserRole]:
+        """
+        Get all role instances associated with the user.
+        Returns:
+            list[IUserRole]: List of assigned role instances.
+        """
+        roles:list[IUserRole] = []
+        if self.patient:
+            roles.append(self.patient)
+        if self.doctor:
+            roles.append(self.doctor)
+        if self.admin:
+            roles.append(self.admin)
+        return roles
+
     @staticmethod
     def hash_password(password: str) -> str:
         """
@@ -92,19 +108,18 @@ class User(db.Model):
         """
         self.password = self.hash_password(new_password)
 
-    def get_role_instance(self) -> IUserRole | None:
+    def get_role_instance(self) -> IUserRole:
         """
         Get the role instance associated with the user
         Returns:
-            IUserRole | None: The associated role instance or None if no role is assigned
+            IUserRole: The associated role instance
+        Raises:
+            UserRoleConflictException: If the user has zero or multiple roles assigned.
         """
-        if self.patient:
-            return self.patient
-        if self.doctor:
-            return self.doctor
-        if self.admin:
-            return self.admin
-        return None
+        roles = self.get_roles()
+        if len(roles) != 1:
+            raise UserRoleConflictException("User must have exactly one role assigned.")
+        return roles[0]
     
     def set_email(self, new_email: str) -> None:
         """

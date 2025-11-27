@@ -10,6 +10,7 @@ from db import create_db
 
 from resources.health import blp as HealthBlueprint
 from resources.version import blp as VersionBlueprint
+from resources.user import blp as UserBlueprint
 
 def create_app(settings_module: str = 'globals') -> Flask:
     """
@@ -100,6 +101,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
     # HTTP routes
     api.register_blueprint(HealthBlueprint, url_prefix=getApiPrefix('health'))
     api.register_blueprint(VersionBlueprint, url_prefix=app.config['VERSION_ENDPOINT'])
+    api.register_blueprint(UserBlueprint, url_prefix=getApiPrefix('user'))
 
     with app.app_context():
         db = create_db(app)
@@ -130,4 +132,18 @@ def create_app(settings_module: str = 'globals') -> Flask:
 app = create_app(os.getenv('SETTINGS_MODULE', 'globals'))
 
 if __name__ == "__main__":
-    app.run(threaded=True, host="0.0.0.0", port=app.config.get('PORT', 5000), debug=app.config.get('DEBUG', False), use_reloader=app.config.get('DEBUG', False), allow_unsafe_werkzeug=True)
+    import inspect
+    from werkzeug.serving import run_simple
+
+    run_kwargs = dict(
+        threaded=True,
+        host="0.0.0.0",
+        port=app.config.get('PORT', 5000),
+        debug=app.config.get('DEBUG', False),
+        use_reloader=app.config.get('DEBUG', False),
+    )
+
+    if "allow_unsafe_werkzeug" in inspect.signature(run_simple).parameters:
+        run_kwargs["allow_unsafe_werkzeug"] = True
+
+    run_simple(app, **run_kwargs)
