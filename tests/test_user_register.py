@@ -15,15 +15,16 @@ class TestUserRegister(BaseTest):
         assert body["role"]["doctors"] == [doctor_user.email]
 
     def test_register_doctor_returns_user(self):
-        patient_user = self.create_patient_model()
-        payload = self.make_doctor_payload(patients=[patient_user.email])
+        patient_payload = self.make_patient_payload()
+        self.register_patient(patient_payload)
+        payload = self.make_doctor_payload(patients=[patient_payload["email"]])
 
         response = self.register_doctor(payload)
 
         assert response.status_code == 201
         body = response.get_json()
         assert body["email"] == payload["email"]
-        assert body["role"]["patients"] == [patient_user.email]
+        assert body["role"]["patients"] == [patient_payload["email"]]
 
     def test_register_patient_with_unknown_doctor_returns_404(self):
         payload = self.make_patient_payload(doctors=["missing@nowhere.com"])

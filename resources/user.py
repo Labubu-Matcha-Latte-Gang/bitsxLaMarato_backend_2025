@@ -92,10 +92,11 @@ class PatientRegister(MethodView):
                 email=data['email'],
                 user=user,
             )
-            patient.add_doctors(doctors)
 
             db.session.add(user)
             db.session.add(patient)
+            db.session.flush()
+            patient.add_doctors(doctors)
             db.session.commit()
 
             return jsonify(user.to_dict()), 201
@@ -161,10 +162,11 @@ class DoctorRegister(MethodView):
                 email=data['email'],
                 user=user,
             )
-            doctor.add_patients(patients)
 
             db.session.add(user)
             db.session.add(doctor)
+            db.session.flush()
+            doctor.add_patients(patients)
             db.session.commit()
 
             return jsonify(user.to_dict()), 201
