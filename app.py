@@ -146,4 +146,4 @@ if __name__ == "__main__":
     if "allow_unsafe_werkzeug" in inspect.signature(run_simple).parameters:
         run_kwargs["allow_unsafe_werkzeug"] = True
 
-    app.run(**run_kwargs)
+    run_simple(app, **run_kwargs)
