@@ -1,5 +1,6 @@
 import pytest
 from sqlalchemy import event
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from app import create_app
 from db import db
@@ -24,8 +25,8 @@ def db_connection(app):
 @pytest.fixture(scope="function")
 def db_session(app, db_connection):
     transaction = db_connection.begin()
-    options = dict(bind=db_connection, binds={})
-    session = db.create_scoped_session(options=options)
+    session_factory = sessionmaker(bind=db_connection)
+    session = scoped_session(session_factory)
     db.session = session
 
     session.begin_nested()
