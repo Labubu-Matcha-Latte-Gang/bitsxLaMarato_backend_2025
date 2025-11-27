@@ -96,7 +96,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
         'jwt', {'type': 'http', 'scheme': 'bearer', 'bearerFormat': 'JWT', 'x-bearerInfoFunc': 'app.decode_token'}
     )
 
-    api.spec.options["security"] = []
+    api.spec.options["security"] = [{"jwt": []}]
 
     # HTTP routes
     api.register_blueprint(HealthBlueprint, url_prefix=getApiPrefix('health'))
