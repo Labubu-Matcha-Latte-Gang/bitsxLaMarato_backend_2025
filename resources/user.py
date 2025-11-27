@@ -50,7 +50,6 @@ def _fetch_patients_by_email(emails: list[str]) -> set[Patient]:
     return patients
 
 @blp.route('/patient')
-@blp.doc(security=[])
 class PatientRegister(MethodView):
     """
     Patient Registration Endpoint
@@ -127,7 +126,6 @@ class PatientRegister(MethodView):
             abort(500, message=str(e))
 
 @blp.route('/doctor')
-@blp.doc(security=[])
 class DoctorRegister(MethodView):
     """
     Doctor Registration Endpoint
@@ -198,7 +196,6 @@ class DoctorRegister(MethodView):
             abort(500, message=str(e))
 
 @blp.route('/login')
-@blp.doc(security=[])
 class UserLogin(MethodView):
     """
     User Login Endpoint
@@ -240,7 +237,6 @@ class UserLogin(MethodView):
             abort(500, message=str(e))
 
 @blp.route('')
-@blp.doc(security=[{"jwt": []}])
 class UserCRUD(MethodView):
     """
     User CRUD Endpoint
@@ -428,7 +424,6 @@ class UserCRUD(MethodView):
             abort(500, message=str(e))
 
 @blp.route('/<string:email>')
-@blp.doc(security=[{"jwt": []}])
 class PatientData(MethodView):
     """
     Patient data access endpoint for admins and authorized doctors.
