@@ -33,8 +33,8 @@ class UserUpdateSchema(Schema):
     """
     Schema for full user updates (PUT).
     """
-    name = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "Updated name of the user."})
-    surname = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "Updated surname of the user."})
+    name = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "Updated name of the user."})
+    surname = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "Updated surname of the user."})
     password = fields.String(
         required=False,
         load_only=True,
@@ -54,8 +54,8 @@ class UserPartialUpdateSchema(Schema):
     """
     Schema for partial user updates (PATCH).
     """
-    name = fields.String(required=False, validate=lambda s: len(s) <= 80, metadata={"description": "Updated name of the user."})
-    surname = fields.String(required=False, validate=lambda s: len(s) <= 80, metadata={"description": "Updated surname of the user."})
+    name = fields.String(required=False, validate=validate.Length(max=80), metadata={"description": "Updated name of the user."})
+    surname = fields.String(required=False, validate=validate.Length(max=80), metadata={"description": "Updated surname of the user."})
     password = fields.String(
         required=False,
         load_only=True,
@@ -75,8 +75,8 @@ class UserRegisterSchema(Schema):
     """
     Schema for user registration data.
     """
-    name = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "The name of the user."})
-    surname = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "The surname of the user."})
+    name = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "The name of the user."})
+    surname = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "The surname of the user."})
     email = fields.Email(required=True, metadata={"description": "The email address of the user."})
     password = fields.String(
         required=True,
