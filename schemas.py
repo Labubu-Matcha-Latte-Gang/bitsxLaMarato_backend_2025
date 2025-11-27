@@ -1,5 +1,10 @@
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 from helpers.enums.gender import Gender
+
+password_complexity = validate.Regexp(
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$",
+    error="Password must contain at least one uppercase letter, one lowercase letter, and one number.",
+)
 
 class PatientEmailPathSchema(Schema):
     """
@@ -30,7 +35,12 @@ class UserUpdateSchema(Schema):
     """
     name = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "Updated name of the user."})
     surname = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "Updated surname of the user."})
-    password = fields.String(required=False, load_only=True, metadata={"description": "New password for the user."})
+    password = fields.String(
+        required=False,
+        load_only=True,
+        validate=password_complexity,
+        metadata={"description": "New password for the user."},
+    )
     ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
     gender = fields.Enum(Gender, required=False, metadata={"description": "Patient gender."})
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
@@ -46,7 +56,12 @@ class UserPartialUpdateSchema(Schema):
     """
     name = fields.String(required=False, validate=lambda s: len(s) <= 80, metadata={"description": "Updated name of the user."})
     surname = fields.String(required=False, validate=lambda s: len(s) <= 80, metadata={"description": "Updated surname of the user."})
-    password = fields.String(required=False, load_only=True, metadata={"description": "New password for the user."})
+    password = fields.String(
+        required=False,
+        load_only=True,
+        validate=password_complexity,
+        metadata={"description": "New password for the user."},
+    )
     ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
     gender = fields.Enum(Gender, required=False, metadata={"description": "Patient gender."})
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
@@ -63,7 +78,12 @@ class UserRegisterSchema(Schema):
     name = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "The name of the user."})
     surname = fields.String(required=True, validate=lambda s: len(s) <= 80, metadata={"description": "The surname of the user."})
     email = fields.Email(required=True, metadata={"description": "The email address of the user."})
-    password = fields.String(required=True, load_only=True, metadata={"description": "The password for the user."})
+    password = fields.String(
+        required=True,
+        load_only=True,
+        validate=password_complexity,
+        metadata={"description": "The password for the user."},
+    )
 
 class PatientRegisterSchema(UserRegisterSchema):
     """Schema for patient registration data."""
