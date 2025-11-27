@@ -19,6 +19,7 @@ marshmallow==4.1.0
 packaging==25.0
 psycopg2-binary==2.9.11
 PyJWT==2.10.1
+pytest==9.0.1
 python-dotenv==1.2.1
 SQLAlchemy==2.0.44
 typing_extensions==4.15.0
