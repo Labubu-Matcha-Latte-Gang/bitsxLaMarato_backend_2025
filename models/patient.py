@@ -206,7 +206,7 @@ class Patient(db.Model, IUserRole):
         """
         return {
             "ailments": self.ailments,
-            "gender": self.gender,
+            "gender": self.gender.value if self.gender else None,
             "age": self.age,
             "treatments": self.treatments,
             "height_cm": self.height_cm,

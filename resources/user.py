@@ -5,6 +5,7 @@ from flask import Response, jsonify
 from werkzeug.exceptions import HTTPException
 
 from db import db
+from sqlalchemy.exc import IntegrityError
 from helpers.debugger.logger import AbstractLogger
 from helpers.exceptions.user_exceptions import (
     UserAlreadyExistsException,
@@ -114,7 +115,7 @@ class PatientRegister(MethodView):
             db.session.rollback()
             self.logger.error("Patient register failed due to invalid data", module="PatientRegister", error=e)
             abort(422, message=str(e))
-        except db.IntegrityError as e:
+        except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to database integrity error", module="PatientRegister", error=e)
             abort(400, message="A user with this email already exists.")
@@ -183,7 +184,7 @@ class DoctorRegister(MethodView):
             db.session.rollback()
             self.logger.error("Doctor register failed due to invalid data", module="DoctorRegister", error=e)
             abort(422, message=str(e))
-        except db.IntegrityError as e:
+        except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to database integrity error", module="DoctorRegister", error=e)
             abort(400, message="A user with this email already exists.")
