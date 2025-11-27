@@ -4,6 +4,7 @@ from abc import ABC
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from flask_jwt_extended import create_access_token
 from helpers.enums.gender import Gender
 from models.admin import Admin
@@ -15,16 +16,19 @@ from models.user import User
 class BaseTest(ABC):
     """
     Base helper class for API integration tests.
+    Injects Flask app, client y sesión de DB vía fixture autouse.
     """
 
     default_password = "Password1"
 
-    def __init__(self, app, client, db_session):
+    @pytest.fixture(autouse=True)
+    def _inject_dependencies(self, app, client, db_session):
         self.app = app
         self.client = client
         self.db = db_session
         self.api_prefix: str = app.config["API_PREFIX"]
         self.version_endpoint: str = app.config["VERSION_ENDPOINT"]
+        yield
 
     @staticmethod
     def unique_email(prefix: str = "user") -> str:
