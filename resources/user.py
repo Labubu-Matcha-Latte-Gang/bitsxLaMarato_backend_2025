@@ -439,7 +439,7 @@ class PatientData(MethodView):
     @blp.response(403, description="Forbidden")
     @blp.response(404, description="Patient not found.")
     @blp.response(500, description="Internal Server Error")
-    def get(self, path_args: dict):
+    def get(self, path_args: dict, **kwargs):
         """Get patient information by email for admins or assigned doctors."""
         patient_email = None
         try:
