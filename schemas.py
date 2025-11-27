@@ -2,8 +2,8 @@ from marshmallow import Schema, fields, validate
 from helpers.enums.gender import Gender
 
 password_complexity = validate.Regexp(
-    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$",
-    error="Password must contain at least one uppercase letter, one lowercase letter, and one number.",
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
+    error="Password must contain at least one uppercase letter, one lowercase letter, one number, and be at least 8 characters long.",
 )
 
 class PatientEmailPathSchema(Schema):
