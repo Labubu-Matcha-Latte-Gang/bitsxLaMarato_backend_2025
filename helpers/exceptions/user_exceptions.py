@@ -13,3 +13,11 @@ class UserNotFoundException(Exception):
 class UnauthorizedAccessException(Exception):
     """Exception raised when a user tries to access a resource they are not authorized for."""
     pass
+
+class UserRoleConflictException(Exception):
+    """Exception raised when a user has zero or multiple roles assigned."""
+    pass
+
+class RelatedUserNotFoundException(Exception):
+    """Exception raised when related users (doctors/patients) are not found."""
+    pass
