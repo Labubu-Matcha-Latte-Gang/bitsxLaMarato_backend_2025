@@ -5,8 +5,15 @@ from flask import Response, jsonify
 from werkzeug.exceptions import HTTPException
 
 from db import db
+from sqlalchemy.exc import IntegrityError
 from helpers.debugger.logger import AbstractLogger
-from helpers.exceptions.user_exceptions import UnauthorizedAccessException, UserAlreadyExistsException, InvalidCredentialsException, UserNotFoundException
+from helpers.exceptions.user_exceptions import (
+    UserAlreadyExistsException,
+    InvalidCredentialsException,
+    UserNotFoundException,
+    UserRoleConflictException,
+    RelatedUserNotFoundException,
+)
 from models.admin import Admin
 from models.patient import Patient
 from models.user import User
@@ -21,10 +28,26 @@ from schemas import (
     UserUpdateSchema,
     UserPartialUpdateSchema,
 )
-from helpers.decorators import roles_required
-from helpers.enums.user_role import UserRole
 
 blp = Blueprint('user', __name__, description='User related operations')
+
+def _fetch_doctors_by_email(emails: list[str]) -> set[Doctor]:
+    doctors:set[Doctor] = set()
+    for email in emails:
+        doctor = Doctor.query.get(email)
+        if doctor is None:
+            raise RelatedUserNotFoundException(f"Doctor not found: {email}")
+        doctors.add(doctor)
+    return doctors
+
+def _fetch_patients_by_email(emails: list[str]) -> set[Patient]:
+    patients:set[Patient] = set()
+    for email in emails:
+        patient = Patient.query.get(email)
+        if patient is None:
+            raise RelatedUserNotFoundException(f"Patient not found: {email}")
+        patients.add(patient)
+    return patients
 
 @blp.route('/patient')
 class PatientRegister(MethodView):
@@ -57,7 +80,8 @@ class PatientRegister(MethodView):
             }
             user = User(**user_payload)
 
-            doctors = {Doctor.query.get(email) for email in data.get('doctors', [])}
+            doctor_emails:list[str] = data.get('doctors', []) or []
+            doctors = _fetch_doctors_by_email(doctor_emails)
             patient = Patient(
                 ailments=data.get('ailments'),
                 gender=data['gender'],
@@ -68,13 +92,14 @@ class PatientRegister(MethodView):
                 email=data['email'],
                 user=user,
             )
-            patient.add_doctors(doctors)
 
             db.session.add(user)
             db.session.add(patient)
+            db.session.flush()
+            patient.add_doctors(doctors)
             db.session.commit()
 
-            return Response(status=201)
+            return jsonify(user.to_dict()), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to missing field", module="PatientRegister", error=e)
@@ -83,11 +108,15 @@ class PatientRegister(MethodView):
             db.session.rollback()
             self.logger.error("Patient register failed: User already exists", module="PatientRegister", metadata={"email": data['email']}, error=e)
             abort(400, message=str(e))
+        except RelatedUserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("Patient register failed: Related doctor not found", module="PatientRegister", metadata={"email": data.get('email')}, error=e)
+            abort(404, message=str(e))
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to invalid data", module="PatientRegister", error=e)
             abort(422, message=str(e))
-        except db.IntegrityError as e:
+        except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to database integrity error", module="PatientRegister", error=e)
             abort(400, message="A user with this email already exists.")
@@ -127,18 +156,20 @@ class DoctorRegister(MethodView):
             }
             user = User(**user_payload)
 
-            patients = {Patient.query.get(email) for email in data.get('patients', [])}
+            patient_emails:list[str] = data.get('patients', []) or []
+            patients = _fetch_patients_by_email(patient_emails)
             doctor = Doctor(
                 email=data['email'],
                 user=user,
             )
-            doctor.add_patients(patients)
 
             db.session.add(user)
             db.session.add(doctor)
+            db.session.flush()
+            doctor.add_patients(patients)
             db.session.commit()
 
-            return Response(status=201)
+            return jsonify(user.to_dict()), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to missing field", module="DoctorRegister", error=e)
@@ -147,11 +178,15 @@ class DoctorRegister(MethodView):
             db.session.rollback()
             self.logger.error("Doctor register failed: User already exists", module="DoctorRegister", metadata={"email": data['email']}, error=e)
             abort(400, message=str(e))
+        except RelatedUserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("Doctor register failed: Related patient not found", module="DoctorRegister", metadata={"email": data.get('email')}, error=e)
+            abort(404, message=str(e))
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to invalid data", module="DoctorRegister", error=e)
             abort(422, message=str(e))
-        except db.IntegrityError as e:
+        except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to database integrity error", module="DoctorRegister", error=e)
             abort(400, message="A user with this email already exists.")
@@ -180,10 +215,14 @@ class UserLogin(MethodView):
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
             user:User|None = User.query.get(data['email'])
             if user and user.check_password(data['password']):
+                user.get_role_instance()
                 access_token = user.generate_jwt()
                 return {"access_token": access_token}, 200
             else:
                 raise InvalidCredentialsException("Invalid email or password.")
+        except UserRoleConflictException as e:
+            self.logger.error("User login failed: Role conflict", module="UserLogin", metadata={"email": data.get('email')}, error=e)
+            abort(409, message=str(e))
         except KeyError as e:
             self.logger.error("User login failed due to missing field", module="UserLogin", error=e)
             abort(400, message=f"Missing field: {str(e)}")
@@ -219,6 +258,9 @@ class UserCRUD(MethodView):
             if not user:
                 raise UserNotFoundException("User not found.")
             return jsonify(user.to_dict()), 200
+        except UserRoleConflictException as e:
+            self.logger.error("User role conflict", module="UserCRUD", error=e)
+            abort(409, message=str(e))
         except UserNotFoundException as e:
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
@@ -250,21 +292,26 @@ class UserCRUD(MethodView):
 
             user.set_properties(data)
 
-            doctor_emails:list[str] = data.get('doctors') or []
-            new_doctors = {Doctor.query.get(email) for email in doctor_emails}
-            data['doctors'] = new_doctors
+            doctor_emails:list[str] = data.get('doctors', []) or []
+            patient_emails:list[str] = data.get('patients', []) or []
 
-            patient_emails:list[str] = data.get('patients') or []
-            new_patients = {Patient.query.get(email) for email in patient_emails}
-            data['patients'] = new_patients
+            data['doctors'] = _fetch_doctors_by_email(doctor_emails)
+            data['patients'] = _fetch_patients_by_email(patient_emails)
 
             role_instance = user.get_role_instance()
-            if role_instance:
-                role_instance.remove_all_associations()
-                role_instance.set_properties(data)
+            role_instance.remove_all_associations()
+            role_instance.set_properties(data)
 
             db.session.commit()
             return jsonify(user.to_dict()), 200
+        except RelatedUserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("User update failed: Related user not found", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(404, message=str(e))
+        except UserRoleConflictException as e:
+            db.session.rollback()
+            self.logger.error("User update failed due to role conflict", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(409, message=str(e))
         except UserNotFoundException as e:
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
@@ -287,9 +334,6 @@ class UserCRUD(MethodView):
     def patch(self, data: dict):
         """Partially update user information (name, surname, or password)."""
         try:
-            if not data:
-                abort(400, message="No data provided for update.")
-
             email: str = get_jwt_identity()
             user: User | None = User.query.get(email)
             if not user:
@@ -304,20 +348,34 @@ class UserCRUD(MethodView):
 
             user.set_properties(data)
 
-            doctor_emails:list[str] = data.get('doctors') or []
-            new_doctors = {Doctor.query.get(email) for email in doctor_emails}
-            data['doctors'] = new_doctors
-
-            patient_emails:list[str] = data.get('patients') or []
-            new_patients = {Patient.query.get(email) for email in patient_emails}
-            data['patients'] = new_patients
-
             role_instance = user.get_role_instance()
-            if role_instance:
-                role_instance.set_properties(data)
+            role_data = dict(data)
+
+            if isinstance(role_instance, Patient) and 'doctors' in data:
+                doctor_emails:list[str] = data.get('doctors') or []
+                new_doctors = _fetch_doctors_by_email(doctor_emails)
+                role_instance.remove_all_associations()
+                role_instance.add_doctors(new_doctors)
+                role_data.pop('doctors', None)
+            elif isinstance(role_instance, Doctor) and 'patients' in data:
+                patient_emails:list[str] = data.get('patients') or []
+                new_patients = _fetch_patients_by_email(patient_emails)
+                role_instance.remove_all_associations()
+                role_instance.add_patients(new_patients)
+                role_data.pop('patients', None)
+
+            role_instance.set_properties(role_data)
 
             db.session.commit()
             return jsonify(user.to_dict()), 200
+        except RelatedUserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("Partial user update failed: Related user not found", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(404, message=str(e))
+        except UserRoleConflictException as e:
+            db.session.rollback()
+            self.logger.error("Partial user update failed due to role conflict", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(409, message=str(e))
         except UserNotFoundException as e:
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
@@ -352,6 +410,10 @@ class UserCRUD(MethodView):
             db.session.commit()
 
             return Response(status=204)
+        except UserRoleConflictException as e:
+            db.session.rollback()
+            self.logger.error("Deleting user failed due to role conflict", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(409, message=str(e))
         except UserNotFoundException as e:
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
@@ -369,7 +431,7 @@ class PatientData(MethodView):
 
     logger = AbstractLogger.get_instance()
 
-    @roles_required([UserRole.ADMIN, UserRole.DOCTOR])
+    @jwt_required()
     @blp.arguments(PatientEmailPathSchema, location="path")
     @blp.response(200, schema=UserResponseSchema, description="Patient information retrieved successfully.")
     @blp.response(400, description="Bad Request")
@@ -377,7 +439,7 @@ class PatientData(MethodView):
     @blp.response(403, description="Forbidden")
     @blp.response(404, description="Patient not found.")
     @blp.response(500, description="Internal Server Error")
-    def get(self, path_args: dict):
+    def get(self, path_args: dict, **kwargs):
         """Get patient information by email for admins or assigned doctors."""
         patient_email = None
         try:
@@ -398,16 +460,25 @@ class PatientData(MethodView):
             if not current_user:
                 abort(401, message="Invalid authentication token.")
 
-            role_instance:Admin|Doctor|None = current_user.get_role_instance()
-            if not role_instance:
-                raise UnauthorizedAccessException("User has no role assigned.")
-            if not role_instance.doctor_of_this_patient(patient):
+            role_instance:Admin|Doctor|Patient = current_user.get_role_instance()
+
+            authorized = False
+            if current_user_email == patient_email:
+                authorized = True
+            elif isinstance(role_instance, Admin):
+                authorized = True
+            elif isinstance(role_instance, Doctor) and role_instance.doctor_of_this_patient(patient):
+                authorized = True
+
+            if not authorized:
                 abort(403, message="You do not have permission to access this patient's data.")
 
-            return jsonify(patient.get_user().to_dict()), 200
-        except UnauthorizedAccessException as e:
-            self.logger.error("Unauthorized access attempt", module="PatientData", metadata={"patient_email": patient_email}, error=e)
-            abort(403, message=str(e))
+            patient_payload = patient.get_user().to_dict()
+            return jsonify(patient_payload), 200
+
+        except UserRoleConflictException as e:
+            self.logger.error("User role conflict", module="PatientData", metadata={"patient_email": patient_email}, error=e)
+            abort(409, message=str(e))
         except UserNotFoundException as e:
             self.logger.error("Patient not found", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(404, message=str(e))

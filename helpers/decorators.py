@@ -4,6 +4,7 @@ from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from flask_smorest import abort
 from helpers.enums.user_role import UserRole
 from models.user import User
+from helpers.exceptions.user_exceptions import UserRoleConflictException
 
 def roles_required(roles: Sequence[UserRole]):
     """
@@ -21,12 +22,13 @@ def roles_required(roles: Sequence[UserRole]):
             if not user:
                 abort(401, message="Invalid authentication token.")
 
-            role_instance = user.get_role_instance()
-            if role_instance is None:
-                abort(403, message="You do not have the required role to access this resource because you have no role assigned.")
-            role = role_instance.get_role()
-            if role not in roles:
-                abort(403, message="You do not have the required role to access this resource.")
+            try:
+                role_instance = user.get_role_instance()
+                role = role_instance.get_role()
+                if role not in roles:
+                    abort(403, message="You do not have the required role to access this resource.")
+            except UserRoleConflictException as e:
+                abort(409, message=str(e))
             
             return f(*args, **kwargs)
         return decorated_function
