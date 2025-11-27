@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped
 from helpers.enums.user_role import UserRole
 from models.associations import DoctorPatientAssociation
 from models.interfaces import IUserRole
+from models.patient import Patient
 
 class Doctor(db.Model, IUserRole):
     __tablename__ = 'doctors'
