@@ -3,7 +3,6 @@ from sqlalchemy import event
 
 from app import create_app
 from db import db
-from tests.base_test import BaseTest
 
 
 @pytest.fixture(scope="session")
@@ -49,8 +48,3 @@ def db_session(app, db_connection):
 @pytest.fixture(scope="function")
 def client(app, db_session):
     return app.test_client()
-
-
-@pytest.fixture(scope="function")
-def helper(app, client, db_session):
-    return BaseTest(app, client, db_session)
