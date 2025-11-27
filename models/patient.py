@@ -1,4 +1,6 @@
+from __future__ import annotations
 from db import db
+from sqlalchemy.orm import Mapped
 
 from helpers.enums.user_role import UserRole
 from models.associations import DoctorPatientAssociation
@@ -7,6 +9,7 @@ from models.interfaces import IUserRole
 
 class Patient(db.Model, IUserRole):
     __tablename__ = 'patients'
+    __allow_unmapped__ = True
 
     email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
     ailments = db.Column(db.String(2048), nullable=True)
@@ -16,7 +19,7 @@ class Patient(db.Model, IUserRole):
     height_cm = db.Column(db.Float, nullable=False)
     weight_kg = db.Column(db.Float, nullable=False)
     user = db.relationship('User', back_populates='patient', uselist=False)
-    doctors: list = db.relationship(
+    doctors: Mapped[list[Doctor]] = db.relationship(
         'Doctor',
         secondary=DoctorPatientAssociation.__table__,
         back_populates='patients',
