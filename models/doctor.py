@@ -5,7 +5,6 @@ from sqlalchemy.orm import Mapped
 from helpers.enums.user_role import UserRole
 from models.associations import DoctorPatientAssociation
 from models.interfaces import IUserRole
-from models.patient import Patient
 
 class Doctor(db.Model, IUserRole):
     __tablename__ = 'doctors'
@@ -13,7 +12,7 @@ class Doctor(db.Model, IUserRole):
 
     email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
     user = db.relationship('User', back_populates='doctor', uselist=False)
-    patients: Mapped[list[Patient]] = db.relationship(
+    patients: Mapped[list['Patient']] = db.relationship(
         'Patient',
         secondary=DoctorPatientAssociation.__table__,
         back_populates='doctors',
