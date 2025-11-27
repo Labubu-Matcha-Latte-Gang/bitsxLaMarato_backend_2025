@@ -4,6 +4,7 @@ from models.interfaces import IUserRole
 
 class Admin(db.Model, IUserRole):
     __tablename__ = 'admins'
+    __allow_unmapped__ = True
 
     email = db.Column(db.String(120), db.ForeignKey('users.email', onupdate='CASCADE'), primary_key=True)
     user = db.relationship('User', back_populates='admin', uselist=False)
