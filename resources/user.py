@@ -58,6 +58,7 @@ class PatientRegister(MethodView):
     logger = AbstractLogger.get_instance()
 
     @blp.arguments(PatientRegisterSchema, location='json')
+    @blp.doc(security=[])
     @blp.response(201, description="Patient successfully registered")
     @blp.response(400, description="Bad Request")
     @blp.response(422, description="Unprocessable Entity")
@@ -134,6 +135,7 @@ class DoctorRegister(MethodView):
     logger = AbstractLogger.get_instance()
 
     @blp.arguments(DoctorRegisterSchema, location='json')
+    @blp.doc(security=[])
     @blp.response(201, description="Doctor successfully registered")
     @blp.response(400, description="Bad Request")
     @blp.response(422, description="Unprocessable Entity")
@@ -204,6 +206,7 @@ class UserLogin(MethodView):
     logger = AbstractLogger.get_instance()
 
     @blp.arguments(UserLoginSchema, location='json')
+    @blp.doc(security=[])
     @blp.response(200, schema=UserLoginResponseSchema, description="User successfully logged in")
     @blp.response(400, description="Bad Request")
     @blp.response(401, description="Unauthorized")

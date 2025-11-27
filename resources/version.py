@@ -13,6 +13,7 @@ class Version(MethodView):
 
     logger = AbstractLogger.get_instance()
     
+    @blp.doc(security=[])
     @blp.response(200, description="Current version of the API.")
     @blp.response(500, description="Internal Server Error")
     def get(self):
