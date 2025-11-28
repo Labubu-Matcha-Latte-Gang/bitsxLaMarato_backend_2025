@@ -60,7 +60,7 @@ class Doctor(db.Model, IUserRole):
         for patient in list(self.patients):
             self.remove_patients({patient})
 
-    def remove_all_associations(self) -> None:
+    def remove_all_associations_between_user_roles(self) -> None:
         """
         Remove all associations with patients
         """
