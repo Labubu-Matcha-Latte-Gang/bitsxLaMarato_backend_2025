@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Sequence
 
-from helpers.email_service.send_grid import SendGridEmailAdapter
-
-
 class AbstractEmailAdapter(ABC):
     __instance: 'AbstractEmailAdapter' = None
 
@@ -29,5 +26,7 @@ class AbstractEmailAdapter(ABC):
             AbstractEmailAdapter: The instance of the email adapter.
         """
         if cls.__instance is None:
+            from helpers.email_service.send_grid import SendGridEmailAdapter
+
             cls.__instance = SendGridEmailAdapter()
         return cls.__instance
