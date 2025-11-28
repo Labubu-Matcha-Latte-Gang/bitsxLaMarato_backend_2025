@@ -21,3 +21,7 @@ class UserRoleConflictException(Exception):
 class RelatedUserNotFoundException(Exception):
     """Exception raised when related users (doctors/patients) are not found."""
     pass
+
+class InvalidResetCodeException(Exception):
+    """Exception raised when a provided reset code is invalid or expired."""
+    pass
