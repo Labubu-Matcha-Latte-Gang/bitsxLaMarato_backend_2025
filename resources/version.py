@@ -5,7 +5,7 @@ from flask import current_app as app, Response
 
 from helpers.debugger.logger import AbstractLogger
 
-blp = Blueprint('version', __name__, description='Get the current version of the API.')
+blp = Blueprint('version', __name__, description="Obtenir la versió actual de l'API.")
 
 @blp.route('')
 class Version(MethodView):
@@ -15,11 +15,11 @@ class Version(MethodView):
     
     @blp.doc(
         security=[],
-        summary="API version",
-        description="Returns the configured API version string.",
+        summary="Versió de l'API",
+        description="Retorna la cadena de versió configurada de l'API.",
     )
-    @blp.response(200, description="Plain-text API version string.")
-    @blp.response(500, description="Unexpected server error while retrieving the version.")
+    @blp.response(200, description="Cadena de versió de l'API en text pla.")
+    @blp.response(500, description="Error inesperat del servidor en obtenir la versió.")
     def get(self):
         """
         Return the current API version.
@@ -35,4 +35,4 @@ class Version(MethodView):
             return Response(version, status=200, mimetype="text/plain")
         except Exception as e:
             self.logger.error("Version check failed", module="Version", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error en obtenir la versió de l'API: {str(e)}")

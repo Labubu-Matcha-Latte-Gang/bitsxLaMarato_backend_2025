@@ -1,6 +1,9 @@
 from marshmallow import Schema, fields, validate
 from helpers.enums.gender import Gender
 
+GENDER_VALUES = [gender.value for gender in Gender]
+GENDER_DESCRIPTION = f"Patient gender. Accepted values: {', '.join(GENDER_VALUES)}."
+
 password_complexity = validate.Regexp(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
     error="Password must contain at least one uppercase letter, one lowercase letter, one number, and be at least 8 characters long.",
@@ -42,7 +45,13 @@ class UserUpdateSchema(Schema):
         metadata={"description": "New password for the user."},
     )
     ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
-    gender = fields.Enum(Gender, required=False, by_value=True, metadata={"description": "Patient gender."})
+    gender = fields.Enum(
+        Gender,
+        required=False,
+        by_value=True,
+        validate=validate.OneOf(GENDER_VALUES),
+        metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
+    )
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
     treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient treatments."})
     height_cm = fields.Float(required=False, allow_none=False, metadata={"description": "Patient height in centimeters."})
@@ -63,7 +72,13 @@ class UserPartialUpdateSchema(Schema):
         metadata={"description": "New password for the user."},
     )
     ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
-    gender = fields.Enum(Gender, required=False, by_value=True, metadata={"description": "Patient gender."})
+    gender = fields.Enum(
+        Gender,
+        required=False,
+        by_value=True,
+        validate=validate.OneOf(GENDER_VALUES),
+        metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
+    )
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
     treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient treatments."})
     height_cm = fields.Float(required=False, allow_none=False, metadata={"description": "Patient height in centimeters."})
@@ -88,7 +103,13 @@ class UserRegisterSchema(Schema):
 class PatientRegisterSchema(UserRegisterSchema):
     """Schema for patient registration data."""
     ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "The ailments of the patient."})
-    gender = fields.Enum(Gender, required=True, by_value=True, metadata={"description": "The gender of the patient."})
+    gender = fields.Enum(
+        Gender,
+        required=True,
+        by_value=True,
+        validate=validate.OneOf(GENDER_VALUES),
+        metadata={"description": f"The gender of the patient. Accepted values: {', '.join(GENDER_VALUES)}.", "enum": GENDER_VALUES},
+    )
     age = fields.Integer(required=True, allow_none=False, metadata={"description": "The age of the patient."})
     treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "The treatments of the patient."})
     height_cm = fields.Float(required=True, allow_none=False, metadata={"description": "The height of the patient in centimeters."})

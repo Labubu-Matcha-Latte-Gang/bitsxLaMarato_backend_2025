@@ -5,7 +5,7 @@ from flask import Response
 
 from helpers.debugger.logger import AbstractLogger
 
-blp = Blueprint('health', __name__, description='Get the health status of the API.')
+blp = Blueprint('health', __name__, description="Obtenir l'estat de salut de l'API.")
 
 @blp.route('')
 class Health(MethodView):
@@ -15,11 +15,11 @@ class Health(MethodView):
 
     @blp.doc(
         security=[],
-        summary="Health check",
-        description="Returns 200 when the service is reachable.",
+        summary="Prova de salut",
+        description="Retorna 200 quan el servei és accessible.",
     )
-    @blp.response(200, description="Service is reachable.")
-    @blp.response(500, description="Unexpected server error while performing the health check.")
+    @blp.response(200, description="Servei accessible.")
+    @blp.response(500, description="Error inesperat del servidor durant la comprovació de salut.")
     def get(self):
         """
         Perform an unauthenticated health probe.
@@ -34,4 +34,4 @@ class Health(MethodView):
             return Response(status=200)
         except Exception as e:
             self.logger.error("Health check failed", module="Health", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en la comprovació de salut: {str(e)}")
