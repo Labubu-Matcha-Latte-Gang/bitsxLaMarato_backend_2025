@@ -1,26 +1,78 @@
-name: Deploy Pipeline
+name: CI/CD Pipeline Segura
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  build-push:
+  build-test-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Bajar código
+      # 1. Bajar el código
+      - name: Bajar el código
         uses: actions/checkout@v3
 
+      # 2. Login en Docker Hub
       - name: Login en Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Construir y Subir
+      # 3. Construir la imagen (¡Pero NO subirla todavía!)
+      # Usamos 'load: true' para que la imagen quede disponible en el runner local
+      - name: Construir imagen para testing
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          load: true 
+          tags: ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test
+          # Cache para ir más rápido
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 4. EJECUTAR TESTS AUTOMÁTICOS (Unit Tests)
+      # Esto corre pytest dentro del contenedor. Si falla, el pipeline se detiene.
+      - name: Correr Tests Unitarios
+        run: |
+          docker run --rm \
+            -e FLASK_ENV=testing \
+            -e SECRET_KEY=test_key \
+            ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test \
+            pytest tests/
+
+      # 5. PRUEBA DE ARRANQUE (Smoke Test)
+      # Arrancamos el contenedor y esperamos a ver si explota.
+      - name: Verificar que la API arranca correctamente
+        run: |
+          echo "🚀 Arrancando contenedor de prueba..."
+          docker run -d --name api-test -p 5000:5000 \
+            -e SECRET_KEY=ci_test_key \
+            -e DB_USER=dummy \
+            -e DB_PASSWORD=dummy \
+            -e DB_HOST=localhost \
+            -e DB_NAME=dummy_db \
+            ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test
+          
+          echo "⏳ Esperando 10 segundos para ver si se mantiene estable..."
+          sleep 10
+
+          # Verificamos si el contenedor sigue corriendo
+          if [ "$(docker inspect -f '{{.State.Running}}' api-test)" = "true" ]; then
+              echo "✅ El contenedor sigue vivo. ¡Parece estable!"
+              docker logs api-test
+          else
+              echo "❌ El contenedor se ha muerto al arrancar."
+              echo "🔍 LOGS DEL ERROR:"
+              docker logs api-test
+              exit 1 # Esto rompe el pipeline y evita el deploy
+          fi
+
+      # 6. Si todo lo anterior pasó, construimos y subimos la versión FINAL
+      - name: Construir y Subir imagen Final (Push)
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-
-          tags: kireee/api-bitsxlamarato:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:latest
+          cache-from: type=gha
