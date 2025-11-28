@@ -34,3 +34,9 @@ DB_SSL_CA = os.getenv("DB_SSL_CA")
 DB_AUTO_MIGRATE = str(os.getenv('DB_AUTO_MIGRATE', 'true')).lower() in ('t', 'true', '1', 'y', 'yes')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 JWT_TOKEN_LOCATION = os.getenv('JWT_TOKEN_LOCATION', 'headers').split(',')
+
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
+APPLICATION_EMAIL = os.getenv('APPLICATION_EMAIL')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+RESET_PASSWORD_FRONTEND_PATH = FRONTEND_URL + os.getenv('RESET_PASSWORD_FRONTEND_PATH', '/reset-password')
+RESET_CODE_VALIDITY_MINUTES = 5
