@@ -62,6 +62,7 @@ class QuestionAnsweredAssociation(db.Model):
     patient_email = db.Column(db.String(120), db.ForeignKey('patients.email', onupdate='CASCADE'), primary_key=True)
     question_id = db.Column(UUID(as_uuid=True), db.ForeignKey('questions.id', onupdate='CASCADE'), primary_key=True)
     answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    question = db.relationship('Question', lazy=True)
 
     def __repr__(self):
         return f"<QuestionAnsweredAssociation Patient: {self.patient_email}, Question ID: {self.question_id}, Answered At: {self.answered_at}>"
