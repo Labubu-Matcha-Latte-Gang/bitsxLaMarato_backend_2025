@@ -1,10 +1,14 @@
 from __future__ import annotations
 from db import db
 from sqlalchemy.orm import Mapped
+from typing import TYPE_CHECKING
 
 from helpers.enums.user_role import UserRole
 from models.associations import DoctorPatientAssociation
 from models.interfaces import IUserRole
+
+if TYPE_CHECKING:
+    from models.patient import Patient
 
 class Doctor(db.Model, IUserRole):
     __tablename__ = 'doctors'
