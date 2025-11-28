@@ -111,3 +111,35 @@ class UserLoginResponseSchema(Schema):
     Schema for user login response data.
     """
     access_token = fields.String(required=True, metadata={"description": "Authentication token for the user."})
+
+class UserForgotPasswordSchema(Schema):
+    """
+    Schema for user forgot password data.
+    """
+    email = fields.Email(required=True, metadata={"description": "The email address of the user requesting password reset."})
+
+class UserForgotPasswordResponseSchema(Schema):
+    """
+    Schema for user forgot password response data.
+    """
+    message = fields.String(required=True, metadata={"description": "Response message indicating the result of the password reset request."})
+    validity = fields.Float(required=True, metadata={"description": "Validity duration of the password reset code in minutes."})
+
+class UserResetPasswordSchema(Schema):
+    """
+    Schema for user reset password data.
+    """
+    email = fields.Email(required=True, metadata={"description": "The email address of the user resetting their password."})
+    reset_code = fields.String(required=True, metadata={"description": "The reset code provided to the user."})
+    new_password = fields.String(
+        required=True,
+        load_only=True,
+        validate=password_complexity,
+        metadata={"description": "The new password for the user."},
+    )
+
+class UserResetPasswordResponseSchema(Schema):
+    """
+    Schema for user reset password response data.
+    """
+    message = fields.String(required=True, metadata={"description": "Response message indicating the result of the password reset operation."})
