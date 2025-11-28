@@ -379,8 +379,9 @@ class UserCRUD(MethodView):
         - 422: Payload failed schema validation.
         - 500: Unexpected error while updating the user.
         """
+        email: str | None = None
         try:
-            email: str = get_jwt_identity()
+            email = get_jwt_identity()
             user: User | None = User.query.get(email)
             if not user:
                 raise UserNotFoundException("User not found.")
@@ -454,8 +455,9 @@ class UserCRUD(MethodView):
         - 422: Payload failed schema validation.
         - 500: Unexpected error while updating the user.
         """
+        email: str | None = None
         try:
-            email: str = get_jwt_identity()
+            email = get_jwt_identity()
             user: User | None = User.query.get(email)
             if not user:
                 raise UserNotFoundException("User not found.")
@@ -532,8 +534,9 @@ class UserCRUD(MethodView):
         - 409: User role configuration is inconsistent.
         - 500: Unexpected error while deleting the user.
         """
+        email: str | None = None
         try:
-            email: str = get_jwt_identity()
+            email = get_jwt_identity()
             user: User | None = User.query.get(email)
             if not user:
                 raise UserNotFoundException("User not found.")
