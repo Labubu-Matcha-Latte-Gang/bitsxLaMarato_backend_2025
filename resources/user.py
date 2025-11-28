@@ -402,7 +402,7 @@ class UserCRUD(MethodView):
             data['patients'] = _fetch_patients_by_email(patient_emails)
 
             role_instance = user.get_role_instance()
-            role_instance.remove_all_associations()
+            role_instance.remove_all_associations_between_user_roles()
             role_instance.set_properties(data)
 
             db.session.commit()
@@ -477,13 +477,13 @@ class UserCRUD(MethodView):
             if isinstance(role_instance, Patient) and 'doctors' in data:
                 doctor_emails:list[str] = data.get('doctors') or []
                 new_doctors = _fetch_doctors_by_email(doctor_emails)
-                role_instance.remove_all_associations()
+                role_instance.remove_all_associations_between_user_roles()
                 role_instance.add_doctors(new_doctors)
                 role_data.pop('doctors', None)
             elif isinstance(role_instance, Doctor) and 'patients' in data:
                 patient_emails:list[str] = data.get('patients') or []
                 new_patients = _fetch_patients_by_email(patient_emails)
-                role_instance.remove_all_associations()
+                role_instance.remove_all_associations_between_user_roles()
                 role_instance.add_patients(new_patients)
                 role_data.pop('patients', None)
 
@@ -544,7 +544,7 @@ class UserCRUD(MethodView):
             self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
 
             role_instance = user.get_role_instance()
-            role_instance.remove_all_associations()
+            role_instance.remove_all_associations_between_user_roles()
 
             db.session.delete(user)
             db.session.commit()
