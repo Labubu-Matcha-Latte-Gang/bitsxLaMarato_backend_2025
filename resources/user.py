@@ -21,7 +21,6 @@ from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
 )
 from helpers.factories.forgot_password import AbstractForgotPasswordFactory
-from helpers.forgot_password.forgot_password import ForgotPasswordFacade
 from models.admin import Admin
 from models.patient import Patient
 from models.user import User
