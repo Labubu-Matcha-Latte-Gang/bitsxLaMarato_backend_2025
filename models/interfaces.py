@@ -45,7 +45,7 @@ class IUserRole:
         """
         raise NotImplementedError()
 
-    def remove_all_associations(self) -> None:
+    def remove_all_associations_between_user_roles(self) -> None:
         """
         Remove all associations between user roles for this role
         """

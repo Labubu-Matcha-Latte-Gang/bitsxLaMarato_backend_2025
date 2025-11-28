@@ -1,11 +1,18 @@
 from __future__ import annotations
+from datetime import datetime, timezone
+
 from db import db
 from sqlalchemy.orm import Mapped
+from typing import TYPE_CHECKING
 
 from helpers.enums.user_role import UserRole
-from models.associations import DoctorPatientAssociation
+from models.associations import DoctorPatientAssociation, QuestionAnsweredAssociation
 from helpers.enums.gender import Gender
 from models.interfaces import IUserRole
+
+if TYPE_CHECKING:
+    from models.doctor import Doctor
+    from models.questions import Question
 
 class Patient(db.Model, IUserRole):
     __tablename__ = 'patients'
@@ -23,6 +30,12 @@ class Patient(db.Model, IUserRole):
         'Doctor',
         secondary=DoctorPatientAssociation.__table__,
         back_populates='patients',
+        lazy=True,
+    )
+    question_answers: Mapped[list[QuestionAnsweredAssociation]] = db.relationship(
+        'QuestionAnsweredAssociation',
+        backref='patient',
+        cascade='all, delete-orphan',
         lazy=True,
     )
 
@@ -63,11 +76,71 @@ class Patient(db.Model, IUserRole):
         for doctor in list(self.doctors):
             self.remove_doctors({doctor})
 
-    def remove_all_associations(self) -> None:
+    def remove_all_associations_between_user_roles(self) -> None:
         """
-        Remove all associations with doctors
+        Remove all associations with doctors.
         """
         self.remove_all_doctors()
+
+    def add_answered_questions(self, questions:set['Question'], answered_at: datetime | None = None) -> None:
+        """
+        Add questions to the answered list if not already present.
+        Args:
+            questions (set[Question]): Questions to mark as answered.
+            answered_at (datetime | None): Timestamp to store; defaults to now UTC.
+        """
+        for question in questions:
+            if question is None:
+                continue
+            existing = next((qa for qa in self.question_answers if qa.question_id == question.id), None)
+            if existing:
+                if answered_at:
+                    existing.answered_at = answered_at
+                continue
+            self.question_answers.append(
+                QuestionAnsweredAssociation(
+                    question=question,
+                    answered_at=answered_at or datetime.now(timezone.utc),
+                )
+            )
+
+    def remove_answered_questions(self, questions:set['Question']) -> None:
+        """
+        Remove answered question associations for the given questions.
+        Args:
+            questions (set[Question]): Questions to unmark as answered.
+        """
+        for question in questions:
+            if question is None:
+                continue
+            for association in list(self.question_answers):
+                if association.question_id == question.id:
+                    self.question_answers.remove(association)
+                    break
+
+    def get_answered_questions(self) -> list[QuestionAnsweredAssociation]:
+        """
+        Get associations of answered questions.
+        Returns:
+            list[QuestionAnsweredAssociation]: Associations for answered questions.
+        """
+        return self.question_answers
+
+    def has_answered_question(self, question: 'Question') -> bool:
+        """
+        Check if the patient answered a given question.
+        Args:
+            question (Question): Question to check.
+        Returns:
+            bool: True if answered, False otherwise.
+        """
+        return any(qa.question_id == question.id for qa in self.question_answers)
+
+    def remove_all_answered_questions(self) -> None:
+        """
+        Remove all answered question associations.
+        """
+        self.question_answers.clear()
 
     def get_user(self):
         """
