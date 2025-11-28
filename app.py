@@ -133,7 +133,6 @@ app = create_app(os.getenv('SETTINGS_MODULE', 'globals'))
 
 if __name__ == "__main__":
     import inspect
-    from werkzeug.serving import run_simple
 
     run_kwargs = dict(
         threaded=True,
@@ -143,7 +142,7 @@ if __name__ == "__main__":
         use_reloader=app.config.get('DEBUG', False),
     )
 
-    if "allow_unsafe_werkzeug" in inspect.signature(run_simple).parameters:
+    if "allow_unsafe_werkzeug" in inspect.signature(app.run).parameters:
         run_kwargs["allow_unsafe_werkzeug"] = True
 
-    run_simple(app, **run_kwargs)
+    app.run(**run_kwargs)
