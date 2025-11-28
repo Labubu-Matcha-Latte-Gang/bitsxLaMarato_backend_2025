@@ -31,18 +31,11 @@ class UserCodeAssociation(db.Model):
             bool: True if the code is expired, False otherwise.
         """
         expiration = self.expiration
-
-        # Normalize timezone awareness to avoid TypeError when comparing aware vs naive datetimes
-        if expiration.tzinfo is None and current_time.tzinfo is not None:
-            expiration = expiration.replace(tzinfo=current_time.tzinfo)
-        elif expiration.tzinfo is not None and current_time.tzinfo is None:
-            current_time = current_time.replace(tzinfo=expiration.tzinfo)
-
-        # Fallback to UTC if both are naive
-        if expiration.tzinfo is None and current_time.tzinfo is None:
+        # Ensure both datetimes are timezone-aware and in UTC
+        if expiration.tzinfo is None:
             expiration = expiration.replace(tzinfo=timezone.utc)
+        if current_time.tzinfo is None:
             current_time = current_time.replace(tzinfo=timezone.utc)
-
         return current_time >= expiration
     
     def check_code(self, code: str) -> bool:
