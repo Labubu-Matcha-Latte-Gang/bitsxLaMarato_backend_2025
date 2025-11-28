@@ -1,3 +1,6 @@
+from functools import lru_cache
+from pathlib import Path
+
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
@@ -6,14 +9,19 @@ from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
+from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
+from helpers.exceptions.mail_exceptions import SendEmailException
 from helpers.exceptions.user_exceptions import (
+    InvalidResetCodeException,
     UserAlreadyExistsException,
     InvalidCredentialsException,
     UserNotFoundException,
     UserRoleConflictException,
     RelatedUserNotFoundException,
 )
+from helpers.factories.forgot_password import AbstractForgotPasswordFactory
+from helpers.forgot_password.forgot_password import ForgotPasswordFacade
 from models.admin import Admin
 from models.patient import Patient
 from models.user import User
@@ -21,12 +29,16 @@ from models.doctor import Doctor
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
+    UserForgotPasswordResponseSchema,
     UserLoginSchema,
     UserLoginResponseSchema,
     PatientEmailPathSchema,
+    UserResetPasswordResponseSchema,
+    UserResetPasswordSchema,
     UserResponseSchema,
     UserUpdateSchema,
     UserPartialUpdateSchema,
+    UserForgotPasswordSchema
 )
 
 blp = Blueprint('user', __name__, description='User related operations')
@@ -490,4 +502,104 @@ class PatientData(MethodView):
             raise e
         except Exception as e:
             self.logger.error("Fetching patient information failed", module="PatientData", metadata={"patient_email": patient_email}, error=e)
+            abort(500, message=str(e))
+
+@blp.route('/forgot-password')
+class UserForgotPassword(MethodView):
+    """
+    User Forgot Password Endpoint
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    RESET_PASSWORD_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "mail_reset_password.html"
+
+    @lru_cache(maxsize=1)
+    def _load_reset_password_template(self) -> str:
+        return self.RESET_PASSWORD_TEMPLATE_PATH.read_text(encoding='utf-8')
+
+    @blp.arguments(UserForgotPasswordSchema, location='json')
+    @blp.doc(security=[])
+    @blp.response(200, schema=UserForgotPasswordResponseSchema, description="Password reset request processed successfully")
+    @blp.response(400, description="Bad Request")
+    @blp.response(422, description="Unprocessable Entity")
+    @blp.response(500, description="Internal Server Error")
+    def post(self, data: dict) -> Response:
+        """A user forgot their password and requests a reset"""
+        try:
+            self.logger.info("A user forgot their password", module="UserForgotPassword", metadata={"email": data['email']})
+
+            try:
+                template = self._load_reset_password_template()
+            except OSError as e:
+                self.logger.error("Failed to load reset password template", module="UserForgotPassword", error=e)
+                abort(500, message="Failed to load reset email template.")
+
+            factory = AbstractForgotPasswordFactory.get_instance()
+            forgot_password_facade = factory.get_password_facade()
+            forgot_password_facade.process_forgot_password(data['email'], APPLICATION_EMAIL, "Sol·licitud de canvi de contrasenya", template)
+
+            response_payload = {"message": "El mail ha estat enviat exitosament a l'usuari.", "validity": RESET_CODE_VALIDITY_MINUTES}
+            return jsonify(response_payload), 200
+        
+        except SendEmailException as e:
+            self.logger.error("User forgot password failed: Email sending error", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(500, message="Failed to send reset email. Please try again later.")
+        except UserRoleConflictException as e:
+            self.logger.error("User forgot password failed: Role conflict", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(409, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error("User forgot password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(404, message=str(e))
+        except KeyError as e:
+            self.logger.error("User forgot password failed due to missing field", module="UserForgotPassword", error=e)
+            abort(400, message=f"Missing field: {str(e)}")
+        except InvalidCredentialsException as e:
+            self.logger.error("User forgot password failed: Invalid credentials", module="UserForgotPassword", metadata={"email": data['email']}, error=e)
+            abort(401, message=str(e))
+        except ValueError as e:
+            self.logger.error("User forgot password failed: Value Error", module="UserForgotPassword", error=e)
+            abort(422, message=str(e))
+        except Exception as e:
+            self.logger.error("User forgot password failed", module="UserForgotPassword", error=e)
+            abort(500, message=str(e))
+
+    @blp.arguments(UserResetPasswordSchema, location='json')
+    @blp.doc(security=[])
+    @blp.response(200, schema=UserResetPasswordResponseSchema, description="Password reset successfully")
+    @blp.response(400, description="Bad Request")
+    @blp.response(422, description="Unprocessable Entity")
+    @blp.response(500, description="Internal Server Error")
+    def patch(self, data: dict) -> Response:
+        """A user resets their password using the reset code"""
+        try:
+            self.logger.info("A user wants to reset their password", module="UserForgotPassword", metadata={"email": data['email']})
+
+            factory = AbstractForgotPasswordFactory.get_instance()
+            forgot_password_facade = factory.get_password_facade()
+            forgot_password_facade.reset_password(data['email'], data['reset_code'], data['new_password'])
+
+            response_payload = {"message": "Contrasenya restablerta exitosament."}
+            return jsonify(response_payload), 200
+        
+        except InvalidResetCodeException as e:
+            self.logger.error("User reset password failed: Invalid or expired reset code", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(400, message=str(e))
+        except UserRoleConflictException as e:
+            self.logger.error("User reset password failed: Role conflict", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(409, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error("User reset password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(404, message=str(e))
+        except KeyError as e:
+            self.logger.error("User reset password failed due to missing field", module="UserForgotPassword", error=e)
+            abort(400, message=f"Missing field: {str(e)}")
+        except InvalidCredentialsException as e:
+            self.logger.error("User reset password failed: Invalid credentials", module="UserForgotPassword", metadata={"email": data['email']}, error=e)
+            abort(401, message=str(e))
+        except ValueError as e:
+            self.logger.error("User reset password failed: Value Error", module="UserForgotPassword", error=e)
+            abort(422, message=str(e))
+        except Exception as e:
+            self.logger.error("User reset password failed", module="UserForgotPassword", error=e)
             abort(500, message=str(e))
