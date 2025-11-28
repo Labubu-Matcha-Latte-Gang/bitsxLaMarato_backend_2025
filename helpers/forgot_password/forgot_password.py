@@ -70,12 +70,7 @@ class ForgotPasswordFacade(AbstractForgotPasswordFacade):
     
     def process_forgot_password(self, email: str, from_email: str, subject: str, body_template: str) -> None:
         reset_code = self.__user_service.user_forgot_password(email)
-        body = body_template.format(
-            reset_code=reset_code,
-            reset_url=RESET_PASSWORD_FRONTEND_PATH,
-            support_email=from_email or APPLICATION_EMAIL,
-            code_validity=RESET_CODE_VALIDITY_MINUTES
-        )
+        body = body_template.replace("{reset_code}", reset_code).replace("{reset_url}", RESET_PASSWORD_FRONTEND_PATH).replace("{support_email}", from_email or APPLICATION_EMAIL).replace("{code_validity}", str(RESET_CODE_VALIDITY_MINUTES))
         self.__email_service.send_email([email], from_email, subject, body)
 
     def reset_password(self, email: str, reset_code: str, new_password: str) -> None:
