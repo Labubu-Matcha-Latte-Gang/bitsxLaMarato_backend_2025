@@ -40,14 +40,14 @@ from schemas import (
     UserForgotPasswordSchema
 )
 
-blp = Blueprint('user', __name__, description='User related operations')
+blp = Blueprint('user', __name__, description="Operacions relacionades amb els usuaris")
 
 def _fetch_doctors_by_email(emails: list[str]) -> set[Doctor]:
     doctors:set[Doctor] = set()
     for email in emails:
         doctor = Doctor.query.get(email)
         if doctor is None:
-            raise RelatedUserNotFoundException(f"Doctor not found: {email}")
+            raise RelatedUserNotFoundException(f"No s'ha trobat cap metge amb el correu: {email}")
         doctors.add(doctor)
     return doctors
 
@@ -56,7 +56,7 @@ def _fetch_patients_by_email(emails: list[str]) -> set[Patient]:
     for email in emails:
         patient = Patient.query.get(email)
         if patient is None:
-            raise RelatedUserNotFoundException(f"Patient not found: {email}")
+            raise RelatedUserNotFoundException(f"No s'ha trobat cap pacient amb el correu: {email}")
         patients.add(patient)
     return patients
 
@@ -71,14 +71,14 @@ class PatientRegister(MethodView):
     @blp.arguments(PatientRegisterSchema, location='json')
     @blp.doc(
         security=[],
-        summary="Register patient",
-        description="Creates a base user plus patient profile and links any provided doctor emails.",
+        summary="Registrar pacient",
+        description="Crea un usuari base amb perfil de pacient i enllaça els correus de metges indicats.",
     )
-    @blp.response(201, schema=UserResponseSchema, description="Patient user created with patient role data.")
-    @blp.response(400, description="Missing required field or the email is already registered.")
-    @blp.response(404, description="Referenced doctor email not found.")
-    @blp.response(422, description="Payload failed validation.")
-    @blp.response(500, description="Unexpected server error while creating the patient.")
+    @blp.response(201, schema=UserResponseSchema, description="Usuari pacient creat amb les dades de rol de pacient.")
+    @blp.response(400, description="Falta un camp obligatori o el correu ja està registrat.")
+    @blp.response(404, description="No s'ha trobat cap correu de metge indicat.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en crear el pacient.")
     def post(self, data: dict) -> Response:
         """
         Register a new patient user.
@@ -100,7 +100,7 @@ class PatientRegister(MethodView):
 
             potential_existing_user = User.query.get(data['email'])
             if potential_existing_user:
-                raise UserAlreadyExistsException("A user with this email already exists.")
+                raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
 
             user_payload = {
                 "email": data['email'],
@@ -133,7 +133,7 @@ class PatientRegister(MethodView):
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to missing field", module="PatientRegister", error=e)
-            abort(400, message=f"Missing field: {str(e)}")
+            abort(400, message=f"Falta el camp: {str(e)}")
         except UserAlreadyExistsException as e:
             db.session.rollback()
             self.logger.error("Patient register failed: User already exists", module="PatientRegister", metadata={"email": data['email']}, error=e)
@@ -145,15 +145,15 @@ class PatientRegister(MethodView):
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to invalid data", module="PatientRegister", error=e)
-            abort(422, message=str(e))
+            abort(422, message=f"Dades no vàlides: {str(e)}")
         except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to database integrity error", module="PatientRegister", error=e)
-            abort(400, message="A user with this email already exists.")
+            abort(400, message="Ja existeix un usuari amb aquest correu.")
         except Exception as e:
             db.session.rollback()
             self.logger.error("Patient register failed", module="PatientRegister", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en registrar el pacient: {str(e)}")
 
 @blp.route('/doctor')
 class DoctorRegister(MethodView):
@@ -166,14 +166,14 @@ class DoctorRegister(MethodView):
     @blp.arguments(DoctorRegisterSchema, location='json')
     @blp.doc(
         security=[],
-        summary="Register doctor",
-        description="Creates a base user plus doctor profile and links any provided patients.",
+        summary="Registrar metge",
+        description="Crea un usuari base amb perfil de metge i enllaça els pacients indicats.",
     )
-    @blp.response(201, schema=UserResponseSchema, description="Doctor user created with doctor role data.")
-    @blp.response(400, description="Missing required field or the email is already registered.")
-    @blp.response(404, description="Referenced patient email not found.")
-    @blp.response(422, description="Payload failed validation.")
-    @blp.response(500, description="Unexpected server error while creating the doctor.")
+    @blp.response(201, schema=UserResponseSchema, description="Usuari metge creat amb les dades de rol de metge.")
+    @blp.response(400, description="Falta un camp obligatori o el correu ja està registrat.")
+    @blp.response(404, description="No s'ha trobat cap correu de pacient indicat.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en crear el metge.")
     def post(self, data: dict) -> Response:
         """
         Register a new doctor user.
@@ -194,7 +194,7 @@ class DoctorRegister(MethodView):
 
             potential_existing_user = User.query.get(data['email'])
             if potential_existing_user:
-                raise UserAlreadyExistsException("A user with this email already exists.")
+                raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
 
             user_payload = {
                 "email": data['email'],
@@ -221,7 +221,7 @@ class DoctorRegister(MethodView):
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to missing field", module="DoctorRegister", error=e)
-            abort(400, message=f"Missing field: {str(e)}")
+            abort(400, message=f"Falta el camp: {str(e)}")
         except UserAlreadyExistsException as e:
             db.session.rollback()
             self.logger.error("Doctor register failed: User already exists", module="DoctorRegister", metadata={"email": data['email']}, error=e)
@@ -233,15 +233,15 @@ class DoctorRegister(MethodView):
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to invalid data", module="DoctorRegister", error=e)
-            abort(422, message=str(e))
+            abort(422, message=f"Dades no vàlides: {str(e)}")
         except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to database integrity error", module="DoctorRegister", error=e)
-            abort(400, message="A user with this email already exists.")
+            abort(400, message="Ja existeix un usuari amb aquest correu.")
         except Exception as e:
             db.session.rollback()
             self.logger.error("Doctor register failed", module="DoctorRegister", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en registrar el metge: {str(e)}")
 
 @blp.route('/login')
 class UserLogin(MethodView):
@@ -254,15 +254,15 @@ class UserLogin(MethodView):
     @blp.arguments(UserLoginSchema, location='json')
     @blp.doc(
         security=[],
-        summary="Login user",
-        description="Authenticates a user with email and password and issues a JWT access token.",
+        summary="Iniciar sessió",
+        description="Autentica un usuari amb correu i contrasenya i emet un token JWT.",
     )
-    @blp.response(200, schema=UserLoginResponseSchema, description="JWT access token issued for valid credentials.")
-    @blp.response(400, description="Missing required login fields.")
-    @blp.response(401, description="Invalid credentials.")
-    @blp.response(409, description="User role conflict detected during login.")
-    @blp.response(422, description="Payload failed validation.")
-    @blp.response(500, description="Unexpected server error during authentication.")
+    @blp.response(200, schema=UserLoginResponseSchema, description="Token JWT emès amb credencials vàlides.")
+    @blp.response(400, description="Falten camps obligatoris d'inici de sessió.")
+    @blp.response(401, description="Credencials no vàlides.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari durant l'inici de sessió.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor durant l'autenticació.")
     def post(self, data: dict) -> Response:
         """
         Authenticate a user and issue a JWT.
@@ -286,22 +286,22 @@ class UserLogin(MethodView):
                 access_token = user.generate_jwt()
                 return {"access_token": access_token}, 200
             else:
-                raise InvalidCredentialsException("Invalid email or password.")
+                raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
         except UserRoleConflictException as e:
             self.logger.error("User login failed: Role conflict", module="UserLogin", metadata={"email": data.get('email')}, error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except KeyError as e:
             self.logger.error("User login failed due to missing field", module="UserLogin", error=e)
-            abort(400, message=f"Missing field: {str(e)}")
+            abort(400, message=f"Falta el camp: {str(e)}")
         except InvalidCredentialsException as e:
             self.logger.error("User login failed: Invalid credentials", module="UserLogin", metadata={"email": data['email']}, error=e)
             abort(401, message=str(e))
         except ValueError as e:
             self.logger.error("User login failed: Value Error", module="UserLogin", error=e)
-            abort(422, message=str(e))
+            abort(422, message=f"Dades no vàlides: {str(e)}")
         except Exception as e:
             self.logger.error("User login failed", module="UserLogin", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en iniciar sessió: {str(e)}")
 
 @blp.route('')
 class UserCRUD(MethodView):
@@ -313,14 +313,14 @@ class UserCRUD(MethodView):
 
     @jwt_required()
     @blp.doc(
-        summary="Get current user",
-        description="Returns the authenticated user's profile including role data.",
+        summary="Obtenir l'usuari actual",
+        description="Retorna el perfil de l'usuari autenticat, incloses les dades del rol.",
     )
-    @blp.response(200, schema=UserResponseSchema, description="Current user profile returned.")
-    @blp.response(401, description="Missing or invalid JWT.")
-    @blp.response(404, description="User not found.")
-    @blp.response(409, description="User role conflict detected.")
-    @blp.response(500, description="Unexpected server error while retrieving the user.")
+    @blp.response(200, schema=UserResponseSchema, description="Perfil de l'usuari actual retornat.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(404, description="Usuari no trobat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari.")
+    @blp.response(500, description="Error inesperat del servidor en obtenir l'usuari.")
     def get(self):
         """
         Retrieve the authenticated user's profile.
@@ -339,30 +339,30 @@ class UserCRUD(MethodView):
             email:str = get_jwt_identity()
             user:User|None = User.query.get(email)
             if not user:
-                raise UserNotFoundException("User not found.")
+                raise UserNotFoundException("Usuari no trobat.")
             return jsonify(user.to_dict()), 200
         except UserRoleConflictException as e:
             self.logger.error("User role conflict", module="UserCRUD", error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except UserNotFoundException as e:
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
         except Exception as e:
             self.logger.error("Fetching user information failed", module="UserCRUD", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en obtenir l'usuari: {str(e)}")
 
     @jwt_required()
     @blp.arguments(UserUpdateSchema, location='json')
     @blp.doc(
-        summary="Replace current user",
-        description="Fully replaces the authenticated user's profile and role data, resetting doctor/patient associations.",
+        summary="Reemplaçar l'usuari actual",
+        description="Substitueix completament el perfil de l'usuari autenticat i les dades del rol, reiniciant les associacions de metge/pacient.",
     )
-    @blp.response(200, schema=UserResponseSchema, description="User updated with the provided data.")
-    @blp.response(401, description="Missing or invalid JWT.")
-    @blp.response(404, description="User not found.")
-    @blp.response(409, description="User role conflict detected.")
-    @blp.response(422, description="Payload failed validation.")
-    @blp.response(500, description="Unexpected server error while updating the user.")
+    @blp.response(200, schema=UserResponseSchema, description="Usuari actualitzat amb les dades proporcionades.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(404, description="Usuari no trobat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en actualitzar l'usuari.")
     def put(self, data: dict):
         """
         Fully replace the authenticated user's profile.
@@ -383,7 +383,7 @@ class UserCRUD(MethodView):
             email = get_jwt_identity()
             user: User | None = User.query.get(email)
             if not user:
-                raise UserNotFoundException("User not found.")
+                raise UserNotFoundException("Usuari no trobat.")
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -413,7 +413,7 @@ class UserCRUD(MethodView):
         except UserRoleConflictException as e:
             db.session.rollback()
             self.logger.error("User update failed due to role conflict", module="UserCRUD", metadata={"email": email}, error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except UserNotFoundException as e:
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
@@ -424,20 +424,20 @@ class UserCRUD(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Updating user information failed", module="UserCRUD", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en actualitzar l'usuari: {str(e)}")
 
     @jwt_required()
     @blp.arguments(UserPartialUpdateSchema, location='json')
     @blp.doc(
-        summary="Partially update current user",
-        description="Updates provided fields for the authenticated user and resets role associations when lists are supplied.",
+        summary="Actualitzar parcialment l'usuari actual",
+        description="Actualitza els camps proporcionats per a l'usuari autenticat i reinicia les associacions de rol quan s'envien llistes.",
     )
-    @blp.response(200, schema=UserResponseSchema, description="User updated with the provided fields.")
-    @blp.response(401, description="Missing or invalid JWT.")
-    @blp.response(404, description="User not found.")
-    @blp.response(409, description="User role conflict detected.")
-    @blp.response(422, description="Payload failed validation.")
-    @blp.response(500, description="Unexpected server error while partially updating the user.")
+    @blp.response(200, schema=UserResponseSchema, description="Usuari actualitzat amb els camps proporcionats.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(404, description="Usuari no trobat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en actualitzar parcialment l'usuari.")
     def patch(self, data: dict):
         """
         Partially update the authenticated user's profile.
@@ -459,7 +459,7 @@ class UserCRUD(MethodView):
             email = get_jwt_identity()
             user: User | None = User.query.get(email)
             if not user:
-                raise UserNotFoundException("User not found.")
+                raise UserNotFoundException("Usuari no trobat.")
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -497,7 +497,7 @@ class UserCRUD(MethodView):
         except UserRoleConflictException as e:
             db.session.rollback()
             self.logger.error("Partial user update failed due to role conflict", module="UserCRUD", metadata={"email": email}, error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except UserNotFoundException as e:
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
@@ -508,18 +508,18 @@ class UserCRUD(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Partially updating user information failed", module="UserCRUD", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en actualitzar parcialment l'usuari: {str(e)}")
 
     @jwt_required()
     @blp.doc(
-        summary="Delete current user",
-        description="Deletes the authenticated user after removing all role associations.",
+        summary="Eliminar l'usuari actual",
+        description="Elimina l'usuari autenticat després d'esborrar totes les associacions de rol.",
     )
-    @blp.response(204, description="User deleted successfully.")
-    @blp.response(401, description="Missing or invalid JWT.")
-    @blp.response(404, description="User not found.")
-    @blp.response(409, description="User role conflict detected.")
-    @blp.response(500, description="Unexpected server error while deleting the user.")
+    @blp.response(204, description="Usuari eliminat correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(404, description="Usuari no trobat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari.")
+    @blp.response(500, description="Error inesperat del servidor en eliminar l'usuari.")
     def delete(self):
         """
         Delete the authenticated user's account.
@@ -538,7 +538,7 @@ class UserCRUD(MethodView):
             email = get_jwt_identity()
             user: User | None = User.query.get(email)
             if not user:
-                raise UserNotFoundException("User not found.")
+                raise UserNotFoundException("Usuari no trobat.")
 
             self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
 
@@ -552,7 +552,7 @@ class UserCRUD(MethodView):
         except UserRoleConflictException as e:
             db.session.rollback()
             self.logger.error("Deleting user failed due to role conflict", module="UserCRUD", metadata={"email": email}, error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except UserNotFoundException as e:
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
@@ -560,7 +560,7 @@ class UserCRUD(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Deleting user failed", module="UserCRUD", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en eliminar l'usuari: {str(e)}")
 
 @blp.route('/<string:email>')
 class PatientData(MethodView):
@@ -573,15 +573,15 @@ class PatientData(MethodView):
     @jwt_required()
     @blp.arguments(PatientEmailPathSchema, location="path")
     @blp.doc(
-        summary="Get patient by email",
-        description="Admins can fetch any patient; doctors only if assigned; patients can fetch their own record.",
+        summary="Obtenir un pacient pel correu",
+        description="Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; els pacients poden obtenir el seu propi registre.",
     )
-    @blp.response(200, schema=UserResponseSchema, description="Patient information retrieved successfully.")
-    @blp.response(401, description="Missing or invalid JWT.")
-    @blp.response(403, description="The authenticated user is not allowed to view this patient.")
-    @blp.response(404, description="Patient not found.")
-    @blp.response(409, description="User role conflict detected.")
-    @blp.response(500, description="Unexpected server error while retrieving the patient.")
+    @blp.response(200, schema=UserResponseSchema, description="Informació del pacient recuperada correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no pot veure aquest pacient.")
+    @blp.response(404, description="Pacient no trobat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari.")
+    @blp.response(500, description="Error inesperat del servidor en recuperar el pacient.")
     def get(self, path_args: dict, **kwargs):
         """
         Retrieve patient information by email with role-based authorization.
@@ -609,12 +609,12 @@ class PatientData(MethodView):
 
             patient: Patient | None = Patient.query.get(patient_email)
             if not patient:
-                raise UserNotFoundException("Patient not found.")
+                raise UserNotFoundException("Pacient no trobat.")
 
             current_user_email: str = get_jwt_identity()
             current_user: User | None = User.query.get(current_user_email)
             if not current_user:
-                abort(401, message="Invalid authentication token.")
+                abort(401, message="Token d'autenticació no vàlid.")
 
             role_instance:Admin|Doctor|Patient = current_user.get_role_instance()
 
@@ -627,14 +627,14 @@ class PatientData(MethodView):
                 authorized = True
 
             if not authorized:
-                abort(403, message="You do not have permission to access this patient's data.")
+                abort(403, message="No tens permís per accedir a les dades d'aquest pacient.")
 
             patient_payload = patient.get_user().to_dict()
             return jsonify(patient_payload), 200
 
         except UserRoleConflictException as e:
             self.logger.error("User role conflict", module="PatientData", metadata={"patient_email": patient_email}, error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except UserNotFoundException as e:
             self.logger.error("Patient not found", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(404, message=str(e))
@@ -643,7 +643,7 @@ class PatientData(MethodView):
             raise e
         except Exception as e:
             self.logger.error("Fetching patient information failed", module="PatientData", metadata={"patient_email": patient_email}, error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en obtenir el pacient: {str(e)}")
 
 @blp.route('/forgot-password')
 class UserForgotPassword(MethodView):
@@ -662,16 +662,16 @@ class UserForgotPassword(MethodView):
     @blp.arguments(UserForgotPasswordSchema, location='json')
     @blp.doc(
         security=[],
-        summary="Request password reset",
-        description="Sends a reset code email using the configured password reset template.",
+        summary="Sol·licitar el restabliment de contrasenya",
+        description="Envia un correu amb el codi de restabliment utilitzant la plantilla configurada.",
     )
-    @blp.response(200, schema=UserForgotPasswordResponseSchema, description="Reset email sent; includes validity minutes.")
-    @blp.response(400, description="Missing required field.")
-    @blp.response(401, description="Invalid credentials for the reset request.")
-    @blp.response(404, description="User not found for the provided email.")
-    @blp.response(409, description="User role conflict detected.")
-    @blp.response(422, description="Payload failed validation.")
-    @blp.response(500, description="Failed to load the email template or send the reset email.")
+    @blp.response(200, schema=UserForgotPasswordResponseSchema, description="Correu de restabliment enviat; inclou els minuts de validesa.")
+    @blp.response(400, description="Falta un camp obligatori.")
+    @blp.response(401, description="Credencials no vàlides per a la sol·licitud de restabliment.")
+    @blp.response(404, description="Usuari no trobat per al correu proporcionat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="No s'ha pogut carregar la plantilla o enviar el correu de restabliment.")
     def post(self, data: dict) -> Response:
         """
         Initiate the password reset flow.
@@ -695,7 +695,7 @@ class UserForgotPassword(MethodView):
                 template = self._load_reset_password_template()
             except OSError as e:
                 self.logger.error("Failed to load reset password template", module="UserForgotPassword", error=e)
-                abort(500, message="Failed to load reset email template.")
+                abort(500, message="No s'ha pogut carregar la plantilla del correu de restabliment.")
 
             factory = AbstractForgotPasswordFactory.get_instance()
             forgot_password_facade = factory.get_password_facade()
@@ -706,39 +706,39 @@ class UserForgotPassword(MethodView):
         
         except SendEmailException as e:
             self.logger.error("User forgot password failed: Email sending error", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
-            abort(500, message="Failed to send reset email. Please try again later.")
+            abort(500, message="No s'ha pogut enviar el correu de restabliment. Torna-ho a provar més tard.")
         except UserRoleConflictException as e:
             self.logger.error("User forgot password failed: Role conflict", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except UserNotFoundException as e:
             self.logger.error("User forgot password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
-            abort(404, message=str(e))
+            abort(404, message="No s'ha trobat cap usuari amb el correu proporcionat.")
         except KeyError as e:
             self.logger.error("User forgot password failed due to missing field", module="UserForgotPassword", error=e)
-            abort(400, message=f"Missing field: {str(e)}")
+            abort(400, message=f"Falta el camp: {str(e)}")
         except InvalidCredentialsException as e:
             self.logger.error("User forgot password failed: Invalid credentials", module="UserForgotPassword", metadata={"email": data['email']}, error=e)
-            abort(401, message=str(e))
+            abort(401, message=f"Credencials no vàlides: {str(e)}")
         except ValueError as e:
             self.logger.error("User forgot password failed: Value Error", module="UserForgotPassword", error=e)
-            abort(422, message=str(e))
+            abort(422, message=f"Dades no vàlides: {str(e)}")
         except Exception as e:
             self.logger.error("User forgot password failed", module="UserForgotPassword", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en sol·licitar el restabliment: {str(e)}")
 
     @blp.arguments(UserResetPasswordSchema, location='json')
     @blp.doc(
         security=[],
-        summary="Reset password with code",
-        description="Validates the reset code and updates the user's password.",
+        summary="Restablir la contrasenya amb el codi",
+        description="Valida el codi de restabliment i actualitza la contrasenya de l'usuari.",
     )
-    @blp.response(200, schema=UserResetPasswordResponseSchema, description="Password reset successfully.")
-    @blp.response(400, description="Missing field or reset code is invalid/expired.")
-    @blp.response(401, description="Invalid credentials for the reset request.")
-    @blp.response(404, description="User not found for the provided email.")
-    @blp.response(409, description="User role conflict detected.")
-    @blp.response(422, description="Payload failed validation.")
-    @blp.response(500, description="Unexpected server error while resetting the password.")
+    @blp.response(200, schema=UserResetPasswordResponseSchema, description="Contrasenya restablerta correctament.")
+    @blp.response(400, description="Falta un camp o el codi de restabliment és invàlid o ha caducat.")
+    @blp.response(401, description="Credencials no vàlides per a la sol·licitud de restabliment.")
+    @blp.response(404, description="Usuari no trobat per al correu proporcionat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en restablir la contrasenya.")
     def patch(self, data: dict) -> Response:
         """
         Complete the password reset by validating the reset code and setting a new password.
@@ -761,27 +761,27 @@ class UserForgotPassword(MethodView):
             forgot_password_facade = factory.get_password_facade()
             forgot_password_facade.reset_password(data['email'], data['reset_code'], data['new_password'])
 
-            response_payload = {"message": "Contrasenya restablerta exitosament."}
+            response_payload = {"message": "Contrasenya restablerta correctament."}
             return jsonify(response_payload), 200
-        
+
         except InvalidResetCodeException as e:
             self.logger.error("User reset password failed: Invalid or expired reset code", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
-            abort(400, message=str(e))
+            abort(400, message="El codi de restabliment no és vàlid o ha caducat.")
         except UserRoleConflictException as e:
             self.logger.error("User reset password failed: Role conflict", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
-            abort(409, message=str(e))
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
         except UserNotFoundException as e:
             self.logger.error("User reset password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
-            abort(404, message=str(e))
+            abort(404, message="No s'ha trobat cap usuari amb el correu proporcionat.")
         except KeyError as e:
             self.logger.error("User reset password failed due to missing field", module="UserForgotPassword", error=e)
-            abort(400, message=f"Missing field: {str(e)}")
+            abort(400, message=f"Falta el camp: {str(e)}")
         except InvalidCredentialsException as e:
             self.logger.error("User reset password failed: Invalid credentials", module="UserForgotPassword", metadata={"email": data['email']}, error=e)
-            abort(401, message=str(e))
+            abort(401, message=f"Credencials no vàlides: {str(e)}")
         except ValueError as e:
             self.logger.error("User reset password failed: Value Error", module="UserForgotPassword", error=e)
-            abort(422, message=str(e))
+            abort(422, message=f"Dades no vàlides: {str(e)}")
         except Exception as e:
             self.logger.error("User reset password failed", module="UserForgotPassword", error=e)
-            abort(500, message=str(e))
+            abort(500, message=f"S'ha produït un error inesperat en restablir la contrasenya: {str(e)}")
