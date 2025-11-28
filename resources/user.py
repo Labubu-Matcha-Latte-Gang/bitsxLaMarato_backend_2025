@@ -1,3 +1,6 @@
+from functools import lru_cache
+from pathlib import Path
+
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
@@ -6,14 +9,19 @@ from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
+from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
+from helpers.exceptions.mail_exceptions import SendEmailException
 from helpers.exceptions.user_exceptions import (
+    InvalidResetCodeException,
     UserAlreadyExistsException,
     InvalidCredentialsException,
     UserNotFoundException,
     UserRoleConflictException,
     RelatedUserNotFoundException,
 )
+from helpers.factories.forgot_password import AbstractForgotPasswordFactory
+from helpers.forgot_password.forgot_password import ForgotPasswordFacade
 from models.admin import Admin
 from models.patient import Patient
 from models.user import User
@@ -21,12 +29,16 @@ from models.doctor import Doctor
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
+    UserForgotPasswordResponseSchema,
     UserLoginSchema,
     UserLoginResponseSchema,
     PatientEmailPathSchema,
+    UserResetPasswordResponseSchema,
+    UserResetPasswordSchema,
     UserResponseSchema,
     UserUpdateSchema,
     UserPartialUpdateSchema,
+    UserForgotPasswordSchema
 )
 
 blp = Blueprint('user', __name__, description='User related operations')
@@ -52,19 +64,37 @@ def _fetch_patients_by_email(emails: list[str]) -> set[Patient]:
 @blp.route('/patient')
 class PatientRegister(MethodView):
     """
-    Patient Registration Endpoint
+    Endpoints for registering patient accounts.
     """
 
     logger = AbstractLogger.get_instance()
 
     @blp.arguments(PatientRegisterSchema, location='json')
-    @blp.doc(security=[])
-    @blp.response(201, description="Patient successfully registered")
-    @blp.response(400, description="Bad Request")
-    @blp.response(422, description="Unprocessable Entity")
-    @blp.response(500, description="Internal Server Error")
+    @blp.doc(
+        security=[],
+        summary="Register patient",
+        description="Creates a base user plus patient profile and links any provided doctor emails.",
+    )
+    @blp.response(201, schema=UserResponseSchema, description="Patient user created with patient role data.")
+    @blp.response(400, description="Missing required field or the email is already registered.")
+    @blp.response(404, description="Referenced doctor email not found.")
+    @blp.response(422, description="Payload failed validation.")
+    @blp.response(500, description="Unexpected server error while creating the patient.")
     def post(self, data: dict) -> Response:
-        """Register a new patient"""
+        """
+        Register a new patient user.
+
+        Expects JSON that matches `PatientRegisterSchema`, including patient metrics and optional ailments,
+        treatments, and doctor associations. Creates the user, creates the patient profile, and assigns the
+        listed doctors.
+
+        Status codes:
+        - 201: Patient created; returns the created user payload.
+        - 400: Missing required fields or email already exists.
+        - 404: At least one doctor email could not be found.
+        - 422: Payload failed schema validation.
+        - 500: Unexpected error during creation.
+        """
         try:
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
@@ -129,19 +159,36 @@ class PatientRegister(MethodView):
 @blp.route('/doctor')
 class DoctorRegister(MethodView):
     """
-    Doctor Registration Endpoint
+    Endpoints for registering doctor accounts.
     """
 
     logger = AbstractLogger.get_instance()
 
     @blp.arguments(DoctorRegisterSchema, location='json')
-    @blp.doc(security=[])
-    @blp.response(201, description="Doctor successfully registered")
-    @blp.response(400, description="Bad Request")
-    @blp.response(422, description="Unprocessable Entity")
-    @blp.response(500, description="Internal Server Error")
+    @blp.doc(
+        security=[],
+        summary="Register doctor",
+        description="Creates a base user plus doctor profile and links any provided patients.",
+    )
+    @blp.response(201, schema=UserResponseSchema, description="Doctor user created with doctor role data.")
+    @blp.response(400, description="Missing required field or the email is already registered.")
+    @blp.response(404, description="Referenced patient email not found.")
+    @blp.response(422, description="Payload failed validation.")
+    @blp.response(500, description="Unexpected server error while creating the doctor.")
     def post(self, data: dict) -> Response:
-        """Register a new doctor"""
+        """
+        Register a new doctor user.
+
+        Expects JSON that matches `DoctorRegisterSchema`, creates the user and doctor profile, and links the
+        provided patients when present.
+
+        Status codes:
+        - 201: Doctor created; returns the created user payload.
+        - 400: Missing required fields or email already exists.
+        - 404: At least one patient email could not be found.
+        - 422: Payload failed schema validation.
+        - 500: Unexpected error during creation.
+        """
         try:
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
@@ -200,20 +247,38 @@ class DoctorRegister(MethodView):
 @blp.route('/login')
 class UserLogin(MethodView):
     """
-    User Login Endpoint
+    Authenticate users and issue JWT access tokens.
     """
 
     logger = AbstractLogger.get_instance()
 
     @blp.arguments(UserLoginSchema, location='json')
-    @blp.doc(security=[])
-    @blp.response(200, schema=UserLoginResponseSchema, description="User successfully logged in")
-    @blp.response(400, description="Bad Request")
-    @blp.response(401, description="Unauthorized")
-    @blp.response(422, description="Unprocessable Entity")
-    @blp.response(500, description="Internal Server Error")
+    @blp.doc(
+        security=[],
+        summary="Login user",
+        description="Authenticates a user with email and password and issues a JWT access token.",
+    )
+    @blp.response(200, schema=UserLoginResponseSchema, description="JWT access token issued for valid credentials.")
+    @blp.response(400, description="Missing required login fields.")
+    @blp.response(401, description="Invalid credentials.")
+    @blp.response(409, description="User role conflict detected during login.")
+    @blp.response(422, description="Payload failed validation.")
+    @blp.response(500, description="Unexpected server error during authentication.")
     def post(self, data: dict) -> Response:
-        """Login a user"""
+        """
+        Authenticate a user and issue a JWT.
+
+        Expects JSON that matches `UserLoginSchema` with an email and password. On success, returns an
+        access token that can be used for authenticated endpoints.
+
+        Status codes:
+        - 200: Valid credentials; returns the JWT access token.
+        - 400: Missing required login fields.
+        - 401: Invalid credentials.
+        - 409: User role state is inconsistent.
+        - 422: Payload failed schema validation.
+        - 500: Unexpected error during authentication.
+        """
         try:
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
             user:User|None = User.query.get(data['email'])
@@ -242,18 +307,34 @@ class UserLogin(MethodView):
 @blp.route('')
 class UserCRUD(MethodView):
     """
-    User CRUD Endpoint
+    Authenticated CRUD operations for the current user.
     """
 
     logger = AbstractLogger.get_instance()
 
     @jwt_required()
-    @blp.response(200, schema=UserResponseSchema, description="My user information retrieved successfully.")
+    @blp.doc(
+        summary="Get current user",
+        description="Returns the authenticated user's profile including role data.",
+    )
+    @blp.response(200, schema=UserResponseSchema, description="Current user profile returned.")
     @blp.response(401, description="Missing or invalid JWT.")
     @blp.response(404, description="User not found.")
-    @blp.response(500, description="Internal Server Error")
+    @blp.response(409, description="User role conflict detected.")
+    @blp.response(500, description="Unexpected server error while retrieving the user.")
     def get(self):
-        """Get my user information."""
+        """
+        Retrieve the authenticated user's profile.
+
+        Returns the base user data plus role-specific information for the current identity.
+
+        Status codes:
+        - 200: User found and returned.
+        - 401: Missing or invalid authentication token.
+        - 404: User does not exist.
+        - 409: User role configuration is inconsistent.
+        - 500: Unexpected error while fetching the user.
+        """
         try:
             self.logger.info("Fetching user information", module="UserCRUD")
             email:str = get_jwt_identity()
@@ -273,13 +354,31 @@ class UserCRUD(MethodView):
 
     @jwt_required()
     @blp.arguments(UserUpdateSchema, location='json')
-    @blp.response(200, schema=UserResponseSchema, description="User information updated successfully.")
-    @blp.response(400, description="Bad Request")
+    @blp.doc(
+        summary="Replace current user",
+        description="Fully replaces the authenticated user's profile and role data, resetting doctor/patient associations.",
+    )
+    @blp.response(200, schema=UserResponseSchema, description="User updated with the provided data.")
     @blp.response(401, description="Missing or invalid JWT.")
     @blp.response(404, description="User not found.")
-    @blp.response(500, description="Internal Server Error")
+    @blp.response(409, description="User role conflict detected.")
+    @blp.response(422, description="Payload failed validation.")
+    @blp.response(500, description="Unexpected server error while updating the user.")
     def put(self, data: dict):
-        """Replace user information (name, surname, and optionally password)."""
+        """
+        Fully replace the authenticated user's profile.
+
+        Expects JSON that matches `UserUpdateSchema`. Updates personal data, password when provided, and
+        replaces doctor/patient associations for the role with the provided values.
+
+        Status codes:
+        - 200: User updated and returned.
+        - 401: Missing or invalid authentication token.
+        - 404: User does not exist or related user not found.
+        - 409: User role configuration is inconsistent.
+        - 422: Payload failed schema validation.
+        - 500: Unexpected error while updating the user.
+        """
         try:
             email: str = get_jwt_identity()
             user: User | None = User.query.get(email)
@@ -329,13 +428,32 @@ class UserCRUD(MethodView):
 
     @jwt_required()
     @blp.arguments(UserPartialUpdateSchema, location='json')
-    @blp.response(200, schema=UserResponseSchema, description="User information partially updated successfully.")
-    @blp.response(400, description="Bad Request")
+    @blp.doc(
+        summary="Partially update current user",
+        description="Updates provided fields for the authenticated user and resets role associations when lists are supplied.",
+    )
+    @blp.response(200, schema=UserResponseSchema, description="User updated with the provided fields.")
     @blp.response(401, description="Missing or invalid JWT.")
     @blp.response(404, description="User not found.")
-    @blp.response(500, description="Internal Server Error")
+    @blp.response(409, description="User role conflict detected.")
+    @blp.response(422, description="Payload failed validation.")
+    @blp.response(500, description="Unexpected server error while partially updating the user.")
     def patch(self, data: dict):
-        """Partially update user information (name, surname, or password)."""
+        """
+        Partially update the authenticated user's profile.
+
+        Accepts any subset of fields from `UserPartialUpdateSchema`. Updates personal data and password when
+        provided. For patients/doctors, if association lists are provided, replaces them with the supplied
+        values.
+
+        Status codes:
+        - 200: User updated and returned.
+        - 401: Missing or invalid authentication token.
+        - 404: User does not exist or related user not found.
+        - 409: User role configuration is inconsistent.
+        - 422: Payload failed schema validation.
+        - 500: Unexpected error while updating the user.
+        """
         try:
             email: str = get_jwt_identity()
             user: User | None = User.query.get(email)
@@ -392,12 +510,28 @@ class UserCRUD(MethodView):
             abort(500, message=str(e))
 
     @jwt_required()
+    @blp.doc(
+        summary="Delete current user",
+        description="Deletes the authenticated user after removing all role associations.",
+    )
     @blp.response(204, description="User deleted successfully.")
     @blp.response(401, description="Missing or invalid JWT.")
     @blp.response(404, description="User not found.")
-    @blp.response(500, description="Internal Server Error")
+    @blp.response(409, description="User role conflict detected.")
+    @blp.response(500, description="Unexpected server error while deleting the user.")
     def delete(self):
-        """Delete the authenticated user."""
+        """
+        Delete the authenticated user's account.
+
+        Removes any role associations, deletes the user record, and returns an empty 204 response.
+
+        Status codes:
+        - 204: User deleted.
+        - 401: Missing or invalid authentication token.
+        - 404: User does not exist.
+        - 409: User role configuration is inconsistent.
+        - 500: Unexpected error while deleting the user.
+        """
         try:
             email: str = get_jwt_identity()
             user: User | None = User.query.get(email)
@@ -429,21 +563,38 @@ class UserCRUD(MethodView):
 @blp.route('/<string:email>')
 class PatientData(MethodView):
     """
-    Patient data access endpoint for admins and authorized doctors.
+    Patient data access endpoint for admins, assigned doctors, and the patient themselves.
     """
 
     logger = AbstractLogger.get_instance()
 
     @jwt_required()
     @blp.arguments(PatientEmailPathSchema, location="path")
+    @blp.doc(
+        summary="Get patient by email",
+        description="Admins can fetch any patient; doctors only if assigned; patients can fetch their own record.",
+    )
     @blp.response(200, schema=UserResponseSchema, description="Patient information retrieved successfully.")
-    @blp.response(400, description="Bad Request")
     @blp.response(401, description="Missing or invalid JWT.")
-    @blp.response(403, description="Forbidden")
+    @blp.response(403, description="The authenticated user is not allowed to view this patient.")
     @blp.response(404, description="Patient not found.")
-    @blp.response(500, description="Internal Server Error")
+    @blp.response(409, description="User role conflict detected.")
+    @blp.response(500, description="Unexpected server error while retrieving the patient.")
     def get(self, path_args: dict, **kwargs):
-        """Get patient information by email for admins or assigned doctors."""
+        """
+        Retrieve patient information by email with role-based authorization.
+
+        Requires a valid JWT. Admins can view any patient. Doctors can view patients they are assigned to.
+        Patients can view their own record.
+
+        Status codes:
+        - 200: Patient information returned.
+        - 401: Missing or invalid authentication token.
+        - 403: Authenticated user lacks permission to view the patient.
+        - 404: Patient does not exist.
+        - 409: User role configuration is inconsistent.
+        - 500: Unexpected error while fetching the patient.
+        """
         patient_email = None
         try:
             patient_email = path_args.get('email')
@@ -490,4 +641,145 @@ class PatientData(MethodView):
             raise e
         except Exception as e:
             self.logger.error("Fetching patient information failed", module="PatientData", metadata={"patient_email": patient_email}, error=e)
+            abort(500, message=str(e))
+
+@blp.route('/forgot-password')
+class UserForgotPassword(MethodView):
+    """
+    Endpoints for requesting and completing password resets.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    RESET_PASSWORD_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "mail_reset_password.html"
+
+    @lru_cache(maxsize=1)
+    def _load_reset_password_template(self) -> str:
+        return self.RESET_PASSWORD_TEMPLATE_PATH.read_text(encoding='utf-8')
+
+    @blp.arguments(UserForgotPasswordSchema, location='json')
+    @blp.doc(
+        security=[],
+        summary="Request password reset",
+        description="Sends a reset code email using the configured password reset template.",
+    )
+    @blp.response(200, schema=UserForgotPasswordResponseSchema, description="Reset email sent; includes validity minutes.")
+    @blp.response(400, description="Missing required field.")
+    @blp.response(401, description="Invalid credentials for the reset request.")
+    @blp.response(404, description="User not found for the provided email.")
+    @blp.response(409, description="User role conflict detected.")
+    @blp.response(422, description="Payload failed validation.")
+    @blp.response(500, description="Failed to load the email template or send the reset email.")
+    def post(self, data: dict) -> Response:
+        """
+        Initiate the password reset flow.
+
+        Expects JSON that matches `UserForgotPasswordSchema` with the user's email. Loads the reset email
+        template, generates and sends a reset code, and returns the validity window for the code.
+
+        Status codes:
+        - 200: Reset email sent successfully.
+        - 400: Required field missing.
+        - 401: Invalid credentials provided.
+        - 404: User does not exist.
+        - 409: User role configuration is inconsistent.
+        - 422: Payload failed schema validation.
+        - 500: Failed to load the template or send the email.
+        """
+        try:
+            self.logger.info("A user forgot their password", module="UserForgotPassword", metadata={"email": data['email']})
+
+            try:
+                template = self._load_reset_password_template()
+            except OSError as e:
+                self.logger.error("Failed to load reset password template", module="UserForgotPassword", error=e)
+                abort(500, message="Failed to load reset email template.")
+
+            factory = AbstractForgotPasswordFactory.get_instance()
+            forgot_password_facade = factory.get_password_facade()
+            forgot_password_facade.process_forgot_password(data['email'], APPLICATION_EMAIL, "Sol·licitud de canvi de contrasenya", template)
+
+            response_payload = {"message": "El mail ha estat enviat exitosament a l'usuari.", "validity": RESET_CODE_VALIDITY_MINUTES}
+            return jsonify(response_payload), 200
+        
+        except SendEmailException as e:
+            self.logger.error("User forgot password failed: Email sending error", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(500, message="Failed to send reset email. Please try again later.")
+        except UserRoleConflictException as e:
+            self.logger.error("User forgot password failed: Role conflict", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(409, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error("User forgot password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(404, message=str(e))
+        except KeyError as e:
+            self.logger.error("User forgot password failed due to missing field", module="UserForgotPassword", error=e)
+            abort(400, message=f"Missing field: {str(e)}")
+        except InvalidCredentialsException as e:
+            self.logger.error("User forgot password failed: Invalid credentials", module="UserForgotPassword", metadata={"email": data['email']}, error=e)
+            abort(401, message=str(e))
+        except ValueError as e:
+            self.logger.error("User forgot password failed: Value Error", module="UserForgotPassword", error=e)
+            abort(422, message=str(e))
+        except Exception as e:
+            self.logger.error("User forgot password failed", module="UserForgotPassword", error=e)
+            abort(500, message=str(e))
+
+    @blp.arguments(UserResetPasswordSchema, location='json')
+    @blp.doc(
+        security=[],
+        summary="Reset password with code",
+        description="Validates the reset code and updates the user's password.",
+    )
+    @blp.response(200, schema=UserResetPasswordResponseSchema, description="Password reset successfully.")
+    @blp.response(400, description="Missing field or reset code is invalid/expired.")
+    @blp.response(401, description="Invalid credentials for the reset request.")
+    @blp.response(404, description="User not found for the provided email.")
+    @blp.response(409, description="User role conflict detected.")
+    @blp.response(422, description="Payload failed validation.")
+    @blp.response(500, description="Unexpected server error while resetting the password.")
+    def patch(self, data: dict) -> Response:
+        """
+        Complete the password reset by validating the reset code and setting a new password.
+
+        Expects JSON that matches `UserResetPasswordSchema` with the email, reset code, and new password.
+
+        Status codes:
+        - 200: Password reset successfully.
+        - 400: Missing field or reset code invalid/expired.
+        - 401: Invalid credentials provided.
+        - 404: User does not exist.
+        - 409: User role configuration is inconsistent.
+        - 422: Payload failed schema validation.
+        - 500: Unexpected error while resetting the password.
+        """
+        try:
+            self.logger.info("A user wants to reset their password", module="UserForgotPassword", metadata={"email": data['email']})
+
+            factory = AbstractForgotPasswordFactory.get_instance()
+            forgot_password_facade = factory.get_password_facade()
+            forgot_password_facade.reset_password(data['email'], data['reset_code'], data['new_password'])
+
+            response_payload = {"message": "Contrasenya restablerta exitosament."}
+            return jsonify(response_payload), 200
+        
+        except InvalidResetCodeException as e:
+            self.logger.error("User reset password failed: Invalid or expired reset code", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(400, message=str(e))
+        except UserRoleConflictException as e:
+            self.logger.error("User reset password failed: Role conflict", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(409, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error("User reset password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(404, message=str(e))
+        except KeyError as e:
+            self.logger.error("User reset password failed due to missing field", module="UserForgotPassword", error=e)
+            abort(400, message=f"Missing field: {str(e)}")
+        except InvalidCredentialsException as e:
+            self.logger.error("User reset password failed: Invalid credentials", module="UserForgotPassword", metadata={"email": data['email']}, error=e)
+            abort(401, message=str(e))
+        except ValueError as e:
+            self.logger.error("User reset password failed: Value Error", module="UserForgotPassword", error=e)
+            abort(422, message=str(e))
+        except Exception as e:
+            self.logger.error("User reset password failed", module="UserForgotPassword", error=e)
             abort(500, message=str(e))
