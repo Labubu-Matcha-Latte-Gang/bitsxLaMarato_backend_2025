@@ -4,6 +4,7 @@ from models.doctor import Doctor
 from models.admin import Admin
 from models.associations import DoctorPatientAssociation, UserCodeAssociation, QuestionAnsweredAssociation
 from models.questions import Question
+from .transcription import TranscriptionChunk
 
 __all__ = [
     'User',
