@@ -164,3 +164,24 @@ class UserResetPasswordResponseSchema(Schema):
     Schema for user reset password response data.
     """
     message = fields.String(required=True, metadata={"description": "Response message indicating the result of the password reset operation."})
+
+class TranscriptionChunkSchema(Schema):
+    """
+    Schema for uploading an audio chunk.
+    Note: The file itself is handled via multipart/form-data, verified in the controller.
+    """
+    session_id = fields.String(required=True, metadata={"description": "Unique identifier for the recording session."})
+    chunk_index = fields.Integer(required=True, metadata={"description": "Sequential index of the chunk."})
+
+class TranscriptionCompleteSchema(Schema):
+    """
+    Schema for finalizing the transcription session.
+    """
+    session_id = fields.String(required=True, metadata={"description": "Unique identifier for the recording session to finalize."})
+
+class TranscriptionResponseSchema(Schema):
+    """
+    Schema for the final transcription response.
+    """
+    status = fields.String(required=True, metadata={"description": "Status of the operation."})
+    transcription = fields.String(required=True, metadata={"description": "The complete combined transcription text."})
