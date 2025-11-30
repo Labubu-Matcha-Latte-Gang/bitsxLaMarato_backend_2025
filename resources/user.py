@@ -11,7 +11,7 @@ from db import db
 from sqlalchemy.exc import IntegrityError
 from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
-from helpers.exceptions.mail_exceptions import SendEmailException
+from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
 from helpers.exceptions.user_exceptions import (
     InvalidResetCodeException,
     UserAlreadyExistsException,
@@ -704,6 +704,9 @@ class UserForgotPassword(MethodView):
             response_payload = {"message": "El mail ha estat enviat exitosament a l'usuari.", "validity": RESET_CODE_VALIDITY_MINUTES}
             return jsonify(response_payload), 200
         
+        except SMTPCredentialsException as e:
+            self.logger.error("User forgot password failed: SMTP credentials error", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(500, message="Error de configuració del servidor de correu. Contacta amb l'administrador.")
         except SendEmailException as e:
             self.logger.error("User forgot password failed: Email sending error", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
             abort(500, message="No s'ha pogut enviar el correu de restabliment. Torna-ho a provar més tard.")
