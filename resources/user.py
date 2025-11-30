@@ -24,10 +24,6 @@ from helpers.exceptions.user_exceptions import (
 from helpers.enums.user_role import UserRole
 from helpers.factories.controller_factories import AbstractControllerFactory
 from helpers.factories.forgot_password import AbstractForgotPasswordFactory
-from models.admin import Admin
-from models.patient import Patient
-from models.user import User
-from models.doctor import Doctor
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
