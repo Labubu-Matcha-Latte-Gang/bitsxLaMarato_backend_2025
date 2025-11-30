@@ -5,7 +5,6 @@ import uuid
 from models.question import Question
 from helpers.exceptions.question_exceptions import (
     QuestionCreationException,
-    QuestionDeletionException,
     QuestionNotFoundException,
     QuestionUpdateException,
 )
