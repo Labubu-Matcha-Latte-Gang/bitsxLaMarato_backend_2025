@@ -1,7 +1,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import uuid
+from random import choice
 
+from models.patient import Patient
 from models.question import Question
 from helpers.exceptions.question_exceptions import (
     QuestionCreationException,
@@ -76,6 +78,17 @@ class IQuestionController(ABC):
             QuestionUpdateException: If there is an error during question update.
         """
         raise NotImplementedError("update_question method must be implemented by subclasses.")
+    
+    @abstractmethod
+    def get_daily_question(self, patient: Patient) -> Question:
+        """
+        Retrieve a random daily question matching optional filters.
+        Args:
+            patient (Patient): The patient for whom to retrieve the daily question.
+        Returns:
+            Question: A random question.
+        """
+        raise NotImplementedError("get_daily_question method must be implemented by subclasses.")
 
     @classmethod
     def get_instance(cls, inst: 'IQuestionController' | None = None) -> 'IQuestionController':
@@ -146,3 +159,28 @@ class QuestionController(IQuestionController):
         except Exception as exc:
             raise QuestionUpdateException(f"No s'ha pogut actualitzar la pregunta: {str(exc)}") from exc
         return question
+
+    def get_daily_question(self, patient: Patient) -> Question:
+        query = Question.query
+
+        filters = patient.get_daily_question_filters()
+        
+        question_type = filters.get('question_type')
+        difficulty = filters.get('difficulty')
+        difficulty_min = filters.get('difficulty_min')
+        difficulty_max = filters.get('difficulty_max')
+
+        if question_type:
+            query = query.filter(Question.question_type == question_type)
+        if difficulty is not None:
+            query = query.filter(Question.difficulty == difficulty)
+        if difficulty_min is not None:
+            query = query.filter(Question.difficulty >= difficulty_min)
+        if difficulty_max is not None:
+            query = query.filter(Question.difficulty <= difficulty_max)
+
+        questions = query.all()
+        if not questions:
+            questions = Question.query.all()
+        
+        return choice(questions)
