@@ -2,6 +2,7 @@ from flask import Response, jsonify
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import IntegrityError
+from flask_jwt_extended import get_jwt_identity
 
 from db import db
 from helpers.debugger.logger import AbstractLogger
@@ -14,6 +15,7 @@ from helpers.exceptions.question_exceptions import (
 )
 from helpers.factories.controller_factories import AbstractControllerFactory
 from schemas import (
+    DailyQuestionSchema,
     QuestionBulkCreateSchema,
     QuestionIdSchema,
     QuestionPartialUpdateSchema,
@@ -290,3 +292,58 @@ class QuestionResource(MethodView):
             db.session.rollback()
             self.logger.error("Error inesperat en DELETE de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(500, message=f"S'ha produït un error inesperat en eliminar la pregunta: {str(e)}")
+
+@blp.route('/daily')
+class DailyQuestionResource(MethodView):
+    """
+    Endpoints per a la pregunta diària.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.PATIENT])
+    @blp.doc(
+        summary="Obtenir pregunta diària",
+        description=(
+            "Obté la pregunta diària per al pacient."
+        ),
+    )
+    @blp.response(200, schema=QuestionResponseSchema, description="Pregunta diària recuperada correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
+    @blp.response(404, description="No s'ha trobat la pregunta indicada.")
+    @blp.response(500, description="Error inesperat del servidor en consultar les preguntes.")
+    def get(self):
+        """
+        Obtenir la pregunta diària.
+        """
+        email:str|None = None
+        try:
+            email = get_jwt_identity()
+
+            self.logger.info(
+                "Recuperant pregunta diària",
+                module="DailyQuestionResource",
+                metadata={"patient_email": email},
+            )
+
+            factory = AbstractControllerFactory.get_instance()
+
+            patient_controller = factory.get_patient_controller()
+            patient = patient_controller.get_patient(email)
+
+            question_controller = factory.get_question_controller()
+            question = question_controller.get_daily_question(patient)
+
+            return jsonify(question.to_dict()), 200
+        except QuestionNotFoundException as e:
+            self.logger.error(
+                "Pregunta no trobada",
+                module="DailyQuestionResource",
+                metadata={"patient_email": email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except Exception as e:
+            self.logger.error("Error inesperat en recuperar preguntes", module="DailyQuestionResource", error=e)
+            abort(500, message=f"S'ha produït un error inesperat en recuperar la pregunta diària: {str(e)}")
