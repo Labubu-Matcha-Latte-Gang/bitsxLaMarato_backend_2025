@@ -150,7 +150,7 @@ class QuestionResource(MethodView):
         """
         question_id = None
         try:
-            query_args = QuestionIdSchema().load(request.args)
+            query_args:dict = QuestionIdSchema().load(request.args)
             question_id = query_args['id']
         except ValidationError as e:
             abort(422, message=e.messages)
@@ -205,7 +205,7 @@ class QuestionResource(MethodView):
         """
         question_id = None
         try:
-            query_args = QuestionIdSchema().load(request.args)
+            query_args:dict = QuestionIdSchema().load(request.args)
             question_id = query_args['id']
         except ValidationError as e:
             abort(422, message=e.messages)
@@ -260,7 +260,7 @@ class QuestionResource(MethodView):
         """
         question_id = None
         try:
-            query_args = QuestionIdSchema().load(request.args)
+            query_args:dict = QuestionIdSchema().load(request.args)
             question_id = query_args['id']
         except ValidationError as e:
             abort(422, message=e.messages)
