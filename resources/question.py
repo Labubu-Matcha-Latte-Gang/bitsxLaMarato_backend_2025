@@ -90,7 +90,12 @@ class QuestionResource(MethodView):
     @blp.arguments(QuestionQuerySchema, location='query')
     @blp.doc(
         summary="Consultar preguntes",
-        description="Recupera preguntes filtrant per ID, dificultat o tipus de pregunta.",
+        description=(
+            "Filtra preguntes per diversos criteris: "
+            "`id` (UUID exacte), `question_type` (enum), `difficulty` (valor exacte), "
+            "`difficulty_min` (>=) i `difficulty_max` (<=). "
+            "Es poden combinar; sense cap filtre es retornen totes."
+        ),
     )
     @blp.response(200, schema=QuestionResponseSchema(many=True), description="Preguntes recuperades correctament.")
     @blp.response(401, description="Falta o és invàlid el JWT.")
@@ -101,9 +106,15 @@ class QuestionResource(MethodView):
         """
         Obtenir preguntes amb filtres opcionals.
 
-        - Amb 'id' recupera la pregunta específica.
-        - Amb 'difficulty' i/o 'question_type' retorna les coincidències.
-        - Sense filtres retorna totes les preguntes.
+        Paràmetres de consulta:
+        - `id`: UUID exacte d'una pregunta (retorna només aquesta o 404 si no existeix).
+        - `question_type`: Valor de l'enum QuestionType.
+        - `difficulty`: Valor exacte de dificultat (0-5).
+        - `difficulty_min`: Dificultat mínima (>=).
+        - `difficulty_max`: Dificultat màxima (<=).
+
+        Es poden combinar `difficulty`, `difficulty_min` i `difficulty_max`; tots els filtres aplicats alhora.
+        Sense filtres retorna totes les preguntes.
         """
         filters = {k: v for k, v in (query_args or {}).items() if v is not None}
         try:
