@@ -9,7 +9,7 @@ class EmailAdapterServiceLocator:
     """
     Service locator responsible for resolving concrete email adapters.
     """
-    __instance: 'EmailAdapterServiceLocator' | None = None
+    __instance: 'EmailAdapterServiceLocator' = None
 
     def __init__(self):
         self.__registry: dict[str, Callable[[], AbstractEmailAdapter]] = {}
