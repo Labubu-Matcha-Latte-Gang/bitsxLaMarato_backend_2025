@@ -34,14 +34,14 @@ class IUserController(ABC):
         raise NotImplementedError("create_user method must be implemented by subclasses.")
     
     @abstractmethod
-    def update_user(self, email: str, update_data: dict) -> tuple[User, UserRole]:
+    def update_user(self, email: str, update_data: dict) -> tuple[User, str]:
         """
         Update an existing user with the provided data.
         Args:
             email (str): The email of the user to update.
             update_data (dict): A dictionary containing attributes to update.
         Returns:
-            tuple[User, UserRole]: The updated user object and their role.
+            tuple[User, str]: The updated user object and the association key.
         Raises:
             UserNotFoundException: If no user is found with the given email.
             UserUpdateException: If there is an error during user update.
@@ -82,7 +82,7 @@ class UserController(IUserController):
         new_user = User(**user_payload)
         return new_user
 
-    def update_user(self, email: str, update_data: dict) -> tuple[User, UserRole]:
+    def update_user(self, email: str, update_data: dict) -> tuple[User, str]:
         user: User | None = User.query.get(email)
         if not user:
             raise UserNotFoundException("Usuari no trobat.")
@@ -90,4 +90,5 @@ class UserController(IUserController):
         user.set_properties(update_data)
         role_instance = user.get_role_instance()
         role_type = role_instance.get_role()
-        return user, role_type
+        association_key = "patients" if role_type == UserRole.DOCTOR else "doctors"
+        return user, association_key
