@@ -76,19 +76,6 @@ class IQuestionController(ABC):
             QuestionUpdateException: If there is an error during question update.
         """
         raise NotImplementedError("update_question method must be implemented by subclasses.")
-    
-    @abstractmethod
-    def delete_question(self, question_id: uuid.UUID) -> Question:
-        """
-        Delete a question by its ID.
-        Args:
-            question_id (uuid.UUID): The ID of the question to delete.
-        Returns:
-            Question: The deleted question.
-        Raises:
-            QuestionNotFoundException: If no question is found with the given ID.
-        """
-        raise NotImplementedError("delete_question method must be implemented by subclasses.")
 
     @classmethod
     def get_instance(cls, inst: 'IQuestionController' | None = None) -> 'IQuestionController':
@@ -158,8 +145,4 @@ class QuestionController(IQuestionController):
             question.set_properties(update_data)
         except Exception as exc:
             raise QuestionUpdateException(f"No s'ha pogut actualitzar la pregunta: {str(exc)}") from exc
-        return question
-
-    def delete_question(self, question_id: uuid.UUID) -> Question:
-        question = self.get_question(question_id)
         return question

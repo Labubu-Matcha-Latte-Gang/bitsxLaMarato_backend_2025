@@ -273,7 +273,7 @@ class QuestionResource(MethodView):
             factory = AbstractControllerFactory.get_instance()
             question_controller = factory.get_question_controller()
 
-            question = question_controller.delete_question(question_id)
+            question = question_controller.get_question(question_id)
             db.session.delete(question)
             db.session.commit()
 
