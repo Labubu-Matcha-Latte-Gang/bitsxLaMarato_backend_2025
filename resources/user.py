@@ -386,9 +386,11 @@ class UserCRUD(MethodView):
         email: str | None = None
         try:
             email = get_jwt_identity()
-            user: User | None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -396,18 +398,6 @@ class UserCRUD(MethodView):
                 module="UserCRUD",
                 metadata={"email": email, "fields_updated": update_fields}
             )
-
-            user.set_properties(data)
-
-            doctor_emails:list[str] = data.get('doctors', []) or []
-            patient_emails:list[str] = data.get('patients', []) or []
-
-            data['doctors'] = _fetch_doctors_by_email(doctor_emails)
-            data['patients'] = _fetch_patients_by_email(patient_emails)
-
-            role_instance = user.get_role_instance()
-            role_instance.remove_all_associations_between_user_roles()
-            role_instance.set_properties(data)
 
             db.session.commit()
             return jsonify(user.to_dict()), 200
@@ -462,9 +452,11 @@ class UserCRUD(MethodView):
         email: str | None = None
         try:
             email = get_jwt_identity()
-            user: User | None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+            
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -472,26 +464,6 @@ class UserCRUD(MethodView):
                 module="UserCRUD",
                 metadata={"email": email, "fields_updated": update_fields}
             )
-
-            user.set_properties(data)
-
-            role_instance = user.get_role_instance()
-            role_data = dict(data)
-
-            if isinstance(role_instance, Patient) and 'doctors' in data:
-                doctor_emails:list[str] = data.get('doctors') or []
-                new_doctors = _fetch_doctors_by_email(doctor_emails)
-                role_instance.remove_all_associations_between_user_roles()
-                role_instance.add_doctors(new_doctors)
-                role_data.pop('doctors', None)
-            elif isinstance(role_instance, Doctor) and 'patients' in data:
-                patient_emails:list[str] = data.get('patients') or []
-                new_patients = _fetch_patients_by_email(patient_emails)
-                role_instance.remove_all_associations_between_user_roles()
-                role_instance.add_patients(new_patients)
-                role_data.pop('patients', None)
-
-            role_instance.set_properties(role_data)
 
             db.session.commit()
             return jsonify(user.to_dict()), 200
