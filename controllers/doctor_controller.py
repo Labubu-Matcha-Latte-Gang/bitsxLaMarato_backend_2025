@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from helpers.exceptions.user_exceptions import RelatedUserNotFoundException, UserAlreadyExistsException, UserNotFoundException
+from helpers.factories.controller_factories import AbstractControllerFactory
 from models.doctor import Doctor
 from models.user import User
 
@@ -105,7 +106,9 @@ class DoctorController(IDoctorController):
         
         patient_emails:list[str] = update_data.get('patients', []) or []
 
-        update_data['patients'] = _fetch_patients_by_email(patient_emails)
+        factory = AbstractControllerFactory.get_instance()
+        patient_controller = factory.get_patient_controller()
+        update_data['patients'] = patient_controller.fetch_patients_by_email(patient_emails)
 
         role_instance = user.get_role_instance()
         role_instance.remove_all_associations_between_user_roles()
