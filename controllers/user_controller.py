@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from models.user import User
 
 class IUserController(ABC):
+    __instance: 'IUserController' = None
+
     @abstractmethod
     def get_user(self, email: str) -> User:
         """
@@ -43,3 +45,29 @@ class IUserController(ABC):
             UserUpdateException: If there is an error during user update.
         """
         raise NotImplementedError("update_user method must be implemented by subclasses.")
+    
+    @classmethod
+    def get_instance(cls, inst: 'IUserController' | None = None) -> 'IUserController':
+        """
+        Get the singleton instance of the user controller.
+        Args:
+            inst (IUserController | None): Optional instance to set as the singleton.
+        Returns:
+            IUserController: The instance of the user controller.
+        """
+        if cls.__instance is None:
+            cls.__instance = inst or UserController()
+        return cls.__instance
+    
+class UserController(IUserController):
+    def get_user(self, email: str) -> User:
+        # Implementation for retrieving a user by email
+        pass
+
+    def create_user(self, user_data: dict) -> User:
+        # Implementation for creating a new user
+        pass
+
+    def update_user(self, email: str, update_data: dict) -> User:
+        # Implementation for updating an existing user
+        pass
