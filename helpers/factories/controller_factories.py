@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from controllers.doctor_controller import IDoctorController
     from controllers.patient_controller import IPatientController
-    from controllers.user_controller import IUserController, UserController
+    from controllers.user_controller import IUserController
 
 class AbstractControllerFactory(ABC):
     __instance: 'AbstractControllerFactory' = None
