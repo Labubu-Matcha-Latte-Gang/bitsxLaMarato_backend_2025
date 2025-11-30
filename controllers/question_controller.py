@@ -38,5 +38,5 @@ class QuestionController(IQuestionController):
     def get_question(self, question_id: uuid.UUID) -> Question:
         question = Question.query.get(question_id)
         if not question:
-            raise ValueError(f"Question with ID {question_id} not found.")
+            raise QuestionNotFoundException(f"No s'ha trobat cap pregunta amb l'ID {question_id}.")
         return question
