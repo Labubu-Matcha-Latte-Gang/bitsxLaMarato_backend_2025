@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from helpers.exceptions.user_exceptions import UserAlreadyExistsException, UserNotFoundException
 from models.user import User
 
 class IUserController(ABC):
@@ -61,13 +62,24 @@ class IUserController(ABC):
     
 class UserController(IUserController):
     def get_user(self, email: str) -> User:
-        # Implementation for retrieving a user by email
-        pass
+        user: User | None = User.query.get(email)
+        if not user:
+            raise UserNotFoundException("Usuari no trobat.")
+        return user
 
     def create_user(self, user_data: dict) -> User:
-        # Implementation for creating a new user
-        pass
+        potential_existing_user = User.query.get(user_data.get('email'))
+        if potential_existing_user:
+            raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
+        
+        new_user = User(**user_data)
+        return new_user
 
     def update_user(self, email: str, update_data: dict) -> User:
-        # Implementation for updating an existing user
-        pass
+        user: User | None = User.query.get(email)
+        if not user:
+            raise UserNotFoundException("Usuari no trobat.")
+        
+        user.set_properties(update_data)
+        #TODO: patients & doctors update
+        return user
