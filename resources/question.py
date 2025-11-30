@@ -1,7 +1,6 @@
-from flask import Response, jsonify, request
+from flask import Response, jsonify
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
-from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 from db import db
@@ -142,6 +141,7 @@ class QuestionResource(MethodView):
             abort(500, message=f"S'ha produït un error inesperat en recuperar les preguntes: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
+    @blp.arguments(QuestionIdSchema, location='query')
     @blp.arguments(QuestionUpdateSchema, location='json')
     @blp.doc(
         summary="Reemplaçar una pregunta",
@@ -153,18 +153,13 @@ class QuestionResource(MethodView):
     @blp.response(404, description="No s'ha trobat la pregunta indicada.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en actualitzar la pregunta.")
-    def put(self, data: dict):
+    def put(self, query_args: dict, data: dict):
         """
         Reemplaçar completament una pregunta.
 
         Cal passar l'ID per query string (?id=<uuid>) i tots els camps al cos.
         """
-        question_id = None
-        try:
-            query_args:dict = QuestionIdSchema().load(request.args)
-            question_id = query_args['id']
-        except ValidationError as e:
-            abort(422, message=e.messages)
+        question_id = query_args['id']
 
         try:
             self.logger.info(
@@ -197,6 +192,7 @@ class QuestionResource(MethodView):
             abort(500, message=f"S'ha produït un error inesperat en actualitzar la pregunta: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
+    @blp.arguments(QuestionIdSchema, location='query')
     @blp.arguments(QuestionPartialUpdateSchema, location='json')
     @blp.doc(
         summary="Actualització parcial d'una pregunta",
@@ -208,18 +204,13 @@ class QuestionResource(MethodView):
     @blp.response(404, description="No s'ha trobat la pregunta indicada.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en actualitzar la pregunta.")
-    def patch(self, data: dict):
+    def patch(self, query_args: dict, data: dict):
         """
         Actualitzar parcialment una pregunta.
 
         Cal passar l'ID per query string (?id=<uuid>) i com a mínim un camp al cos.
         """
-        question_id = None
-        try:
-            query_args:dict = QuestionIdSchema().load(request.args)
-            question_id = query_args['id']
-        except ValidationError as e:
-            abort(422, message=e.messages)
+        question_id = query_args['id']
 
         if not data:
             abort(400, message="No s'ha proporcionat cap camp per actualitzar.")
@@ -255,6 +246,7 @@ class QuestionResource(MethodView):
             abort(500, message=f"S'ha produït un error inesperat en actualitzar la pregunta: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
+    @blp.arguments(QuestionIdSchema, location='query')
     @blp.doc(
         summary="Eliminar una pregunta",
         description="Esborra una pregunta existent identificada per ID.",
@@ -265,16 +257,11 @@ class QuestionResource(MethodView):
     @blp.response(404, description="No s'ha trobat la pregunta indicada.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en eliminar la pregunta.")
-    def delete(self):
+    def delete(self, query_args: dict):
         """
         Eliminar una pregunta pel seu ID.
         """
-        question_id = None
-        try:
-            query_args:dict = QuestionIdSchema().load(request.args)
-            question_id = query_args['id']
-        except ValidationError as e:
-            abort(422, message=e.messages)
+        question_id = query_args['id']
 
         try:
             self.logger.info(
