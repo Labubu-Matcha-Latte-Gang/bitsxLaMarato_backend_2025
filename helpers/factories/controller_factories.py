@@ -52,10 +52,13 @@ class AbstractControllerFactory(ABC):
 
 class ControllerFactory(AbstractControllerFactory):
     def get_user_controller(self) -> IUserController:
+        from controllers.user_controller import IUserController, UserController
         return IUserController.get_instance(UserController())
     
     def get_patient_controller(self) -> IPatientController:
-        return IPatientController.get_instance()
+        from controllers.patient_controller import IPatientController, PatientController
+        return IPatientController.get_instance(PatientController())
     
     def get_doctor_controller(self) -> IDoctorController:
-        return IDoctorController.get_instance()
+        from controllers.doctor_controller import IDoctorController, DoctorController
+        return IDoctorController.get_instance(DoctorController())
