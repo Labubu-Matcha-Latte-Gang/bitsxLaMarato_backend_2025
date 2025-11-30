@@ -15,7 +15,6 @@ from helpers.exceptions.question_exceptions import (
 )
 from helpers.factories.controller_factories import AbstractControllerFactory
 from schemas import (
-    DailyQuestionSchema,
     QuestionBulkCreateSchema,
     QuestionIdSchema,
     QuestionPartialUpdateSchema,
