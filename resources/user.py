@@ -186,7 +186,7 @@ class DoctorRegister(MethodView):
 
             user_payload = {
                 "email": data['email'],
-                "password": User.hash_password(data['password']),
+                "password": data['password'],
                 "name": data['name'],
                 "surname": data['surname'],
             }
