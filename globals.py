@@ -40,3 +40,12 @@ APPLICATION_EMAIL = os.getenv('APPLICATION_EMAIL')
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 RESET_PASSWORD_FRONTEND_PATH = FRONTEND_URL + os.getenv('RESET_PASSWORD_FRONTEND_PATH', '/reset-password')
 RESET_CODE_VALIDITY_MINUTES = 5
+
+EMAIL_ADAPTER_PROVIDER = os.getenv('EMAIL_ADAPTER_PROVIDER', 'smtp').lower()
+
+SMTP_HOST = os.getenv('SMTP_HOST')
+SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+SMTP_USERNAME = os.getenv('SMTP_USERNAME')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+SMTP_USE_TLS = str(os.getenv('SMTP_USE_TLS', 'true')).lower() in ('t', 'true', '1', 'y', 'yes')
+SMTP_USE_SSL = str(os.getenv('SMTP_USE_SSL', 'false')).lower() in ('t', 'true', '1', 'y', 'yes')
