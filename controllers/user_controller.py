@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import UserAlreadyExistsException, UserNotFoundException
+from helpers.factories.controller_factories import AbstractControllerFactory
+from models.interfaces import IUserRole
 from models.user import User
 
 class IUserController(ABC):
@@ -34,14 +36,14 @@ class IUserController(ABC):
         raise NotImplementedError("create_user method must be implemented by subclasses.")
     
     @abstractmethod
-    def update_user(self, email: str, update_data: dict) -> tuple[User, str]:
+    def update_user(self, email: str, update_data: dict) -> User:
         """
         Update an existing user with the provided data.
         Args:
             email (str): The email of the user to update.
             update_data (dict): A dictionary containing attributes to update.
         Returns:
-            tuple[User, str]: The updated user object and the association key.
+            User: The updated user object.
         Raises:
             UserNotFoundException: If no user is found with the given email.
             UserUpdateException: If there is an error during user update.
@@ -82,7 +84,7 @@ class UserController(IUserController):
         new_user = User(**user_payload)
         return new_user
 
-    def update_user(self, email: str, update_data: dict) -> tuple[User, str]:
+    def update_user(self, email: str, update_data: dict) -> User:
         user: User | None = User.query.get(email)
         if not user:
             raise UserNotFoundException("Usuari no trobat.")
@@ -90,5 +92,13 @@ class UserController(IUserController):
         user.set_properties(update_data)
         role_instance = user.get_role_instance()
         role_type = role_instance.get_role()
-        association_key = "patients" if role_type == UserRole.DOCTOR else "doctors"
-        return user, association_key
+        factory = AbstractControllerFactory.get_instance()
+        match role_type:
+            case UserRole.DOCTOR:
+                controller = factory.get_doctor_controller()
+                controller.update_doctor(user, update_data)
+            case UserRole.PATIENT:
+                controller = factory.get_patient_controller()
+                controller.update_patient(user, update_data)
+
+        return user
