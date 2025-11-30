@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from controllers.doctor_controller import IDoctorController
-from controllers.patient_controller import IPatientController
-from controllers.user_controller import IUserController, UserController
+if TYPE_CHECKING:
+    from controllers.doctor_controller import IDoctorController
+    from controllers.patient_controller import IPatientController
+    from controllers.user_controller import IUserController, UserController
 
 class AbstractControllerFactory(ABC):
     __instance: 'AbstractControllerFactory' = None
