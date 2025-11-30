@@ -3,7 +3,12 @@ from abc import ABC, abstractmethod
 import uuid
 
 from models.question import Question
-from helpers.exceptions.question_exceptions import QuestionNotFoundException
+from helpers.exceptions.question_exceptions import (
+    QuestionCreationException,
+    QuestionDeletionException,
+    QuestionNotFoundException,
+    QuestionUpdateException,
+)
 
 class IQuestionController(ABC):
     __instance: 'IQuestionController' = None
@@ -22,6 +27,19 @@ class IQuestionController(ABC):
         raise NotImplementedError("get_question method must be implemented by subclasses.")
     
     @abstractmethod
+    def list_questions(self, filters: dict) -> list[Question]:
+        """
+        Retrieve questions matching optional filters.
+        Args:
+            filters (dict): Dictionary with optional keys: id, difficulty, question_type.
+        Returns:
+            list[Question]: Questions that match the filters.
+        Raises:
+            QuestionNotFoundException: If an ID filter is provided but no question matches.
+        """
+        raise NotImplementedError("list_questions method must be implemented by subclasses.")
+    
+    @abstractmethod
     def create_question(self, question_data: dict) -> Question:
         """
         Create a new question with the provided data.
@@ -33,6 +51,17 @@ class IQuestionController(ABC):
             QuestionCreationException: If there is an error during question creation.
         """
         raise NotImplementedError("create_question method must be implemented by subclasses.")
+    
+    @abstractmethod
+    def create_questions(self, questions_data: list[dict]) -> list[Question]:
+        """
+        Create multiple questions.
+        Args:
+            questions_data (list[dict]): List of question payloads.
+        Returns:
+            list[Question]: Created questions.
+        """
+        raise NotImplementedError("create_questions method must be implemented by subclasses.")
     
     @abstractmethod
     def update_question(self, question_id: uuid.UUID, update_data: dict) -> Question:
@@ -48,6 +77,19 @@ class IQuestionController(ABC):
             QuestionUpdateException: If there is an error during question update.
         """
         raise NotImplementedError("update_question method must be implemented by subclasses.")
+    
+    @abstractmethod
+    def delete_question(self, question_id: uuid.UUID) -> Question:
+        """
+        Delete a question by its ID.
+        Args:
+            question_id (uuid.UUID): The ID of the question to delete.
+        Returns:
+            Question: The deleted question.
+        Raises:
+            QuestionNotFoundException: If no question is found with the given ID.
+        """
+        raise NotImplementedError("delete_question method must be implemented by subclasses.")
 
     @classmethod
     def get_instance(cls, inst: 'IQuestionController' | None = None) -> 'IQuestionController':
@@ -69,15 +111,50 @@ class QuestionController(IQuestionController):
             raise QuestionNotFoundException(f"No s'ha trobat cap pregunta amb l'ID {question_id}.")
         return question
     
+    def list_questions(self, filters: dict) -> list[Question]:
+        query = Question.query
+
+        question_id = filters.get('id')
+        difficulty = filters.get('difficulty')
+        question_type = filters.get('question_type')
+
+        if question_id:
+            query = query.filter(Question.id == question_id)
+        if difficulty is not None:
+            query = query.filter(Question.difficulty == difficulty)
+        if question_type:
+            query = query.filter(Question.question_type == question_type)
+
+        questions = query.all()
+        if question_id and not questions:
+            raise QuestionNotFoundException(f"No s'ha trobat cap pregunta amb l'ID {question_id}.")
+        return questions
+    
     def create_question(self, question_data: dict) -> Question:
-        question_payload = {
-            "id": uuid.uuid4(),
-            **question_data
-        }
-        question = Question(**question_payload)
-        return question
+        try:
+            question_payload = {
+                "id": uuid.uuid4(),
+                **question_data
+            }
+            question = Question(**question_payload)
+            return question
+        except Exception as exc:
+            raise QuestionCreationException(f"No s'ha pogut crear la pregunta: {str(exc)}") from exc
+    
+    def create_questions(self, questions_data: list[dict]) -> list[Question]:
+        try:
+            return [self.create_question(question_data) for question_data in questions_data]
+        except Exception as exc:
+            raise QuestionCreationException(f"No s'han pogut crear les preguntes: {str(exc)}") from exc
     
     def update_question(self, question_id: uuid.UUID, update_data: dict) -> Question:
         question = self.get_question(question_id)
-        question.set_properties(update_data)
+        try:
+            question.set_properties(update_data)
+        except Exception as exc:
+            raise QuestionUpdateException(f"No s'ha pogut actualitzar la pregunta: {str(exc)}") from exc
+        return question
+
+    def delete_question(self, question_id: uuid.UUID) -> Question:
+        question = self.get_question(question_id)
         return question
