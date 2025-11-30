@@ -1,9 +1,9 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import UserAlreadyExistsException, UserNotFoundException
 from helpers.factories.controller_factories import AbstractControllerFactory
-from models.interfaces import IUserRole
 from models.user import User
 
 class IUserController(ABC):
