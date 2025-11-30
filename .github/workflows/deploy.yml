@@ -52,6 +52,7 @@ jobs:
             -e DB_PASSWORD=dummy \
             -e DB_HOST=localhost \
             -e DB_NAME=dummy_db \
+            -e OPENAI_API_KEY=dummy \
             ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test
           
           echo "⏳ Esperando 10 segundos para ver si se mantiene estable..."
