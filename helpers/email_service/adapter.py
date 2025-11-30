@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Sequence
 
+from bs4 import BeautifulSoup
+
+from globals import EMAIL_ADAPTER_PROVIDER
+from helpers.service_locators.email import EmailAdapterServiceLocator
+
 class AbstractEmailAdapter(ABC):
     __instance: 'AbstractEmailAdapter' = None
 
@@ -26,7 +31,17 @@ class AbstractEmailAdapter(ABC):
             AbstractEmailAdapter: The instance of the email adapter.
         """
         if cls.__instance is None:
-            from helpers.email_service.send_grid import SendGridEmailAdapter
-
-            cls.__instance = SendGridEmailAdapter()
+            locator = EmailAdapterServiceLocator.get_instance()
+            cls.__instance = locator.resolve(EMAIL_ADAPTER_PROVIDER)
         return cls.__instance
+    
+    def _is_html(self, content: str) -> bool:
+        """
+        Check if the content is HTML.
+        Args:
+            content (str): The content to check.
+        Returns:
+            bool: True if the content is HTML, False otherwise.
+        """
+        bool_html = bool(BeautifulSoup(content, "html.parser").find())
+        return bool_html
