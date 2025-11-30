@@ -26,7 +26,7 @@ from schemas import (
 blp = Blueprint('question', __name__, description="Operacions CRUD per a les preguntes de l'aplicació.")
 
 
-@blp.route('/question')
+@blp.route('')
 class QuestionResource(MethodView):
     """
     Endpoints per gestionar preguntes.
