@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from controllers.doctor_controller import IDoctorController
     from controllers.patient_controller import IPatientController
     from controllers.user_controller import IUserController
+    from controllers.question_controller import IQuestionController
 
 class AbstractControllerFactory(ABC):
     __instance: 'AbstractControllerFactory' = None
@@ -49,6 +50,15 @@ class AbstractControllerFactory(ABC):
             IDoctorController: The doctor controller instance.
         """
         raise NotImplementedError("get_doctor_controller method must be implemented by subclasses.")
+    
+    @abstractmethod
+    def get_question_controller(self) -> IQuestionController:
+        """
+        Get the question controller instance.
+        Returns:
+            IQuestionController: The question controller instance.
+        """
+        raise NotImplementedError("get_question_controller method must be implemented by subclasses.")
 
 class ControllerFactory(AbstractControllerFactory):
     def get_user_controller(self) -> IUserController:
@@ -62,3 +72,7 @@ class ControllerFactory(AbstractControllerFactory):
     def get_doctor_controller(self) -> IDoctorController:
         from controllers.doctor_controller import IDoctorController, DoctorController
         return IDoctorController.get_instance(DoctorController())
+
+    def get_question_controller(self) -> IQuestionController:
+        from controllers.question_controller import IQuestionController, QuestionController
+        return IQuestionController.get_instance(QuestionController())
