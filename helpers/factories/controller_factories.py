@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from controllers.doctor_controller import IDoctorController
+from controllers.patient_controller import IPatientController
 from controllers.user_controller import IUserController, UserController
 
 class AbstractControllerFactory(ABC):
@@ -26,7 +28,31 @@ class AbstractControllerFactory(ABC):
             IUserController: The user controller instance.
         """
         raise NotImplementedError("get_user_controller method must be implemented by subclasses.")
+    
+    @abstractmethod
+    def get_patient_controller(self) -> IPatientController:
+        """
+        Get the patient controller instance.
+        Returns:
+            IPatientController: The patient controller instance.
+        """
+        raise NotImplementedError("get_patient_controller method must be implemented by subclasses.")
+    
+    @abstractmethod
+    def get_doctor_controller(self) -> IDoctorController:
+        """
+        Get the doctor controller instance.
+        Returns:
+            IDoctorController: The doctor controller instance.
+        """
+        raise NotImplementedError("get_doctor_controller method must be implemented by subclasses.")
 
 class ControllerFactory(AbstractControllerFactory):
     def get_user_controller(self) -> IUserController:
         return IUserController.get_instance(UserController())
+    
+    def get_patient_controller(self) -> IPatientController:
+        return IPatientController.get_instance()
+    
+    def get_doctor_controller(self) -> IDoctorController:
+        return IDoctorController.get_instance()
