@@ -11,6 +11,7 @@ from db import create_db
 from resources.health import blp as HealthBlueprint
 from resources.version import blp as VersionBlueprint
 from resources.user import blp as UserBlueprint
+from resources.question import blp as QuestionBlueprint
 
 def create_app(settings_module: str = 'globals') -> Flask:
     """
@@ -102,6 +103,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
     api.register_blueprint(HealthBlueprint, url_prefix=getApiPrefix('health'))
     api.register_blueprint(VersionBlueprint, url_prefix=app.config['VERSION_ENDPOINT'])
     api.register_blueprint(UserBlueprint, url_prefix=getApiPrefix('user'))
+    api.register_blueprint(QuestionBlueprint, url_prefix=getApiPrefix('question'))
 
     with app.app_context():
         db = create_db(app)

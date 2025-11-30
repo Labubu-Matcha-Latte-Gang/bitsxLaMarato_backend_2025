@@ -1,5 +1,6 @@
 from functools import wraps
 from typing import Sequence
+from flask import g
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from flask_smorest import abort
 from helpers.enums.user_role import UserRole
@@ -16,19 +17,23 @@ def roles_required(roles: Sequence[UserRole]):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             verify_jwt_in_request()
-            email:str = get_jwt_identity()
+            email: str = get_jwt_identity()
             
-            user:User|None = User.query.get(email)
+            user: User | None = User.query.get(email)
             if not user:
-                abort(401, message="Invalid authentication token.")
+                abort(401, message="Token d'autenticació no vàlid.")
 
             try:
                 role_instance = user.get_role_instance()
                 role = role_instance.get_role()
-                if role not in roles:
-                    abort(403, message="You do not have the required role to access this resource.")
             except UserRoleConflictException as e:
                 abort(409, message=str(e))
+
+            if role not in roles:
+                abort(403, message="No tens el rol necessari per accedir a aquest recurs.")
+
+            g.current_user = user
+            g.current_role_instance = role_instance
             
             return f(*args, **kwargs)
         return decorated_function
