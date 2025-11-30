@@ -4,13 +4,14 @@ from pathlib import Path
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import Response, jsonify
+from flask import Response, jsonify, g
 from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
 from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
+from helpers.decorators import roles_required
 from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
 from helpers.exceptions.user_exceptions import (
     InvalidResetCodeException,
@@ -20,6 +21,7 @@ from helpers.exceptions.user_exceptions import (
     UserRoleConflictException,
     RelatedUserNotFoundException,
 )
+from helpers.enums.user_role import UserRole
 from helpers.factories.controller_factories import AbstractControllerFactory
 from helpers.factories.forgot_password import AbstractForgotPasswordFactory
 from models.admin import Admin
@@ -575,7 +577,7 @@ class PatientData(MethodView):
 
     logger = AbstractLogger.get_instance()
 
-    @jwt_required()
+    @roles_required([UserRole.ADMIN, UserRole.DOCTOR, UserRole.PATIENT])
     @blp.arguments(PatientEmailPathSchema, location="path")
     @blp.doc(
         summary="Obtenir un pacient pel correu",
@@ -616,22 +618,24 @@ class PatientData(MethodView):
             patient_controller = factory.get_patient_controller()
             patient = patient_controller.get_patient(patient_email)
 
-            current_user_email: str = get_jwt_identity()
-            user_controller = factory.get_user_controller()
-            try:
-                current_user = user_controller.get_user(current_user_email)
-            except UserNotFoundException:
-                abort(401, message="Token d'autenticació no vàlid.")
+            current_user = getattr(g, "current_user", None)
+            role_instance = getattr(g, "current_role_instance", None)
 
-            role_instance = current_user.get_role_instance()
+            if current_user is None or role_instance is None:
+                current_user_email: str = get_jwt_identity()
+                user_controller = factory.get_user_controller()
+                try:
+                    current_user = user_controller.get_user(current_user_email)
+                except UserNotFoundException:
+                    abort(401, message="Token d'autenticació no vàlid.")
+                role_instance = current_user.get_role_instance()
 
-            authorized = False
-            if current_user_email == patient_email:
-                authorized = True
-            elif isinstance(role_instance, Admin):
-                authorized = True
-            elif isinstance(role_instance, Doctor) and role_instance.doctor_of_this_patient(patient):
-                authorized = True
+            current_user_email: str = current_user.get_email()
+
+            authorized = (
+                current_user_email == patient_email
+                or role_instance.doctor_of_this_patient(patient)
+            )
 
             if not authorized:
                 abort(403, message="No tens permís per accedir a les dades d'aquest pacient.")
