@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-VERSION = '0.0.4'
+VERSION = '0.0.5'
 
 DEFAULT_VERSION_ENDPOINT = '/api/version'
 
