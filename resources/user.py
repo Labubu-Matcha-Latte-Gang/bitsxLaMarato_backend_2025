@@ -340,7 +340,7 @@ class UserCRUD(MethodView):
 
             factory = AbstractControllerFactory.get_instance()
             user_controller = factory.get_user_controller()
-            
+
             user = user_controller.get_user(email)
 
             return jsonify(user.to_dict()), 200
@@ -539,9 +539,11 @@ class UserCRUD(MethodView):
         email: str | None = None
         try:
             email = get_jwt_identity()
-            user: User | None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.get_user(email)
 
             self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
 
