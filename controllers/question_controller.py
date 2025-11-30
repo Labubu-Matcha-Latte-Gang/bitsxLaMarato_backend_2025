@@ -115,12 +115,18 @@ class QuestionController(IQuestionController):
 
         question_id = filters.get('id')
         difficulty = filters.get('difficulty')
+        difficulty_min = filters.get('difficulty_min')
+        difficulty_max = filters.get('difficulty_max')
         question_type = filters.get('question_type')
 
         if question_id:
             query = query.filter(Question.id == question_id)
         if difficulty is not None:
             query = query.filter(Question.difficulty == difficulty)
+        if difficulty_min is not None:
+            query = query.filter(Question.difficulty >= difficulty_min)
+        if difficulty_max is not None:
+            query = query.filter(Question.difficulty <= difficulty_max)
         if question_type:
             query = query.filter(Question.question_type == question_type)
 
