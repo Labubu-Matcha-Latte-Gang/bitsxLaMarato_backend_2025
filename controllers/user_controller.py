@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import UserAlreadyExistsException, UserNotFoundException
 from models.user import User
 
@@ -33,14 +34,14 @@ class IUserController(ABC):
         raise NotImplementedError("create_user method must be implemented by subclasses.")
     
     @abstractmethod
-    def update_user(self, email: str, update_data: dict) -> User:
+    def update_user(self, email: str, update_data: dict) -> tuple[User, UserRole]:
         """
         Update an existing user with the provided data.
         Args:
             email (str): The email of the user to update.
             update_data (dict): A dictionary containing attributes to update.
         Returns:
-            User: The updated user object.
+            tuple[User, UserRole]: The updated user object and their role.
         Raises:
             UserNotFoundException: If no user is found with the given email.
             UserUpdateException: If there is an error during user update.
@@ -81,11 +82,12 @@ class UserController(IUserController):
         new_user = User(**user_payload)
         return new_user
 
-    def update_user(self, email: str, update_data: dict) -> User:
+    def update_user(self, email: str, update_data: dict) -> tuple[User, UserRole]:
         user: User | None = User.query.get(email)
         if not user:
             raise UserNotFoundException("Usuari no trobat.")
         
         user.set_properties(update_data)
-        #TODO: patients & doctors update
-        return user
+        role_instance = user.get_role_instance()
+        role_type = role_instance.get_role()
+        return user, role_type
