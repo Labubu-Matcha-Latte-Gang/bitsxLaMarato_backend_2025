@@ -20,6 +20,7 @@ from helpers.exceptions.user_exceptions import (
     UserRoleConflictException,
     RelatedUserNotFoundException,
 )
+from helpers.factories.controller_factories import AbstractControllerFactory
 from helpers.factories.forgot_password import AbstractForgotPasswordFactory
 from models.admin import Admin
 from models.patient import Patient
@@ -41,24 +42,6 @@ from schemas import (
 )
 
 blp = Blueprint('user', __name__, description="Operacions relacionades amb els usuaris")
-
-def _fetch_doctors_by_email(emails: list[str]) -> set[Doctor]:
-    doctors:set[Doctor] = set()
-    for email in emails:
-        doctor = Doctor.query.get(email)
-        if doctor is None:
-            raise RelatedUserNotFoundException(f"No s'ha trobat cap metge amb el correu: {email}")
-        doctors.add(doctor)
-    return doctors
-
-def _fetch_patients_by_email(emails: list[str]) -> set[Patient]:
-    patients:set[Patient] = set()
-    for email in emails:
-        patient = Patient.query.get(email)
-        if patient is None:
-            raise RelatedUserNotFoundException(f"No s'ha trobat cap pacient amb el correu: {email}")
-        patients.add(patient)
-    return patients
 
 @blp.route('/patient')
 class PatientRegister(MethodView):
@@ -98,30 +81,34 @@ class PatientRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            potential_existing_user = User.query.get(data['email'])
-            if potential_existing_user:
-                raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
 
             user_payload = {
                 "email": data['email'],
-                "password": User.hash_password(data['password']),
+                "password": data['password'],
                 "name": data['name'],
                 "surname": data['surname'],
             }
-            user = User(**user_payload)
+            user = user_controller.create_user(user_payload)
+
+            doctor_controller = factory.get_doctor_controller()
 
             doctor_emails:list[str] = data.get('doctors', []) or []
-            doctors = _fetch_doctors_by_email(doctor_emails)
-            patient = Patient(
-                ailments=data.get('ailments'),
-                gender=data['gender'],
-                age=data['age'],
-                treatments=data.get('treatments'),
-                height_cm=data['height_cm'],
-                weight_kg=data['weight_kg'],
-                email=data['email'],
-                user=user,
-            )
+            doctors = doctor_controller.fetch_doctors_by_email(doctor_emails)
+
+            patient_controller = factory.get_patient_controller()
+            patient_payload = {
+                "ailments": data.get('ailments'),
+                "gender": data['gender'],
+                "age": data['age'],
+                "treatments": data.get('treatments'),
+                "height_cm": data['height_cm'],
+                "weight_kg": data['weight_kg'],
+                "email": data['email'],
+                "user": user
+            }
+            patient = patient_controller.create_patient(patient_payload)
 
             db.session.add(user)
             db.session.add(patient)
@@ -192,9 +179,8 @@ class DoctorRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            potential_existing_user = User.query.get(data['email'])
-            if potential_existing_user:
-                raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
 
             user_payload = {
                 "email": data['email'],
@@ -202,14 +188,20 @@ class DoctorRegister(MethodView):
                 "name": data['name'],
                 "surname": data['surname'],
             }
-            user = User(**user_payload)
+            user = user_controller.create_user(user_payload)
+
+            patient_controller = factory.get_patient_controller()
 
             patient_emails:list[str] = data.get('patients', []) or []
-            patients = _fetch_patients_by_email(patient_emails)
-            doctor = Doctor(
-                email=data['email'],
-                user=user,
-            )
+            patients = patient_controller.fetch_patients_by_email(patient_emails)
+
+            doctor_controller = factory.get_doctor_controller()
+
+            doctor_payload = {
+                "email": data['email'],
+                "user": user
+            }
+            doctor = doctor_controller.create_doctor(doctor_payload)
 
             db.session.add(user)
             db.session.add(doctor)
@@ -280,13 +272,20 @@ class UserLogin(MethodView):
         """
         try:
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
-            user:User|None = User.query.get(data['email'])
-            if user and user.check_password(data['password']):
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.get_user(data['email'])
+            if user.check_password(data['password']):
                 user.get_role_instance()
                 access_token = user.generate_jwt()
                 return {"access_token": access_token}, 200
             else:
                 raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
+        except UserNotFoundException as e:
+            self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
+            abort(401, message="Correu o contrasenya no vàlids.")
         except UserRoleConflictException as e:
             self.logger.error("User login failed: Role conflict", module="UserLogin", metadata={"email": data.get('email')}, error=e)
             abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
@@ -336,10 +335,14 @@ class UserCRUD(MethodView):
         """
         try:
             self.logger.info("Fetching user information", module="UserCRUD")
+
             email:str = get_jwt_identity()
-            user:User|None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+            
+            user = user_controller.get_user(email)
+
             return jsonify(user.to_dict()), 200
         except UserRoleConflictException as e:
             self.logger.error("User role conflict", module="UserCRUD", error=e)
