@@ -164,7 +164,7 @@ class QuestionController(IQuestionController):
         query = Question.query
 
         filters = patient.get_daily_question_filters()
-        
+
         question_type = filters.get('question_type')
         difficulty = filters.get('difficulty')
         difficulty_min = filters.get('difficulty_min')
@@ -182,5 +182,8 @@ class QuestionController(IQuestionController):
         questions = query.all()
         if not questions:
             questions = Question.query.all()
+
+        if not questions:
+            raise QuestionNotFoundException("No hi ha preguntes disponibles a la base de dades.")
         
         return choice(questions)
