@@ -612,16 +612,18 @@ class PatientData(MethodView):
                 metadata={"patient_email": patient_email}
             )
 
-            patient: Patient | None = Patient.query.get(patient_email)
-            if not patient:
-                raise UserNotFoundException("Pacient no trobat.")
+            factory = AbstractControllerFactory.get_instance()
+            patient_controller = factory.get_patient_controller()
+            patient = patient_controller.get_patient(patient_email)
 
             current_user_email: str = get_jwt_identity()
-            current_user: User | None = User.query.get(current_user_email)
-            if not current_user:
+            user_controller = factory.get_user_controller()
+            try:
+                current_user = user_controller.get_user(current_user_email)
+            except UserNotFoundException:
                 abort(401, message="Token d'autenticació no vàlid.")
 
-            role_instance:Admin|Doctor|Patient = current_user.get_role_instance()
+            role_instance = current_user.get_role_instance()
 
             authorized = False
             if current_user_email == patient_email:
