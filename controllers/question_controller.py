@@ -87,6 +87,8 @@ class IQuestionController(ABC):
             patient (Patient): The patient for whom to retrieve the daily question.
         Returns:
             Question: A random question.
+        Raises:
+            QuestionNotFoundException: If no questions are available.
         """
         raise NotImplementedError("get_daily_question method must be implemented by subclasses.")
 
