@@ -268,6 +268,16 @@ class QuestionQuerySchema(Schema):
         validate=validate.Range(min=0, max=5),
         metadata={"description": "Filtra per dificultat exacta entre 0 i 5."},
     )
+    difficulty_min = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra preguntes amb dificultat superior o igual al valor indicat."},
+    )
+    difficulty_max = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra preguntes amb dificultat inferior o igual al valor indicat."},
+    )
 
 
 class QuestionIdSchema(Schema):
