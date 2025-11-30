@@ -93,3 +93,16 @@ class Question(db.Model):
             self.set_question_type(data['question_type'])
         if 'difficulty' in data:
             self.set_difficulty(data['difficulty'])
+
+    def to_dict(self) -> dict:
+        """
+        Convert the question to a serializable dictionary.
+        Returns:
+            dict: A dictionary representation of the question.
+        """
+        return {
+            "id": str(self.id),
+            "text": self.text,
+            "question_type": self.question_type.value if self.question_type else None,
+            "difficulty": self.difficulty,
+        }
