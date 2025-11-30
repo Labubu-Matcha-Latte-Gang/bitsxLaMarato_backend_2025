@@ -1,12 +1,10 @@
-from abc import ABC, abstractmethod
 from helpers.enums.user_role import UserRole
 
 
-class IUserRole(ABC):
+class IUserRole:
     """
     Interface for user roles
     """
-    @abstractmethod
     def get_user(self):
         """
         Get the associated User object
@@ -15,7 +13,6 @@ class IUserRole(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def get_email(self) -> str:
         """
         Get the email for this role
@@ -24,7 +21,6 @@ class IUserRole(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def set_email(self, new_email: str) -> None:
         """
         Set a new email for this role
@@ -33,7 +29,6 @@ class IUserRole(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def to_dict(self) -> dict:
         """
         Convert the role to a dictionary representation
@@ -42,7 +37,6 @@ class IUserRole(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def get_role(self) -> UserRole:
         """
         Get the role of this user
@@ -51,14 +45,12 @@ class IUserRole(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def remove_all_associations_between_user_roles(self) -> None:
         """
         Remove all associations between user roles for this role
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def set_properties(self, data: dict) -> None:
         """
         Set multiple properties for the role from a dictionary
@@ -67,7 +59,6 @@ class IUserRole(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def doctor_of_this_patient(self, patient) -> bool:
         """
         Checks if the role grants access to the provided patient
