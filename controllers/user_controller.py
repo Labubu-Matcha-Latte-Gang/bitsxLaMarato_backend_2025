@@ -72,7 +72,13 @@ class UserController(IUserController):
         if potential_existing_user:
             raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
         
-        new_user = User(**user_data)
+        user_payload = {
+                "email": user_data['email'],
+                "password": User.hash_password(user_data['password']),
+                "name": user_data['name'],
+                "surname": user_data['surname'],
+            }
+        new_user = User(**user_payload)
         return new_user
 
     def update_user(self, email: str, update_data: dict) -> User:
