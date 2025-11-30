@@ -49,7 +49,6 @@ class UserUpdateSchema(Schema):
         Gender,
         required=False,
         by_value=True,
-        validate=validate.OneOf(GENDER_VALUES),
         metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
     )
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
@@ -76,7 +75,6 @@ class UserPartialUpdateSchema(Schema):
         Gender,
         required=False,
         by_value=True,
-        validate=validate.OneOf(GENDER_VALUES),
         metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
     )
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
@@ -107,7 +105,6 @@ class PatientRegisterSchema(UserRegisterSchema):
         Gender,
         required=True,
         by_value=True,
-        validate=validate.OneOf(GENDER_VALUES),
         metadata={"description": f"The gender of the patient. Accepted values: {', '.join(GENDER_VALUES)}.", "enum": GENDER_VALUES},
     )
     age = fields.Integer(required=True, allow_none=False, metadata={"description": "The age of the patient."})
