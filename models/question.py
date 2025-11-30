@@ -80,3 +80,16 @@ class Question(db.Model):
         if new_difficulty < 0 or new_difficulty > 5:
             raise ValueError("Difficulty must be between 0 and 5 inclusive.")
         self.difficulty = new_difficulty
+
+    def set_properties(self, data: dict) -> None:
+        """
+        Set multiple properties for the question from a dictionary.
+        Args:
+            data (dict): A dictionary containing the properties to set.
+        """
+        if 'text' in data:
+            self.set_text(data['text'])
+        if 'question_type' in data:
+            self.set_question_type(data['question_type'])
+        if 'difficulty' in data:
+            self.set_difficulty(data['difficulty'])
