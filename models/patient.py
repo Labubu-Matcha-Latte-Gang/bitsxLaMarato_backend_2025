@@ -34,7 +34,7 @@ class Patient(db.Model, IUserRole):
     )
     question_answers: Mapped[list[QuestionAnsweredAssociation]] = db.relationship(
         'QuestionAnsweredAssociation',
-        backref='patient',
+        back_populates='patient',
         cascade='all, delete-orphan',
         lazy=True,
     )
@@ -328,6 +328,15 @@ class Patient(db.Model, IUserRole):
         Get filters for daily question selection based on patient attributes.
         Returns:
             dict: A dictionary of filters for daily question selection.
+        """
+        # TODO: Implement logic to derive filters based on patient attributes
+        return {}
+    
+    def get_recommended_activity_filters(self) -> dict:
+        """
+        Get filters for recommended activity selection based on patient attributes.
+        Returns:
+            dict: A dictionary of filters for recommended activity selection.
         """
         # TODO: Implement logic to derive filters based on patient attributes
         return {}

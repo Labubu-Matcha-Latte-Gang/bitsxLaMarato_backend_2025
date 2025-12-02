@@ -31,7 +31,7 @@ DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_USER = os.getenv('DB_USER')
 DB_SSL = os.getenv("DB_SSL", "false").lower() == "true"
 DB_SSL_CA = os.getenv("DB_SSL_CA")
-DB_AUTO_MIGRATE = str(os.getenv('DB_AUTO_MIGRATE', 'true')).lower() in ('t', 'true', '1', 'y', 'yes')
+DB_AUTO_MIGRATE = str(os.getenv('DB_AUTO_MIGRATE', '0')).lower() in ('t', 'true', '1', 'y', 'yes')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 JWT_TOKEN_LOCATION = os.getenv('JWT_TOKEN_LOCATION', 'headers').split(',')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')

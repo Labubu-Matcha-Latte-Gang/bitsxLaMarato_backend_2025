@@ -13,6 +13,7 @@ from resources.version import blp as VersionBlueprint
 from resources.user import blp as UserBlueprint
 from resources.transcription import blp as TranscriptionBlueprint
 from resources.question import blp as QuestionBlueprint
+from resources.activity import blp as ActivityBlueprint
 
 def create_app(settings_module: str = 'globals') -> Flask:
     """
@@ -106,12 +107,13 @@ def create_app(settings_module: str = 'globals') -> Flask:
     api.register_blueprint(UserBlueprint, url_prefix=getApiPrefix('user'))
     api.register_blueprint(TranscriptionBlueprint, url_prefix=getApiPrefix('transcription'))
     api.register_blueprint(QuestionBlueprint, url_prefix=getApiPrefix('question'))
+    api.register_blueprint(ActivityBlueprint, url_prefix=getApiPrefix('activity'))
 
     with app.app_context():
         db = create_db(app)
         import models
         migrate = Migrate(app, db)
-        DB_AUTO_MIGRATE = app.config.get("DB_AUTO_MIGRATE", True)
+        DB_AUTO_MIGRATE = app.config.get("DB_AUTO_MIGRATE", False)
         migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
         if DB_AUTO_MIGRATE and os.path.isdir(migrations_dir) and os.path.isfile(os.path.join(migrations_dir, "env.py")):
             alembic_upgrade()
