@@ -6,6 +6,7 @@ GENDER_VALUES = [gender.value for gender in Gender]
 GENDER_DESCRIPTION = f"Patient gender. Accepted values: {', '.join(GENDER_VALUES)}."
 QUESTION_TYPE_VALUES = [question_type.value for question_type in QuestionType]
 QUESTION_TYPE_DESCRIPTION = f"Question type. Accepted values: {', '.join(QUESTION_TYPE_VALUES)}."
+ACTIVITY_TYPE_DESCRIPTION = f"Activity type. Accepted values: {', '.join(QUESTION_TYPE_VALUES)}."
 
 password_complexity = validate.Regexp(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
@@ -285,3 +286,122 @@ class QuestionIdSchema(Schema):
     Schema for operations requiring a question identifier.
     """
     id = fields.UUID(required=True, metadata={"description": "Identificador de la pregunta a operar."})
+
+
+class ActivityBaseSchema(Schema):
+    """
+    Base schema for activity fields.
+    """
+    title = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=255),
+        metadata={"description": "Activity title."},
+    )
+    description = fields.String(
+        required=True,
+        validate=validate.Length(min=1),
+        metadata={"description": "Activity description."},
+    )
+    activity_type = fields.Enum(
+        QuestionType,
+        required=True,
+        by_value=True,
+        metadata={"description": ACTIVITY_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+    )
+    difficulty = fields.Float(
+        required=True,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Difficulty score between 0 (minim) and 5 (maxim)."},
+    )
+
+
+class ActivityCreateSchema(ActivityBaseSchema):
+    """Schema for creating a single activity."""
+    pass
+
+
+class ActivityBulkCreateSchema(Schema):
+    """
+    Schema for bulk creation of activities.
+    """
+    activities = fields.List(
+        fields.Nested(ActivityCreateSchema),
+        required=True,
+        validate=validate.Length(min=1),
+        metadata={"description": "Array d'activitats a crear."},
+    )
+
+
+class ActivityResponseSchema(ActivityBaseSchema):
+    """
+    Schema for returning activity data.
+    """
+    id = fields.UUID(required=True, dump_only=True, metadata={"description": "Unique identifier of the activity."})
+
+
+class ActivityUpdateSchema(ActivityBaseSchema):
+    """Schema for fully updating an activity (PUT)."""
+    pass
+
+
+class ActivityPartialUpdateSchema(Schema):
+    """
+    Schema for partially updating an activity (PATCH).
+    """
+    title = fields.String(
+        required=False,
+        validate=validate.Length(min=1, max=255),
+        metadata={"description": "Activity title."},
+    )
+    description = fields.String(
+        required=False,
+        validate=validate.Length(min=1),
+        metadata={"description": "Activity description."},
+    )
+    activity_type = fields.Enum(
+        QuestionType,
+        required=False,
+        by_value=True,
+        metadata={"description": ACTIVITY_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+    )
+    difficulty = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Difficulty score between 0 (minim) and 5 (maxim)."},
+    )
+
+
+class ActivityQuerySchema(Schema):
+    """
+    Schema for filtering activities via query parameters.
+    """
+    id = fields.UUID(required=False, metadata={"description": "Filtra per ID de l'activitat."})
+    title = fields.String(required=False, validate=validate.Length(min=1), metadata={"description": "Filtra per titol exacte de l'activitat."})
+    activity_type = fields.Enum(
+        QuestionType,
+        required=False,
+        by_value=True,
+        metadata={"description": ACTIVITY_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+    )
+    difficulty = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra per dificultat exacta entre 0 i 5."},
+    )
+    difficulty_min = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra activitats amb dificultat superior o igual al valor indicat."},
+    )
+    difficulty_max = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra activitats amb dificultat inferior o igual al valor indicat."},
+    )
+
+
+class ActivityIdSchema(Schema):
+    """
+    Schema for operations requiring an activity identifier.
+    """
+    id = fields.UUID(required=True, metadata={"description": "Identificador de l'activitat a operar."})
