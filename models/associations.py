@@ -56,6 +56,7 @@ class QuestionAnsweredAssociation(db.Model):
     question_id = db.Column(UUID(as_uuid=True), db.ForeignKey('questions.id', onupdate='CASCADE'), primary_key=True)
     answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     question = db.relationship('Question', lazy=True)
+    patient = db.relationship('Patient', lazy=True)
 
     def __repr__(self):
         return f"<QuestionAnsweredAssociation Patient: {self.patient_email}, Question ID: {self.question_id}, Answered At: {self.answered_at}>"
@@ -74,6 +75,7 @@ class ActivityCompletedAssociation(db.Model):
     completed_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     score = db.Column(db.Float, nullable=True)
     activity = db.relationship('Activity', lazy=True)
+    patient = db.relationship('Patient', lazy=True)
 
     def __repr__(self):
         return f"<ActivityCompletedAssociation Patient: {self.patient_email}, Activity ID: {self.activity_id}, Completed At: {self.completed_at}>"
