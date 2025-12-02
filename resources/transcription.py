@@ -4,7 +4,7 @@ from flask import request, current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from flask_jwt_extended import jwt_required
-from openai import OpenAI
+from openai import AzureOpenAI
 
 from db import db
 from models.transcription import TranscriptionChunk
@@ -13,11 +13,19 @@ from schemas import TranscriptionChunkSchema, TranscriptionCompleteSchema, Trans
 
 blp = Blueprint('transcription', __name__, description="Operacions de transcripció d'àudio en temps real (Persistència en DB).")
 
-def get_openai_client():
-    api_key = current_app.config.get("OPENAI_API_KEY")
-    if not api_key:
-        abort(500, message="La configuració del servidor no té la OPENAI_API_KEY definida.")
-    return OpenAI(api_key=api_key)
+def get_azure_client():
+    api_key = current_app.config.get("AZURE_OPENAI_API_KEY")
+    endpoint = current_app.config.get("AZURE_OPENAI_ENDPOINT")
+    api_version = current_app.config.get("AZURE_OPENAI_API_VERSION")
+
+    if not api_key or not endpoint:
+        abort(500, message="Faltan credenciales de Azure OpenAI en la configuración.")
+
+    return AzureOpenAI(
+        api_key=api_key,
+        api_version=api_version,
+        azure_endpoint=endpoint
+    )
 
 @blp.route('/chunk')
 class TranscriptionChunkResource(MethodView):
@@ -66,12 +74,13 @@ class TranscriptionChunkResource(MethodView):
                 temp_path = temp_audio.name
 
             # 2. Transcriure amb OpenAI
-            client = get_openai_client()
+            client = get_azure_client()
+            deployment_name = current_app.config.get("AZURE_OPENAI_DEPLOYMENT_NAME")
             with open(temp_path, "rb") as file_to_send:
                 transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
+                    model=deployment_name,
                     file=file_to_send,
-                    language="ca" 
+                    language="es" 
                 )
                 text_result = transcript.text
 
@@ -137,7 +146,7 @@ class TranscriptionCompleteResource(MethodView):
             return {
                 "status": "completed",
                 "transcription": full_text
-            }
+            }, 200
 
         except Exception as e:
             db.session.rollback()
