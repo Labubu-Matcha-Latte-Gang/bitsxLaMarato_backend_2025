@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 import bcrypt
 from db import db
+from models.activity import Activity
 
 class DoctorPatientAssociation(db.Model):
     __tablename__ = 'doctor_patient'
@@ -56,7 +57,7 @@ class QuestionAnsweredAssociation(db.Model):
     question_id = db.Column(UUID(as_uuid=True), db.ForeignKey('questions.id', onupdate='CASCADE'), primary_key=True)
     answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     question = db.relationship('Question', lazy=True)
-    patient = db.relationship('Patient', lazy=True)
+    patient = db.relationship('Patient', back_populates='question_answers', lazy=True)
 
     def __repr__(self):
         return f"<QuestionAnsweredAssociation Patient: {self.patient_email}, Question ID: {self.question_id}, Answered At: {self.answered_at}>"
