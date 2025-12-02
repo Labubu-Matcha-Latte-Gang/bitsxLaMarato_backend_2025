@@ -331,3 +331,12 @@ class Patient(db.Model, IUserRole):
         """
         # TODO: Implement logic to derive filters based on patient attributes
         return {}
+    
+    def get_recommended_activity_filters(self) -> dict:
+        """
+        Get filters for recommended activity selection based on patient attributes.
+        Returns:
+            dict: A dictionary of filters for recommended activity selection.
+        """
+        # TODO: Implement logic to derive filters based on patient attributes
+        return {}
