@@ -17,7 +17,7 @@ class Question(db.Model):
     )
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    text = db.Column(db.Text, nullable=False)
+    text = db.Column(db.Text, nullable=False, unique=True)
     question_type = db.Column(db.Enum(QuestionType), nullable=False)
     difficulty = db.Column(db.Float, nullable=False)
 
