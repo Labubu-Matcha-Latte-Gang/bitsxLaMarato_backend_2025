@@ -145,15 +145,70 @@ class TestActivityResource(BaseTest):
         )
         assert get_resp.status_code == 404
 
-    def test_patient_cannot_access_admin_endpoints(self):
-        patient_user = self.create_patient_model()
-        token = self.generate_token(patient_user.email)
+    def test_patient_can_get_activities(self):
+        admin_token = self.get_admin_token()
+        create_resp = self._create_activities(count=2, token=admin_token)
+        assert create_resp.status_code == 201
+        created = create_resp.get_json()
 
-        resp = self.client.get(
+        patient_user = self.create_patient_model()
+        patient_token = self.generate_token(patient_user.email)
+
+        list_resp = self.client.get(
             f"{self.api_prefix}/activity",
-            headers=self.auth_headers(token),
+            headers=self.auth_headers(patient_token),
         )
-        assert resp.status_code == 403
+        assert list_resp.status_code == 200
+        listed = list_resp.get_json()
+        assert {a["title"] for a in listed} == {a["title"] for a in created}
+
+        filtered_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(patient_token),
+            query_string={"id": created[0]["id"]},
+        )
+        assert filtered_resp.status_code == 200
+        filtered = filtered_resp.get_json()
+        assert len(filtered) == 1
+        assert filtered[0]["id"] == created[0]["id"]
+
+    def test_patient_cannot_modify_activities(self):
+        admin_token = self.get_admin_token()
+        create_resp = self._create_activities(count=1, token=admin_token)
+        activity = create_resp.get_json()[0]
+
+        patient_user = self.create_patient_model()
+        patient_token = self.generate_token(patient_user.email)
+
+        post_resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(patient_token),
+            json={"activities": [self._make_activity_payload()]},
+        )
+        assert post_resp.status_code == 403
+
+        put_resp = self.client.put(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(patient_token),
+            query_string={"id": activity["id"]},
+            json=self._make_activity_payload(title="No hauria d'actualitzar"),
+        )
+        assert put_resp.status_code == 403
+
+        patch_resp = self.client.patch(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(patient_token),
+            query_string={"id": activity["id"]},
+            json={"title": "No hauria de canviar"},
+        )
+        assert patch_resp.status_code == 403
+
+        delete_resp = self.client.delete(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(patient_token),
+            query_string={"id": activity["id"]},
+        )
+        assert delete_resp.status_code == 403
 
     def test_recommended_activity_for_patient(self):
         patient_user = self.create_patient_model()
