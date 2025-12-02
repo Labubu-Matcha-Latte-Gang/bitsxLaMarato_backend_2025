@@ -113,7 +113,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
         db = create_db(app)
         import models
         migrate = Migrate(app, db)
-        DB_AUTO_MIGRATE = app.config.get("DB_AUTO_MIGRATE", True)
+        DB_AUTO_MIGRATE = app.config.get("DB_AUTO_MIGRATE", False)
         migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
         if DB_AUTO_MIGRATE and os.path.isdir(migrations_dir) and os.path.isfile(os.path.join(migrations_dir, "env.py")):
             alembic_upgrade()
