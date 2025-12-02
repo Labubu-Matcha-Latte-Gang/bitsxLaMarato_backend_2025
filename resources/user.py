@@ -4,14 +4,15 @@ from pathlib import Path
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import Response, jsonify
+from flask import Response, jsonify, g
 from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
 from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
-from helpers.exceptions.mail_exceptions import SendEmailException
+from helpers.decorators import roles_required
+from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
 from helpers.exceptions.user_exceptions import (
     InvalidResetCodeException,
     UserAlreadyExistsException,
@@ -20,11 +21,9 @@ from helpers.exceptions.user_exceptions import (
     UserRoleConflictException,
     RelatedUserNotFoundException,
 )
+from helpers.enums.user_role import UserRole
+from helpers.factories.controller_factories import AbstractControllerFactory
 from helpers.factories.forgot_password import AbstractForgotPasswordFactory
-from models.admin import Admin
-from models.patient import Patient
-from models.user import User
-from models.doctor import Doctor
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
@@ -41,24 +40,6 @@ from schemas import (
 )
 
 blp = Blueprint('user', __name__, description="Operacions relacionades amb els usuaris")
-
-def _fetch_doctors_by_email(emails: list[str]) -> set[Doctor]:
-    doctors:set[Doctor] = set()
-    for email in emails:
-        doctor = Doctor.query.get(email)
-        if doctor is None:
-            raise RelatedUserNotFoundException(f"No s'ha trobat cap metge amb el correu: {email}")
-        doctors.add(doctor)
-    return doctors
-
-def _fetch_patients_by_email(emails: list[str]) -> set[Patient]:
-    patients:set[Patient] = set()
-    for email in emails:
-        patient = Patient.query.get(email)
-        if patient is None:
-            raise RelatedUserNotFoundException(f"No s'ha trobat cap pacient amb el correu: {email}")
-        patients.add(patient)
-    return patients
 
 @blp.route('/patient')
 class PatientRegister(MethodView):
@@ -98,30 +79,34 @@ class PatientRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            potential_existing_user = User.query.get(data['email'])
-            if potential_existing_user:
-                raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
 
             user_payload = {
                 "email": data['email'],
-                "password": User.hash_password(data['password']),
+                "password": data['password'],
                 "name": data['name'],
                 "surname": data['surname'],
             }
-            user = User(**user_payload)
+            user = user_controller.create_user(user_payload)
+
+            doctor_controller = factory.get_doctor_controller()
 
             doctor_emails:list[str] = data.get('doctors', []) or []
-            doctors = _fetch_doctors_by_email(doctor_emails)
-            patient = Patient(
-                ailments=data.get('ailments'),
-                gender=data['gender'],
-                age=data['age'],
-                treatments=data.get('treatments'),
-                height_cm=data['height_cm'],
-                weight_kg=data['weight_kg'],
-                email=data['email'],
-                user=user,
-            )
+            doctors = doctor_controller.fetch_doctors_by_email(doctor_emails)
+
+            patient_controller = factory.get_patient_controller()
+            patient_payload = {
+                "ailments": data.get('ailments'),
+                "gender": data['gender'],
+                "age": data['age'],
+                "treatments": data.get('treatments'),
+                "height_cm": data['height_cm'],
+                "weight_kg": data['weight_kg'],
+                "email": data['email'],
+                "user": user
+            }
+            patient = patient_controller.create_patient(patient_payload)
 
             db.session.add(user)
             db.session.add(patient)
@@ -192,24 +177,29 @@ class DoctorRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            potential_existing_user = User.query.get(data['email'])
-            if potential_existing_user:
-                raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
 
             user_payload = {
                 "email": data['email'],
-                "password": User.hash_password(data['password']),
+                "password": data['password'],
                 "name": data['name'],
                 "surname": data['surname'],
             }
-            user = User(**user_payload)
+            user = user_controller.create_user(user_payload)
+
+            patient_controller = factory.get_patient_controller()
 
             patient_emails:list[str] = data.get('patients', []) or []
-            patients = _fetch_patients_by_email(patient_emails)
-            doctor = Doctor(
-                email=data['email'],
-                user=user,
-            )
+            patients = patient_controller.fetch_patients_by_email(patient_emails)
+
+            doctor_controller = factory.get_doctor_controller()
+
+            doctor_payload = {
+                "email": data['email'],
+                "user": user
+            }
+            doctor = doctor_controller.create_doctor(doctor_payload)
 
             db.session.add(user)
             db.session.add(doctor)
@@ -280,13 +270,20 @@ class UserLogin(MethodView):
         """
         try:
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
-            user:User|None = User.query.get(data['email'])
-            if user and user.check_password(data['password']):
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.get_user(data['email'])
+            if user.check_password(data['password']):
                 user.get_role_instance()
                 access_token = user.generate_jwt()
                 return {"access_token": access_token}, 200
             else:
                 raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
+        except UserNotFoundException as e:
+            self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
+            abort(401, message="Correu o contrasenya no vàlids.")
         except UserRoleConflictException as e:
             self.logger.error("User login failed: Role conflict", module="UserLogin", metadata={"email": data.get('email')}, error=e)
             abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
@@ -336,10 +333,14 @@ class UserCRUD(MethodView):
         """
         try:
             self.logger.info("Fetching user information", module="UserCRUD")
+
             email:str = get_jwt_identity()
-            user:User|None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.get_user(email)
+
             return jsonify(user.to_dict()), 200
         except UserRoleConflictException as e:
             self.logger.error("User role conflict", module="UserCRUD", error=e)
@@ -381,9 +382,11 @@ class UserCRUD(MethodView):
         email: str | None = None
         try:
             email = get_jwt_identity()
-            user: User | None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -391,18 +394,6 @@ class UserCRUD(MethodView):
                 module="UserCRUD",
                 metadata={"email": email, "fields_updated": update_fields}
             )
-
-            user.set_properties(data)
-
-            doctor_emails:list[str] = data.get('doctors', []) or []
-            patient_emails:list[str] = data.get('patients', []) or []
-
-            data['doctors'] = _fetch_doctors_by_email(doctor_emails)
-            data['patients'] = _fetch_patients_by_email(patient_emails)
-
-            role_instance = user.get_role_instance()
-            role_instance.remove_all_associations_between_user_roles()
-            role_instance.set_properties(data)
 
             db.session.commit()
             return jsonify(user.to_dict()), 200
@@ -457,9 +448,11 @@ class UserCRUD(MethodView):
         email: str | None = None
         try:
             email = get_jwt_identity()
-            user: User | None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+            
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -467,26 +460,6 @@ class UserCRUD(MethodView):
                 module="UserCRUD",
                 metadata={"email": email, "fields_updated": update_fields}
             )
-
-            user.set_properties(data)
-
-            role_instance = user.get_role_instance()
-            role_data = dict(data)
-
-            if isinstance(role_instance, Patient) and 'doctors' in data:
-                doctor_emails:list[str] = data.get('doctors') or []
-                new_doctors = _fetch_doctors_by_email(doctor_emails)
-                role_instance.remove_all_associations_between_user_roles()
-                role_instance.add_doctors(new_doctors)
-                role_data.pop('doctors', None)
-            elif isinstance(role_instance, Doctor) and 'patients' in data:
-                patient_emails:list[str] = data.get('patients') or []
-                new_patients = _fetch_patients_by_email(patient_emails)
-                role_instance.remove_all_associations_between_user_roles()
-                role_instance.add_patients(new_patients)
-                role_data.pop('patients', None)
-
-            role_instance.set_properties(role_data)
 
             db.session.commit()
             return jsonify(user.to_dict()), 200
@@ -536,9 +509,11 @@ class UserCRUD(MethodView):
         email: str | None = None
         try:
             email = get_jwt_identity()
-            user: User | None = User.query.get(email)
-            if not user:
-                raise UserNotFoundException("Usuari no trobat.")
+
+            factory = AbstractControllerFactory.get_instance()
+            user_controller = factory.get_user_controller()
+
+            user = user_controller.get_user(email)
 
             self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
 
@@ -570,7 +545,7 @@ class PatientData(MethodView):
 
     logger = AbstractLogger.get_instance()
 
-    @jwt_required()
+    @roles_required([UserRole.ADMIN, UserRole.DOCTOR, UserRole.PATIENT])
     @blp.arguments(PatientEmailPathSchema, location="path")
     @blp.doc(
         summary="Obtenir un pacient pel correu",
@@ -607,24 +582,28 @@ class PatientData(MethodView):
                 metadata={"patient_email": patient_email}
             )
 
-            patient: Patient | None = Patient.query.get(patient_email)
-            if not patient:
-                raise UserNotFoundException("Pacient no trobat.")
+            factory = AbstractControllerFactory.get_instance()
+            patient_controller = factory.get_patient_controller()
+            patient = patient_controller.get_patient(patient_email)
 
-            current_user_email: str = get_jwt_identity()
-            current_user: User | None = User.query.get(current_user_email)
-            if not current_user:
-                abort(401, message="Token d'autenticació no vàlid.")
+            current_user = getattr(g, "current_user", None)
+            role_instance = getattr(g, "current_role_instance", None)
 
-            role_instance:Admin|Doctor|Patient = current_user.get_role_instance()
+            if current_user is None or role_instance is None:
+                current_user_email: str = get_jwt_identity()
+                user_controller = factory.get_user_controller()
+                try:
+                    current_user = user_controller.get_user(current_user_email)
+                except UserNotFoundException:
+                    abort(401, message="Token d'autenticació no vàlid.")
+                role_instance = current_user.get_role_instance()
 
-            authorized = False
-            if current_user_email == patient_email:
-                authorized = True
-            elif isinstance(role_instance, Admin):
-                authorized = True
-            elif isinstance(role_instance, Doctor) and role_instance.doctor_of_this_patient(patient):
-                authorized = True
+            current_user_email: str = current_user.get_email()
+
+            authorized = (
+                current_user_email == patient_email
+                or role_instance.doctor_of_this_patient(patient)
+            )
 
             if not authorized:
                 abort(403, message="No tens permís per accedir a les dades d'aquest pacient.")
@@ -704,6 +683,9 @@ class UserForgotPassword(MethodView):
             response_payload = {"message": "El mail ha estat enviat exitosament a l'usuari.", "validity": RESET_CODE_VALIDITY_MINUTES}
             return jsonify(response_payload), 200
         
+        except SMTPCredentialsException as e:
+            self.logger.error("User forgot password failed: SMTP credentials error", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(500, message="Error de configuració del servidor de correu. Contacta amb l'administrador.")
         except SendEmailException as e:
             self.logger.error("User forgot password failed: Email sending error", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
             abort(500, message="No s'ha pogut enviar el correu de restabliment. Torna-ho a provar més tard.")

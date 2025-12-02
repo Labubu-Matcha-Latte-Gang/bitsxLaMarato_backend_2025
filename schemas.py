@@ -1,8 +1,11 @@
 from marshmallow import Schema, fields, validate
 from helpers.enums.gender import Gender
+from helpers.enums.question_types import QuestionType
 
 GENDER_VALUES = [gender.value for gender in Gender]
 GENDER_DESCRIPTION = f"Patient gender. Accepted values: {', '.join(GENDER_VALUES)}."
+QUESTION_TYPE_VALUES = [question_type.value for question_type in QuestionType]
+QUESTION_TYPE_DESCRIPTION = f"Question type. Accepted values: {', '.join(QUESTION_TYPE_VALUES)}."
 
 password_complexity = validate.Regexp(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
@@ -49,7 +52,6 @@ class UserUpdateSchema(Schema):
         Gender,
         required=False,
         by_value=True,
-        validate=validate.OneOf(GENDER_VALUES),
         metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
     )
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
@@ -76,7 +78,6 @@ class UserPartialUpdateSchema(Schema):
         Gender,
         required=False,
         by_value=True,
-        validate=validate.OneOf(GENDER_VALUES),
         metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
     )
     age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
@@ -107,7 +108,6 @@ class PatientRegisterSchema(UserRegisterSchema):
         Gender,
         required=True,
         by_value=True,
-        validate=validate.OneOf(GENDER_VALUES),
         metadata={"description": f"The gender of the patient. Accepted values: {', '.join(GENDER_VALUES)}.", "enum": GENDER_VALUES},
     )
     age = fields.Integer(required=True, allow_none=False, metadata={"description": "The age of the patient."})
@@ -185,3 +185,103 @@ class TranscriptionResponseSchema(Schema):
     """
     status = fields.String(required=True, metadata={"description": "Status of the operation."})
     transcription = fields.String(required=True, metadata={"description": "The complete combined transcription text."})
+
+
+class QuestionBaseSchema(Schema):
+    """
+    Base schema for question fields.
+    """
+    text = fields.String(required=True, validate=validate.Length(min=1), metadata={"description": "Question statement text."})
+    question_type = fields.Enum(
+        QuestionType,
+        required=True,
+        by_value=True,
+        metadata={"description": QUESTION_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+    )
+    difficulty = fields.Float(
+        required=True,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Difficulty score between 0 (mínim) and 5 (màxim)."},
+    )
+
+
+class QuestionCreateSchema(QuestionBaseSchema):
+    """Schema for creating a single question."""
+    pass
+
+
+class QuestionBulkCreateSchema(Schema):
+    """
+    Schema for bulk creation of questions.
+    """
+    questions = fields.List(
+        fields.Nested(QuestionCreateSchema),
+        required=True,
+        validate=validate.Length(min=1),
+        metadata={"description": "Array de preguntes a crear."},
+    )
+
+
+class QuestionResponseSchema(QuestionBaseSchema):
+    """
+    Schema for returning question data.
+    """
+    id = fields.UUID(required=True, dump_only=True, metadata={"description": "Unique identifier of the question."})
+
+
+class QuestionUpdateSchema(QuestionBaseSchema):
+    """Schema for fully updating a question (PUT)."""
+    pass
+
+
+class QuestionPartialUpdateSchema(Schema):
+    """
+    Schema for partially updating a question (PATCH).
+    """
+    text = fields.String(required=False, validate=validate.Length(min=1), metadata={"description": "Question statement text."})
+    question_type = fields.Enum(
+        QuestionType,
+        required=False,
+        by_value=True,
+        metadata={"description": QUESTION_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+    )
+    difficulty = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Difficulty score between 0 (mínim) and 5 (màxim)."},
+    )
+
+
+class QuestionQuerySchema(Schema):
+    """
+    Schema for filtering questions via query parameters.
+    """
+    id = fields.UUID(required=False, metadata={"description": "Filtra per ID de la pregunta."})
+    question_type = fields.Enum(
+        QuestionType,
+        required=False,
+        by_value=True,
+        metadata={"description": QUESTION_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+    )
+    difficulty = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra per dificultat exacta entre 0 i 5."},
+    )
+    difficulty_min = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra preguntes amb dificultat superior o igual al valor indicat."},
+    )
+    difficulty_max = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={"description": "Filtra preguntes amb dificultat inferior o igual al valor indicat."},
+    )
+
+
+class QuestionIdSchema(Schema):
+    """
+    Schema for operations requiring a question identifier.
+    """
+    id = fields.UUID(required=True, metadata={"description": "Identificador de la pregunta a operar."})

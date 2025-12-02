@@ -12,7 +12,7 @@ from models.interfaces import IUserRole
 
 if TYPE_CHECKING:
     from models.doctor import Doctor
-    from models.questions import Question
+    from models.question import Question
 
 class Patient(db.Model, IUserRole):
     __tablename__ = 'patients'
@@ -322,3 +322,12 @@ class Patient(db.Model, IUserRole):
         Patients do not manage other patients.
         """
         return False
+
+    def get_daily_question_filters(self) -> dict:
+        """
+        Get filters for daily question selection based on patient attributes.
+        Returns:
+            dict: A dictionary of filters for daily question selection.
+        """
+        # TODO: Implement logic to derive filters based on patient attributes
+        return {}
