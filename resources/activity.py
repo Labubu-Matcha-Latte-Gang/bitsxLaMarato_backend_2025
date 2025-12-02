@@ -86,7 +86,7 @@ class ActivityResource(MethodView):
             self.logger.error("Error inesperat en crear activitats", module="ActivityResource", error=e)
             abort(500, message=f"S'ha produit un error inesperat en crear les activitats: {str(e)}")
 
-    @roles_required([UserRole.ADMIN])
+    @roles_required([UserRole.ADMIN, UserRole.PATIENT])
     @blp.arguments(ActivityQuerySchema, location='query')
     @blp.doc(
         summary="Consultar activitats",
@@ -99,7 +99,7 @@ class ActivityResource(MethodView):
     )
     @blp.response(200, schema=ActivityResponseSchema(many=True), description="Activitats recuperades correctament.")
     @blp.response(401, description="Falta o es invalid el JWT.")
-    @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
+    @blp.response(403, description="Cal ser administrador o pacient per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
     @blp.response(500, description="Error inesperat del servidor en consultar les activitats.")
     def get(self, query_args: dict):
