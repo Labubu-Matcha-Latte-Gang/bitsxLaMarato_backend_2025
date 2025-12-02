@@ -34,7 +34,7 @@ class Patient(db.Model, IUserRole):
     )
     question_answers: Mapped[list[QuestionAnsweredAssociation]] = db.relationship(
         'QuestionAnsweredAssociation',
-        backref='patient',
+        back_populates='patient',
         cascade='all, delete-orphan',
         lazy=True,
     )
