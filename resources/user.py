@@ -535,7 +535,7 @@ class PatientData(MethodView):
 @blp.route('/forgot-password')
 class UserForgotPassword(MethodView):
     """
-    Endpoints for requesting and completing password resets.
+    Endpoints per sol·licitar i completar restabliments de contrasenya.
     """
 
     logger = AbstractLogger.get_instance()
@@ -561,19 +561,19 @@ class UserForgotPassword(MethodView):
     @blp.response(500, description="No s'ha pogut carregar la plantilla o enviar el correu de restabliment.")
     def post(self, data: dict) -> Response:
         """
-        Initiate the password reset flow.
+        Inicia el flux de restabliment de contrasenya.
 
-        Expects JSON that matches `UserForgotPasswordSchema` with the user's email. Loads the reset email
-        template, generates and sends a reset code, and returns the validity window for the code.
+        Rep un JSON que segueix `UserForgotPasswordSchema` amb el correu de l'usuari. Carrega la
+        plantilla del correu, genera i envia un codi de restabliment i retorna la finestra de validesa.
 
-        Status codes:
-        - 200: Reset email sent successfully.
-        - 400: Required field missing.
-        - 401: Invalid credentials provided.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Failed to load the template or send the email.
+        Codis d'estat:
+        - 200: Correu de restabliment enviat correctament.
+        - 400: Falta un camp obligatori.
+        - 401: Credencials no vàlides.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: No s'ha pogut carregar la plantilla o enviar el correu.
         """
         try:
             self.logger.info("A user forgot their password", module="UserForgotPassword", metadata={"email": data['email']})
@@ -646,18 +646,18 @@ class UserForgotPassword(MethodView):
     @blp.response(500, description="Error inesperat del servidor en restablir la contrasenya.")
     def patch(self, data: dict) -> Response:
         """
-        Complete the password reset by validating the reset code and setting a new password.
+        Completa el restabliment validant el codi i establint una nova contrasenya.
 
-        Expects JSON that matches `UserResetPasswordSchema` with the email, reset code, and new password.
+        Rep un JSON que segueix `UserResetPasswordSchema` amb el correu, codi de restabliment i nova contrasenya.
 
-        Status codes:
-        - 200: Password reset successfully.
-        - 400: Missing field or reset code invalid/expired.
-        - 401: Invalid credentials provided.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error while resetting the password.
+        Codis d'estat:
+        - 200: Contrasenya restablerta correctament.
+        - 400: Falta algun camp o el codi és invàlid/caducat.
+        - 401: Credencials no vàlides.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat en restablir la contrasenya.
         """
         try:
             self.logger.info("A user wants to reset their password", module="UserForgotPassword", metadata={"email": data['email']})
