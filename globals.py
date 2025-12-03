@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-VERSION = '0.0.5'
+VERSION = '0.1.0'
 
 DEFAULT_VERSION_ENDPOINT = '/api/version'
 
@@ -31,9 +31,14 @@ DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_USER = os.getenv('DB_USER')
 DB_SSL = os.getenv("DB_SSL", "false").lower() == "true"
 DB_SSL_CA = os.getenv("DB_SSL_CA")
-DB_AUTO_MIGRATE = str(os.getenv('DB_AUTO_MIGRATE', 'true')).lower() in ('t', 'true', '1', 'y', 'yes')
+DB_AUTO_MIGRATE = str(os.getenv('DB_AUTO_MIGRATE', '0')).lower() in ('t', 'true', '1', 'y', 'yes')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 JWT_TOKEN_LOCATION = os.getenv('JWT_TOKEN_LOCATION', 'headers').split(',')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+AZURE_OPENAI_API_KEY = os.getenv('AZURE_OPENAI_API_KEY')
+AZURE_OPENAI_ENDPOINT = os.getenv('AZURE_OPENAI_ENDPOINT')
+AZURE_OPENAI_API_VERSION = os.getenv('AZURE_OPENAI_API_VERSION')
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME')
 
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 APPLICATION_EMAIL = os.getenv('APPLICATION_EMAIL')

@@ -11,7 +11,9 @@ from db import create_db
 from resources.health import blp as HealthBlueprint
 from resources.version import blp as VersionBlueprint
 from resources.user import blp as UserBlueprint
+from resources.transcription import blp as TranscriptionBlueprint
 from resources.question import blp as QuestionBlueprint
+from resources.activity import blp as ActivityBlueprint
 
 def create_app(settings_module: str = 'globals') -> Flask:
     """
@@ -38,14 +40,14 @@ def create_app(settings_module: str = 'globals') -> Flask:
     missing_db_fields = [key for key, value in required_db_fields.items() if value is None]
     if missing_db_fields:
         raise RuntimeError(
-            f"Missing database configuration for: {', '.join(missing_db_fields)}. "
-            "Set them in your environment variables or settings module."
+            f"Falten paràmetres de configuració de base de dades per: {', '.join(missing_db_fields)}. "
+            "Configura'ls a les variables d'entorn o al mòdul d'ajusts."
         )
 
     try:
         db_port = int(DB_PORT) if DB_PORT is not None else 5432
     except (TypeError, ValueError):
-        raise RuntimeError(f"Invalid DB_PORT value: {DB_PORT!r}. It must be an integer.")
+        raise RuntimeError(f"Valor de DB_PORT no vàlid: {DB_PORT!r}. Ha de ser un enter.")
 
     db_url = URL.create(
         drivername="postgresql+psycopg2",
@@ -103,13 +105,15 @@ def create_app(settings_module: str = 'globals') -> Flask:
     api.register_blueprint(HealthBlueprint, url_prefix=getApiPrefix('health'))
     api.register_blueprint(VersionBlueprint, url_prefix=app.config['VERSION_ENDPOINT'])
     api.register_blueprint(UserBlueprint, url_prefix=getApiPrefix('user'))
+    api.register_blueprint(TranscriptionBlueprint, url_prefix=getApiPrefix('transcription'))
     api.register_blueprint(QuestionBlueprint, url_prefix=getApiPrefix('question'))
+    api.register_blueprint(ActivityBlueprint, url_prefix=getApiPrefix('activity'))
 
     with app.app_context():
         db = create_db(app)
         import models
         migrate = Migrate(app, db)
-        DB_AUTO_MIGRATE = app.config.get("DB_AUTO_MIGRATE", True)
+        DB_AUTO_MIGRATE = app.config.get("DB_AUTO_MIGRATE", False)
         migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
         if DB_AUTO_MIGRATE and os.path.isdir(migrations_dir) and os.path.isfile(os.path.join(migrations_dir, "env.py")):
             alembic_upgrade()
@@ -120,7 +124,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
         response = {
             "error_message": str(error),
             "code": 501,
-            "status": "Not Implemented"
+            "status": "No implementat"
         }
         return jsonify(response), 501
     

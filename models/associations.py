@@ -56,6 +56,26 @@ class QuestionAnsweredAssociation(db.Model):
     question_id = db.Column(UUID(as_uuid=True), db.ForeignKey('questions.id', onupdate='CASCADE'), primary_key=True)
     answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     question = db.relationship('Question', lazy=True)
+    patient = db.relationship('Patient', back_populates='question_answers', lazy=True)
 
     def __repr__(self):
         return f"<QuestionAnsweredAssociation Patient: {self.patient_email}, Question ID: {self.question_id}, Answered At: {self.answered_at}>"
+
+class ActivityCompletedAssociation(db.Model):
+    __tablename__ = 'activities_completed'
+    __table_args__ = (
+        db.CheckConstraint(
+            'score IS NULL OR (score >= 0 AND score <= 10)',
+            name='check_activity_completed_score_range',
+        ),
+    )
+
+    patient_email = db.Column(db.String(120), db.ForeignKey('patients.email', onupdate='CASCADE'), primary_key=True)
+    activity_id = db.Column(UUID(as_uuid=True), db.ForeignKey('activities.id', onupdate='CASCADE'), primary_key=True)
+    completed_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    score = db.Column(db.Float, nullable=True)
+    activity = db.relationship('Activity', lazy=True)
+    patient = db.relationship('Patient', lazy=True)
+
+    def __repr__(self):
+        return f"<ActivityCompletedAssociation Patient: {self.patient_email}, Activity ID: {self.activity_id}, Completed At: {self.completed_at}>"

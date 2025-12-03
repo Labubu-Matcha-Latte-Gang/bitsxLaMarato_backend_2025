@@ -84,3 +84,33 @@ class TestUserPut(BaseTest):
         )
 
         assert response.status_code == 404
+
+    def test_put_patient_height_out_of_range_returns_422(self):
+        patient_payload = self.make_patient_payload()
+        self.register_patient(patient_payload)
+        token = self.login_and_get_token(patient_payload["email"], patient_payload["password"])
+
+        response = self.client.put(
+            f"{self.api_prefix}/user",
+            headers=self.auth_headers(token),
+            json={"name": "Test", "surname": "User", "height_cm": 300.0},
+        )
+
+        assert response.status_code == 422
+        body = response.get_json() or {}
+        assert "L'alçada del pacient ha d'estar entre 0 i 250 centímetres." in body.get("message", "")
+
+    def test_put_patient_weight_out_of_range_returns_422(self):
+        patient_payload = self.make_patient_payload()
+        self.register_patient(patient_payload)
+        token = self.login_and_get_token(patient_payload["email"], patient_payload["password"])
+
+        response = self.client.put(
+            f"{self.api_prefix}/user",
+            headers=self.auth_headers(token),
+            json={"name": "Test", "surname": "User", "weight_kg": 700.0},
+        )
+
+        assert response.status_code == 422
+        body = response.get_json() or {}
+        assert "El pes del pacient ha d'estar entre 0 i 600 quilograms." in body.get("message", "")

@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+from typing import Optional
+
+from db import db
+from application.services import (
+    ActivityService,
+    PasswordResetService,
+    QuestionService,
+    TokenService,
+    UserService,
+)
+from domain.services.security import PasswordHasher
+from infrastructure.sqlalchemy import (
+    SQLAlchemyActivityRepository,
+    SQLAlchemyAdminRepository,
+    SQLAlchemyDoctorRepository,
+    SQLAlchemyPatientRepository,
+    SQLAlchemyQuestionRepository,
+    SQLAlchemyResetCodeRepository,
+    SQLAlchemyUnitOfWork,
+    SQLAlchemyUserRepository,
+)
+from sqlalchemy.orm import Session
+
+
+class ServiceFactory:
+    """
+    Simple factory that builds service instances with their dependencies.
+    Exposed as a singleton to share wiring (session, repos, UoW) across layers.
+    """
+    __instance: 'ServiceFactory' | None = None
+
+    def __init__(self, session: Optional[Session] = None):
+        self.session: Session = session or db.session
+
+    @classmethod
+    def get_instance(cls, session: Optional[Session] = None, refresh: bool = False) -> 'ServiceFactory':
+        """
+        Return the singleton instance. Optionally refresh or inject a session.
+        Args:
+            session (Optional[Session]): SQLAlchemy session to use.
+            refresh (bool): If True, forces creation of a new instance.
+        Returns:
+            ServiceFactory: The singleton instance.
+        """
+        if refresh or cls.__instance is None or (session is not None and cls.__instance.session is not session):
+            cls.__instance = cls(session)
+        return cls.__instance
+
+    def build_user_service(self) -> UserService:
+        """
+        Build a UserService with its dependencies.
+        Returns:
+            UserService: The constructed UserService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        hasher = PasswordHasher()
+        token_service = TokenService()
+
+        user_repo = SQLAlchemyUserRepository(self.session)
+        patient_repo = SQLAlchemyPatientRepository(self.session)
+        doctor_repo = SQLAlchemyDoctorRepository(self.session)
+        admin_repo = SQLAlchemyAdminRepository(self.session)
+
+        return UserService(
+            user_repo=user_repo,
+            patient_repo=patient_repo,
+            doctor_repo=doctor_repo,
+            admin_repo=admin_repo,
+            uow=uow,
+            hasher=hasher,
+            token_service=token_service,
+        )
+
+    def build_question_service(self) -> QuestionService:
+        """
+        Build a QuestionService with its dependencies.
+        Returns:
+            QuestionService: The constructed QuestionService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        question_repo = SQLAlchemyQuestionRepository(self.session)
+        return QuestionService(question_repo=question_repo, uow=uow)
+
+    def build_activity_service(self) -> ActivityService:
+        """
+        Build an ActivityService with its dependencies.
+        Returns:
+            ActivityService: The constructed ActivityService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        activity_repo = SQLAlchemyActivityRepository(self.session)
+        return ActivityService(activity_repo=activity_repo, uow=uow)
+
+    def build_password_reset_service(self, validity_minutes: int) -> PasswordResetService:
+        """
+        Build a PasswordResetService with its dependencies.
+        Args:
+            validity_minutes (int): The validity duration for reset codes in minutes.
+        Returns:
+            PasswordResetService: The constructed PasswordResetService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        hasher = PasswordHasher()
+        user_repo = SQLAlchemyUserRepository(self.session)
+        code_repo = SQLAlchemyResetCodeRepository(self.session)
+        return PasswordResetService(
+            user_repo=user_repo,
+            code_repo=code_repo,
+            hasher=hasher,
+            uow=uow,
+            validity_minutes=validity_minutes,
+        )

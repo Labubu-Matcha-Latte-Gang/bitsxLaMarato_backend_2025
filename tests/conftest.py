@@ -10,6 +10,8 @@ from db import db
 def app():
     app = create_app("testing_settings")
     with app.app_context():
+        # Ensure schema matches current models (drops existing tables in test DB)
+        db.drop_all()
         db.create_all()
     return app
 
@@ -41,8 +43,8 @@ def db_session(app, db_connection):
 
     yield session
 
-    session.remove()
     transaction.rollback()
+    session.remove()
     ctx.pop()
 
 

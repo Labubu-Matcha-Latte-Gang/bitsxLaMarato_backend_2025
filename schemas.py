@@ -3,285 +3,1184 @@ from helpers.enums.gender import Gender
 from helpers.enums.question_types import QuestionType
 
 GENDER_VALUES = [gender.value for gender in Gender]
-GENDER_DESCRIPTION = f"Patient gender. Accepted values: {', '.join(GENDER_VALUES)}."
+GENDER_DESCRIPTION = f"Gènere del pacient. Valors acceptats: {', '.join(GENDER_VALUES)}."
 QUESTION_TYPE_VALUES = [question_type.value for question_type in QuestionType]
-QUESTION_TYPE_DESCRIPTION = f"Question type. Accepted values: {', '.join(QUESTION_TYPE_VALUES)}."
+QUESTION_TYPE_DESCRIPTION = f"Tipus de pregunta. Valors acceptats: {', '.join(QUESTION_TYPE_VALUES)}."
+ACTIVITY_TYPE_DESCRIPTION = f"Tipus d'activitat. Valors acceptats: {', '.join(QUESTION_TYPE_VALUES)}."
 
 password_complexity = validate.Regexp(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
-    error="Password must contain at least one uppercase letter, one lowercase letter, one number, and be at least 8 characters long.",
+    error="La contrasenya ha de contenir almenys una lletra majúscula, una minúscula, un número i tenir un mínim de 8 caràcters.",
 )
+
 
 class PatientEmailPathSchema(Schema):
     """
-    Schema for retrieving patient data by email via the URL path.
+    Esquema per recuperar dades d'un pacient a partir del correu a la ruta.
     """
-    email = fields.Email(required=True, metadata={"description": "Patient email to retrieve data for."})
+
+    class Meta:
+        description = "Paràmetres de ruta per consultar un pacient pel seu correu electrònic."
+        example = {"email": "pacient@example.com"}
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Correu electrònic del pacient per recuperar les seves dades.",
+            "example": "pacient@example.com",
+        },
+    )
+
 
 class UserResponseSchema(Schema):
     """
-    Schema for user data responses (includes role-specific info when present).
+    Esquema de resposta d'usuari (inclou dades específiques del rol quan existeixen).
     """
-    email = fields.Email(required=True, metadata={"description": "User email."})
-    name = fields.String(required=True, metadata={"description": "User name."})
-    surname = fields.String(required=True, metadata={"description": "User surname."})
+
+    class Meta:
+        description = "Payload retornat per operacions d'usuari amb informació del rol."
+        example = {
+            "email": "jane.doe@example.com",
+            "name": "Jane",
+            "surname": "Doe",
+            "role": {
+                "ailments": "Hipertensió lleu",
+                "gender": "female",
+                "age": 42,
+                "treatments": "Control dietètic",
+                "height_cm": 168.5,
+                "weight_kg": 64.3,
+                "doctors": ["dr.house@example.com"],
+            },
+        }
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Correu electrònic de l'usuari.",
+            "example": "jane.doe@example.com",
+        },
+    )
+    name = fields.String(
+        required=True,
+        metadata={
+            "description": "Nom de l'usuari.",
+            "example": "Jane",
+        },
+    )
+    surname = fields.String(
+        required=True,
+        metadata={
+            "description": "Cognoms de l'usuari.",
+            "example": "Doe",
+        },
+    )
     role = fields.Dict(
         required=False,
         metadata={
             "description": (
-                "Role-specific data. For patients: ailments, gender, age, treatments, height_cm, weight_kg, "
-                "doctors (emails). For doctors: patients (emails). For admins: empty object."
-            )
+                "Dades específiques del rol. Per als pacients: ailments, gender, age, treatments, "
+                "height_cm, weight_kg, doctors (correus). Per als metges: patients (correus). "
+                "Per als administradors: objecte buit."
+            ),
+            "example": {
+                "ailments": "Hipertensió lleu",
+                "gender": "female",
+                "age": 42,
+                "treatments": "Control dietètic",
+                "height_cm": 168.5,
+                "weight_kg": 64.3,
+                "doctors": ["dr.house@example.com"],
+            },
         },
     )
 
+
 class UserUpdateSchema(Schema):
     """
-    Schema for full user updates (PUT).
+    Esquema per a actualitzacions completes de l'usuari (PUT).
     """
-    name = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "Updated name of the user."})
-    surname = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "Updated surname of the user."})
+
+    class Meta:
+        description = "Cos complet per reemplaçar les dades de l'usuari autenticat."
+        example = {
+            "name": "Laura",
+            "surname": "Serra",
+            "password": "Segura123",
+            "ailments": "Diabetis tipus 2",
+            "gender": "female",
+            "age": 36,
+            "treatments": "Dieta baixa en sucre",
+            "height_cm": 170.2,
+            "weight_kg": 65.5,
+            "doctors": ["metge1@example.com", "metge2@example.com"],
+            "patients": ["pacient@example.com"],
+        }
+
+    name = fields.String(
+        required=True,
+        validate=validate.Length(max=80),
+        metadata={
+            "description": "Nom actualitzat de l'usuari.",
+            "example": "Laura",
+        },
+    )
+    surname = fields.String(
+        required=True,
+        validate=validate.Length(max=80),
+        metadata={
+            "description": "Cognoms actualitzats de l'usuari.",
+            "example": "Serra",
+        },
+    )
     password = fields.String(
         required=False,
         load_only=True,
         validate=password_complexity,
-        metadata={"description": "New password for the user."},
+        metadata={
+            "description": "Nova contrasenya per a l'usuari.",
+            "example": "Segura123",
+        },
     )
-    ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
+    ailments = fields.String(
+        required=False,
+        allow_none=True,
+        validate=lambda s: len(s) <= 2048,
+        metadata={
+            "description": "Patologies o malalties del pacient.",
+            "example": "Diabetis tipus 2",
+        },
+    )
     gender = fields.Enum(
         Gender,
         required=False,
         by_value=True,
-        metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
+        metadata={
+            "description": GENDER_DESCRIPTION,
+            "enum": GENDER_VALUES,
+            "example": "female",
+        },
     )
-    age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
-    treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient treatments."})
-    height_cm = fields.Float(required=False, allow_none=False, metadata={"description": "Patient height in centimeters."})
-    weight_kg = fields.Float(required=False, allow_none=False, metadata={"description": "Patient weight in kilograms."})
-    doctors = fields.List(fields.Email(), required=False, metadata={"description": "List of doctor emails for the patient."})
-    patients = fields.List(fields.Email(), required=False, metadata={"description": "List of patient emails for the doctor."})
+    age = fields.Integer(
+        required=False,
+        allow_none=False,
+        metadata={
+            "description": "Edat del pacient.",
+            "example": 36,
+        },
+    )
+    treatments = fields.String(
+        required=False,
+        allow_none=True,
+        validate=lambda s: len(s) <= 2048,
+        metadata={
+            "description": "Tractaments del pacient.",
+            "example": "Dieta baixa en sucre",
+        },
+    )
+    height_cm = fields.Float(
+        required=False,
+        allow_none=False,
+        metadata={
+            "description": "Alçada del pacient en centímetres.",
+            "example": 170.2,
+        },
+    )
+    weight_kg = fields.Float(
+        required=False,
+        allow_none=False,
+        metadata={
+            "description": "Pes del pacient en quilograms.",
+            "example": 65.5,
+        },
+    )
+    doctors = fields.List(
+        fields.Email(),
+        required=False,
+        metadata={
+            "description": "Llista de correus dels metges associats al pacient.",
+            "example": ["metge1@example.com", "metge2@example.com"],
+        },
+    )
+    patients = fields.List(
+        fields.Email(),
+        required=False,
+        metadata={
+            "description": "Llista de correus dels pacients associats al metge.",
+            "example": ["pacient@example.com"],
+        },
+    )
+
 
 class UserPartialUpdateSchema(Schema):
     """
-    Schema for partial user updates (PATCH).
+    Esquema per a actualitzacions parcials de l'usuari (PATCH).
     """
-    name = fields.String(required=False, validate=validate.Length(max=80), metadata={"description": "Updated name of the user."})
-    surname = fields.String(required=False, validate=validate.Length(max=80), metadata={"description": "Updated surname of the user."})
+
+    class Meta:
+        description = "Cos parcial per modificar camps concrets de l'usuari autenticat."
+        example = {
+            "surname": "Ribas",
+            "treatments": "Fisioteràpia setmanal",
+            "height_cm": 172.0,
+        }
+
+    name = fields.String(
+        required=False,
+        validate=validate.Length(max=80),
+        metadata={
+            "description": "Nom actualitzat de l'usuari.",
+            "example": "Marc",
+        },
+    )
+    surname = fields.String(
+        required=False,
+        validate=validate.Length(max=80),
+        metadata={
+            "description": "Cognoms actualitzats de l'usuari.",
+            "example": "Ribas",
+        },
+    )
     password = fields.String(
         required=False,
         load_only=True,
         validate=password_complexity,
-        metadata={"description": "New password for the user."},
+        metadata={
+            "description": "Nova contrasenya per a l'usuari.",
+            "example": "ContrasenyaNova1",
+        },
     )
-    ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient ailments."})
+    ailments = fields.String(
+        required=False,
+        allow_none=True,
+        validate=lambda s: len(s) <= 2048,
+        metadata={
+            "description": "Patologies o malalties del pacient.",
+            "example": "Migranya crònica",
+        },
+    )
     gender = fields.Enum(
         Gender,
         required=False,
         by_value=True,
-        metadata={"description": GENDER_DESCRIPTION, "enum": GENDER_VALUES},
+        metadata={
+            "description": GENDER_DESCRIPTION,
+            "enum": GENDER_VALUES,
+            "example": "male",
+        },
     )
-    age = fields.Integer(required=False, allow_none=False, metadata={"description": "Patient age."})
-    treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "Patient treatments."})
-    height_cm = fields.Float(required=False, allow_none=False, metadata={"description": "Patient height in centimeters."})
-    weight_kg = fields.Float(required=False, allow_none=False, metadata={"description": "Patient weight in kilograms."})
-    doctors = fields.List(fields.Email(), required=False, metadata={"description": "List of doctor emails for the patient."})
-    patients = fields.List(fields.Email(), required=False, metadata={"description": "List of patient emails for the doctor."})
+    age = fields.Integer(
+        required=False,
+        allow_none=False,
+        metadata={
+            "description": "Edat del pacient.",
+            "example": 48,
+        },
+    )
+    treatments = fields.String(
+        required=False,
+        allow_none=True,
+        validate=lambda s: len(s) <= 2048,
+        metadata={
+            "description": "Tractaments del pacient.",
+            "example": "Fisioteràpia setmanal",
+        },
+    )
+    height_cm = fields.Float(
+        required=False,
+        allow_none=False,
+        metadata={
+            "description": "Alçada del pacient en centímetres.",
+            "example": 172.0,
+        },
+    )
+    weight_kg = fields.Float(
+        required=False,
+        allow_none=False,
+        metadata={
+            "description": "Pes del pacient en quilograms.",
+            "example": 72.4,
+        },
+    )
+    doctors = fields.List(
+        fields.Email(),
+        required=False,
+        metadata={
+            "description": "Llista de correus dels metges associats al pacient.",
+            "example": ["metge3@example.com"],
+        },
+    )
+    patients = fields.List(
+        fields.Email(),
+        required=False,
+        metadata={
+            "description": "Llista de correus dels pacients associats al metge.",
+            "example": ["pacient1@example.com", "pacient2@example.com"],
+        },
+    )
+
 
 class UserRegisterSchema(Schema):
     """
-    Schema for user registration data.
+    Esquema per a les dades de registre d'un usuari.
     """
-    name = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "The name of the user."})
-    surname = fields.String(required=True, validate=validate.Length(max=80), metadata={"description": "The surname of the user."})
-    email = fields.Email(required=True, metadata={"description": "The email address of the user."})
+
+    class Meta:
+        description = "Cos base per registrar un usuari amb credencials i dades personals."
+        example = {
+            "name": "Clara",
+            "surname": "Puig",
+            "email": "clara.puig@example.com",
+            "password": "ClaraSegura1",
+        }
+
+    name = fields.String(
+        required=True,
+        validate=validate.Length(max=80),
+        metadata={
+            "description": "Nom de l'usuari.",
+            "example": "Clara",
+        },
+    )
+    surname = fields.String(
+        required=True,
+        validate=validate.Length(max=80),
+        metadata={
+            "description": "Cognoms de l'usuari.",
+            "example": "Puig",
+        },
+    )
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Adreça de correu de l'usuari.",
+            "example": "clara.puig@example.com",
+        },
+    )
     password = fields.String(
         required=True,
         load_only=True,
         validate=password_complexity,
-        metadata={"description": "The password for the user."},
+        metadata={
+            "description": "Contrasenya de l'usuari.",
+            "example": "ClaraSegura1",
+        },
     )
 
+
 class PatientRegisterSchema(UserRegisterSchema):
-    """Schema for patient registration data."""
-    ailments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "The ailments of the patient."})
+    """
+    Esquema per al registre de pacients.
+    """
+
+    class Meta:
+        description = "Cos complet per registrar un pacient amb metadades mèdiques i associacions."
+        example = {
+            "name": "Pau",
+            "surname": "Casals",
+            "email": "pau.casals@example.com",
+            "password": "PauSalut1",
+            "ailments": "Asma",
+            "gender": "male",
+            "age": 28,
+            "treatments": "Inhalador diari",
+            "height_cm": 180.0,
+            "weight_kg": 78.2,
+            "doctors": ["doctor@example.com"],
+        }
+
+    ailments = fields.String(
+        required=False,
+        allow_none=True,
+        validate=lambda s: len(s) <= 2048,
+        metadata={
+            "description": "Malalties o afeccions del pacient.",
+            "example": "Asma",
+        },
+    )
     gender = fields.Enum(
         Gender,
         required=True,
         by_value=True,
-        metadata={"description": f"The gender of the patient. Accepted values: {', '.join(GENDER_VALUES)}.", "enum": GENDER_VALUES},
+        metadata={
+            "description": f"Gènere del pacient. Valors acceptats: {', '.join(GENDER_VALUES)}.",
+            "enum": GENDER_VALUES,
+            "example": "male",
+        },
     )
-    age = fields.Integer(required=True, allow_none=False, metadata={"description": "The age of the patient."})
-    treatments = fields.String(required=False, allow_none=True, validate=lambda s: len(s) <= 2048, metadata={"description": "The treatments of the patient."})
-    height_cm = fields.Float(required=True, allow_none=False, metadata={"description": "The height of the patient in centimeters."})
-    weight_kg = fields.Float(required=True, allow_none=False, metadata={"description": "The weight of the patient in kilograms."})
-    doctors = fields.List(fields.Email(), required=False, metadata={"description": "List of doctor emails associated with the patient."})
+    age = fields.Integer(
+        required=True,
+        allow_none=False,
+        metadata={
+            "description": "Edat del pacient.",
+            "example": 28,
+        },
+    )
+    treatments = fields.String(
+        required=False,
+        allow_none=True,
+        validate=lambda s: len(s) <= 2048,
+        metadata={
+            "description": "Tractaments actuals del pacient.",
+            "example": "Inhalador diari",
+        },
+    )
+    height_cm = fields.Float(
+        required=True,
+        allow_none=False,
+        metadata={
+            "description": "Alçada del pacient en centímetres.",
+            "example": 180.0,
+        },
+    )
+    weight_kg = fields.Float(
+        required=True,
+        allow_none=False,
+        metadata={
+            "description": "Pes del pacient en quilograms.",
+            "example": 78.2,
+        },
+    )
+    doctors = fields.List(
+        fields.Email(),
+        required=False,
+        metadata={
+            "description": "Llista de correus de metges associats al pacient.",
+            "example": ["doctor@example.com"],
+        },
+    )
+
 
 class DoctorRegisterSchema(UserRegisterSchema):
-    """Schema for doctor registration data."""
-    patients = fields.List(fields.Email(), required=False, metadata={"description": "List of patient emails associated with the doctor."})
+    """
+    Esquema per al registre de metges.
+    """
+
+    class Meta:
+        description = "Cos complet per registrar un metge i associar-hi pacients."
+        example = {
+            "name": "Anna",
+            "surname": "Font",
+            "email": "anna.font@example.com",
+            "password": "AnnaMetge1",
+            "patients": ["pacient1@example.com", "pacient2@example.com"],
+        }
+
+    patients = fields.List(
+        fields.Email(),
+        required=False,
+        metadata={
+            "description": "Llista de correus dels pacients associats al metge.",
+            "example": ["pacient1@example.com", "pacient2@example.com"],
+        },
+    )
+
 
 class UserLoginSchema(Schema):
     """
-    Schema for user login data.
+    Esquema per a les credencials d'inici de sessió.
     """
-    email = fields.Email(required=True, metadata={"description": "The email address of the user."})
-    password = fields.String(required=True, load_only=True, metadata={"description": "The password for the user."})
+
+    class Meta:
+        description = "Cos per autenticar un usuari amb correu i contrasenya."
+        example = {
+            "email": "clara.puig@example.com",
+            "password": "ClaraSegura1",
+        }
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Correu electrònic de l'usuari.",
+            "example": "clara.puig@example.com",
+        },
+    )
+    password = fields.String(
+        required=True,
+        load_only=True,
+        metadata={
+            "description": "Contrasenya de l'usuari.",
+            "example": "ClaraSegura1",
+        },
+    )
+
 
 class UserLoginResponseSchema(Schema):
     """
-    Schema for user login response data.
+    Esquema per a la resposta d'inici de sessió.
     """
-    access_token = fields.String(required=True, metadata={"description": "Authentication token for the user."})
+
+    class Meta:
+        description = "Resposta d'autenticació amb el token JWT."
+        example = {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
+
+    access_token = fields.String(
+        required=True,
+        metadata={
+            "description": "Token d'autenticació per a l'usuari.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        },
+    )
+
 
 class UserForgotPasswordSchema(Schema):
     """
-    Schema for user forgot password data.
+    Esquema per a la sol·licitud de recuperar contrasenya.
     """
-    email = fields.Email(required=True, metadata={"description": "The email address of the user requesting password reset."})
+
+    class Meta:
+        description = "Cos per demanar l'enviament del codi de restabliment de contrasenya."
+        example = {"email": "clara.puig@example.com"}
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Correu electrònic de l'usuari que demana restablir la contrasenya.",
+            "example": "clara.puig@example.com",
+        },
+    )
+
 
 class UserForgotPasswordResponseSchema(Schema):
     """
-    Schema for user forgot password response data.
+    Esquema per a la resposta de sol·licitud de restabliment.
     """
-    message = fields.String(required=True, metadata={"description": "Response message indicating the result of the password reset request."})
-    validity = fields.Float(required=True, metadata={"description": "Validity duration of the password reset code in minutes."})
+
+    class Meta:
+        description = "Resposta que indica l'estat de l'enviament del codi i la seva validesa."
+        example = {
+            "message": "El correu de restabliment s'ha enviat correctament.",
+            "validity": 5,
+        }
+
+    message = fields.String(
+        required=True,
+        metadata={
+            "description": "Missatge de resposta que indica el resultat de la sol·licitud.",
+            "example": "El correu de restabliment s'ha enviat correctament.",
+        },
+    )
+    validity = fields.Float(
+        required=True,
+        metadata={
+            "description": "Durada de validesa del codi de restabliment en minuts.",
+            "example": 5,
+        },
+    )
+
 
 class UserResetPasswordSchema(Schema):
     """
-    Schema for user reset password data.
+    Esquema per al restabliment de contrasenya.
     """
-    email = fields.Email(required=True, metadata={"description": "The email address of the user resetting their password."})
-    reset_code = fields.String(required=True, metadata={"description": "The reset code provided to the user."})
+
+    class Meta:
+        description = "Cos per validar el codi de restabliment i establir una nova contrasenya."
+        example = {
+            "email": "clara.puig@example.com",
+            "reset_code": "AB12CD34",
+            "new_password": "NovaContrasenya1",
+        }
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Correu electrònic de l'usuari que restableix la contrasenya.",
+            "example": "clara.puig@example.com",
+        },
+    )
+    reset_code = fields.String(
+        required=True,
+        metadata={
+            "description": "Codi de restabliment proporcionat a l'usuari.",
+            "example": "AB12CD34",
+        },
+    )
     new_password = fields.String(
         required=True,
         load_only=True,
         validate=password_complexity,
-        metadata={"description": "The new password for the user."},
+        metadata={
+            "description": "Nova contrasenya per a l'usuari.",
+            "example": "NovaContrasenya1",
+        },
     )
+
 
 class UserResetPasswordResponseSchema(Schema):
     """
-    Schema for user reset password response data.
+    Esquema per a la resposta de restabliment de contrasenya.
     """
-    message = fields.String(required=True, metadata={"description": "Response message indicating the result of the password reset operation."})
+
+    class Meta:
+        description = "Resposta que confirma que la contrasenya s'ha restablert."
+        example = {"message": "Contrasenya restablerta correctament."}
+
+    message = fields.String(
+        required=True,
+        metadata={
+            "description": "Missatge de resultat de l'operació de restabliment.",
+            "example": "Contrasenya restablerta correctament.",
+        },
+    )
+
 
 class TranscriptionChunkSchema(Schema):
     """
-    Schema for uploading an audio chunk.
-    Note: The file itself is handled via multipart/form-data, verified in the controller.
+    Esquema per pujar un fragment d'àudio.
     """
-    session_id = fields.String(required=True, metadata={"description": "Unique identifier for the recording session."})
-    chunk_index = fields.Integer(required=True, metadata={"description": "Sequential index of the chunk."})
+
+    class Meta:
+        description = "Paràmetres per enviar un fragment d'àudio d'una sessió de transcripció."
+        example = {"session_id": "sessio-123", "chunk_index": 1}
+
+    session_id = fields.String(
+        required=True,
+        metadata={
+            "description": "Identificador únic de la sessió d'enregistrament.",
+            "example": "sessio-123",
+        },
+    )
+    chunk_index = fields.Integer(
+        required=True,
+        metadata={
+            "description": "Índex seqüencial del fragment.",
+            "example": 1,
+        },
+    )
+
 
 class TranscriptionCompleteSchema(Schema):
     """
-    Schema for finalizing the transcription session.
+    Esquema per finalitzar la sessió de transcripció.
     """
-    session_id = fields.String(required=True, metadata={"description": "Unique identifier for the recording session to finalize."})
+
+    class Meta:
+        description = "Paràmetres per tancar una sessió i combinar tots els fragments."
+        example = {"session_id": "sessio-123"}
+
+    session_id = fields.String(
+        required=True,
+        metadata={
+            "description": "Identificador únic de la sessió d'enregistrament a finalitzar.",
+            "example": "sessio-123",
+        },
+    )
+
 
 class TranscriptionResponseSchema(Schema):
     """
-    Schema for the final transcription response.
+    Esquema per a la resposta final de transcripció.
     """
-    status = fields.String(required=True, metadata={"description": "Status of the operation."})
-    transcription = fields.String(required=True, metadata={"description": "The complete combined transcription text."})
+
+    class Meta:
+        description = "Resposta amb l'estat i el text transcrit complet."
+        example = {
+            "status": "completed",
+            "transcription": "Bon dia, aquesta és la transcripció completa de la sessió.",
+        }
+
+    status = fields.String(
+        required=True,
+        metadata={
+            "description": "Estat de l'operació.",
+            "example": "completed",
+        },
+    )
+    transcription = fields.String(
+        required=True,
+        metadata={
+            "description": "Text combinat complet de la transcripció.",
+            "example": "Bon dia, aquesta és la transcripció completa de la sessió.",
+        },
+    )
 
 
 class QuestionBaseSchema(Schema):
     """
-    Base schema for question fields.
+    Esquema base per als camps de pregunta.
     """
-    text = fields.String(required=True, validate=validate.Length(min=1), metadata={"description": "Question statement text."})
+
+    class Meta:
+        description = "Camps comuns per definir una pregunta."
+        example = {
+            "text": "Quin nombre ve després del 7?",
+            "question_type": "concentration",
+            "difficulty": 2.5,
+        }
+
+    text = fields.String(
+        required=True,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Enunciat o text de la pregunta.",
+            "example": "Quin nombre ve després del 7?",
+        },
+    )
     question_type = fields.Enum(
         QuestionType,
         required=True,
         by_value=True,
-        metadata={"description": QUESTION_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+        metadata={
+            "description": QUESTION_TYPE_DESCRIPTION,
+            "enum": QUESTION_TYPE_VALUES,
+            "example": "concentration",
+        },
     )
     difficulty = fields.Float(
         required=True,
         validate=validate.Range(min=0, max=5),
-        metadata={"description": "Difficulty score between 0 (mínim) and 5 (màxim)."},
+        metadata={
+            "description": "Puntuació de dificultat entre 0 (mínim) i 5 (màxim).",
+            "example": 2.5,
+        },
     )
 
 
 class QuestionCreateSchema(QuestionBaseSchema):
-    """Schema for creating a single question."""
-    pass
+    """
+    Esquema per crear una única pregunta.
+    """
+
+    class Meta(QuestionBaseSchema.Meta):
+        description = "Cos per crear una nova pregunta."
+        example = QuestionBaseSchema.Meta.example
 
 
 class QuestionBulkCreateSchema(Schema):
     """
-    Schema for bulk creation of questions.
+    Esquema per a la creació massiva de preguntes.
     """
+
+    class Meta:
+        description = "Cos per crear diverses preguntes en una sola sol·licitud."
+        example = {
+            "questions": [
+                {
+                    "text": "Quants dies té una setmana?",
+                    "question_type": "concentration",
+                    "difficulty": 1.0,
+                },
+                {
+                    "text": "Ordena de menor a major: 3, 1, 2.",
+                    "question_type": "sorting",
+                    "difficulty": 2.0,
+                },
+            ]
+        }
+
     questions = fields.List(
         fields.Nested(QuestionCreateSchema),
         required=True,
         validate=validate.Length(min=1),
-        metadata={"description": "Array de preguntes a crear."},
+        metadata={
+            "description": "Llista de preguntes a crear.",
+            "example": [
+                {
+                    "text": "Quants dies té una setmana?",
+                    "question_type": "concentration",
+                    "difficulty": 1.0,
+                }
+            ],
+        },
     )
 
 
 class QuestionResponseSchema(QuestionBaseSchema):
     """
-    Schema for returning question data.
+    Esquema per retornar dades de pregunta.
     """
-    id = fields.UUID(required=True, dump_only=True, metadata={"description": "Unique identifier of the question."})
+
+    class Meta(QuestionBaseSchema.Meta):
+        description = "Resposta amb la informació d'una pregunta existent."
+        example = {
+            "id": "7e9c5a2c-1234-4b1f-9a77-111122223333",
+            **QuestionBaseSchema.Meta.example,
+        }
+
+    id = fields.UUID(
+        required=True,
+        dump_only=True,
+        metadata={
+            "description": "Identificador únic de la pregunta.",
+            "example": "7e9c5a2c-1234-4b1f-9a77-111122223333",
+        },
+    )
 
 
 class QuestionUpdateSchema(QuestionBaseSchema):
-    """Schema for fully updating a question (PUT)."""
-    pass
+    """
+    Esquema per reemplaçar completament una pregunta (PUT).
+    """
+
+    class Meta(QuestionBaseSchema.Meta):
+        description = "Cos complet per actualitzar tots els camps d'una pregunta existent."
+        example = QuestionBaseSchema.Meta.example
 
 
 class QuestionPartialUpdateSchema(Schema):
     """
-    Schema for partially updating a question (PATCH).
+    Esquema per actualitzar parcialment una pregunta (PATCH).
     """
-    text = fields.String(required=False, validate=validate.Length(min=1), metadata={"description": "Question statement text."})
+
+    class Meta:
+        description = "Cos parcial per modificar només alguns camps d'una pregunta."
+        example = {"difficulty": 3.0}
+
+    text = fields.String(
+        required=False,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Enunciat o text de la pregunta.",
+            "example": "Canvia l'ordre dels números: 4, 2, 3.",
+        },
+    )
     question_type = fields.Enum(
         QuestionType,
         required=False,
         by_value=True,
-        metadata={"description": QUESTION_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+        metadata={
+            "description": QUESTION_TYPE_DESCRIPTION,
+            "enum": QUESTION_TYPE_VALUES,
+            "example": "sorting",
+        },
     )
     difficulty = fields.Float(
         required=False,
         validate=validate.Range(min=0, max=5),
-        metadata={"description": "Difficulty score between 0 (mínim) and 5 (màxim)."},
+        metadata={
+            "description": "Puntuació de dificultat entre 0 (mínim) i 5 (màxim).",
+            "example": 3.0,
+        },
     )
 
 
 class QuestionQuerySchema(Schema):
     """
-    Schema for filtering questions via query parameters.
+    Esquema per filtrar preguntes mitjançant paràmetres de consulta.
     """
-    id = fields.UUID(required=False, metadata={"description": "Filtra per ID de la pregunta."})
+
+    class Meta:
+        description = "Filtres disponibles per consultar les preguntes."
+        example = {
+            "id": "7e9c5a2c-1234-4b1f-9a77-111122223333",
+            "question_type": "speed",
+            "difficulty_min": 1.0,
+            "difficulty_max": 3.0,
+        }
+
+    id = fields.UUID(
+        required=False,
+        metadata={
+            "description": "Filtra per ID de la pregunta.",
+            "example": "7e9c5a2c-1234-4b1f-9a77-111122223333",
+        },
+    )
     question_type = fields.Enum(
         QuestionType,
         required=False,
         by_value=True,
-        metadata={"description": QUESTION_TYPE_DESCRIPTION, "enum": QUESTION_TYPE_VALUES},
+        metadata={
+            "description": QUESTION_TYPE_DESCRIPTION,
+            "enum": QUESTION_TYPE_VALUES,
+            "example": "speed",
+        },
     )
     difficulty = fields.Float(
         required=False,
         validate=validate.Range(min=0, max=5),
-        metadata={"description": "Filtra per dificultat exacta entre 0 i 5."},
+        metadata={
+            "description": "Filtra per dificultat exacta entre 0 i 5.",
+            "example": 2.0,
+        },
     )
     difficulty_min = fields.Float(
         required=False,
         validate=validate.Range(min=0, max=5),
-        metadata={"description": "Filtra preguntes amb dificultat superior o igual al valor indicat."},
+        metadata={
+            "description": "Filtra preguntes amb dificultat superior o igual al valor indicat.",
+            "example": 1.0,
+        },
     )
     difficulty_max = fields.Float(
         required=False,
         validate=validate.Range(min=0, max=5),
-        metadata={"description": "Filtra preguntes amb dificultat inferior o igual al valor indicat."},
+        metadata={
+            "description": "Filtra preguntes amb dificultat inferior o igual al valor indicat.",
+            "example": 3.0,
+        },
     )
 
 
 class QuestionIdSchema(Schema):
     """
-    Schema for operations requiring a question identifier.
+    Esquema per a operacions que requereixen l'identificador d'una pregunta.
     """
-    id = fields.UUID(required=True, metadata={"description": "Identificador de la pregunta a operar."})
+
+    class Meta:
+        description = "Paràmetre per indicar l'ID de la pregunta."
+        example = {"id": "7e9c5a2c-1234-4b1f-9a77-111122223333"}
+
+    id = fields.UUID(
+        required=True,
+        metadata={
+            "description": "Identificador de la pregunta sobre la qual operar.",
+            "example": "7e9c5a2c-1234-4b1f-9a77-111122223333",
+        },
+    )
+
+
+class ActivityBaseSchema(Schema):
+    """
+    Esquema base per als camps d'activitat.
+    """
+
+    class Meta:
+        description = "Camps comuns per definir una activitat."
+        example = {
+            "title": "Memoritzar seqüències",
+            "description": "Recorda l'ordre de colors que apareixen a la pantalla.",
+            "activity_type": "concentration",
+            "difficulty": 2.0,
+        }
+
+    title = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=255),
+        metadata={
+            "description": "Títol de l'activitat.",
+            "example": "Memoritzar seqüències",
+        },
+    )
+    description = fields.String(
+        required=True,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Descripció de l'activitat.",
+            "example": "Recorda l'ordre de colors que apareixen a la pantalla.",
+        },
+    )
+    activity_type = fields.Enum(
+        QuestionType,
+        required=True,
+        by_value=True,
+        metadata={
+            "description": ACTIVITY_TYPE_DESCRIPTION,
+            "enum": QUESTION_TYPE_VALUES,
+            "example": "concentration",
+        },
+    )
+    difficulty = fields.Float(
+        required=True,
+        validate=validate.Range(min=0, max=5),
+        metadata={
+            "description": "Puntuació de dificultat entre 0 (mínim) i 5 (màxim).",
+            "example": 2.0,
+        },
+    )
+
+
+class ActivityCreateSchema(ActivityBaseSchema):
+    """
+    Esquema per crear una única activitat.
+    """
+
+    class Meta(ActivityBaseSchema.Meta):
+        description = "Cos per crear una nova activitat."
+        example = ActivityBaseSchema.Meta.example
+
+
+class ActivityBulkCreateSchema(Schema):
+    """
+    Esquema per a la creació massiva d'activitats.
+    """
+
+    class Meta:
+        description = "Cos per crear diverses activitats en una sola sol·licitud."
+        example = {
+            "activities": [
+                {
+                    "title": "Suma ràpida",
+                    "description": "Respon sumes senzilles en menys de 5 segons.",
+                    "activity_type": "speed",
+                    "difficulty": 1.5,
+                }
+            ]
+        }
+
+    activities = fields.List(
+        fields.Nested(ActivityCreateSchema),
+        required=True,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Llista d'activitats a crear.",
+            "example": [
+                {
+                    "title": "Suma ràpida",
+                    "description": "Respon sumes senzilles en menys de 5 segons.",
+                    "activity_type": "speed",
+                    "difficulty": 1.5,
+                }
+            ],
+        },
+    )
+
+
+class ActivityResponseSchema(ActivityBaseSchema):
+    """
+    Esquema per retornar dades d'activitat.
+    """
+
+    class Meta(ActivityBaseSchema.Meta):
+        description = "Resposta amb la informació d'una activitat existent."
+        example = {
+            "id": "8f0d1a2b-5678-4cde-9abc-444455556666",
+            **ActivityBaseSchema.Meta.example,
+        }
+
+    id = fields.UUID(
+        required=True,
+        dump_only=True,
+        metadata={
+            "description": "Identificador únic de l'activitat.",
+            "example": "8f0d1a2b-5678-4cde-9abc-444455556666",
+        },
+    )
+
+
+class ActivityUpdateSchema(ActivityBaseSchema):
+    """
+    Esquema per reemplaçar completament una activitat (PUT).
+    """
+
+    class Meta(ActivityBaseSchema.Meta):
+        description = "Cos complet per actualitzar tots els camps d'una activitat existent."
+        example = ActivityBaseSchema.Meta.example
+
+
+class ActivityPartialUpdateSchema(Schema):
+    """
+    Esquema per actualitzar parcialment una activitat (PATCH).
+    """
+
+    class Meta:
+        description = "Cos parcial per modificar només alguns camps d'una activitat."
+        example = {"title": "Nou títol d'activitat"}
+
+    title = fields.String(
+        required=False,
+        validate=validate.Length(min=1, max=255),
+        metadata={
+            "description": "Títol de l'activitat.",
+            "example": "Repetició de patrons",
+        },
+    )
+    description = fields.String(
+        required=False,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Descripció de l'activitat.",
+            "example": "Segueix el patró visual que apareix a la pantalla.",
+        },
+    )
+    activity_type = fields.Enum(
+        QuestionType,
+        required=False,
+        by_value=True,
+        metadata={
+            "description": ACTIVITY_TYPE_DESCRIPTION,
+            "enum": QUESTION_TYPE_VALUES,
+            "example": "multitasking",
+        },
+    )
+    difficulty = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={
+            "description": "Puntuació de dificultat entre 0 (mínim) i 5 (màxim).",
+            "example": 3.5,
+        },
+    )
+
+
+class ActivityQuerySchema(Schema):
+    """
+    Esquema per filtrar activitats mitjançant paràmetres de consulta.
+    """
+
+    class Meta:
+        description = "Filtres disponibles per consultar les activitats."
+        example = {
+            "title": "Memoritzar seqüències",
+            "activity_type": "concentration",
+            "difficulty_min": 1.0,
+            "difficulty_max": 4.0,
+        }
+
+    id = fields.UUID(
+        required=False,
+        metadata={
+            "description": "Filtra per ID de l'activitat.",
+            "example": "8f0d1a2b-5678-4cde-9abc-444455556666",
+        },
+    )
+    title = fields.String(
+        required=False,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Filtra per títol exacte de l'activitat.",
+            "example": "Memoritzar seqüències",
+        },
+    )
+    activity_type = fields.Enum(
+        QuestionType,
+        required=False,
+        by_value=True,
+        metadata={
+            "description": ACTIVITY_TYPE_DESCRIPTION,
+            "enum": QUESTION_TYPE_VALUES,
+            "example": "concentration",
+        },
+    )
+    difficulty = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={
+            "description": "Filtra per dificultat exacta entre 0 i 5.",
+            "example": 2.0,
+        },
+    )
+    difficulty_min = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={
+            "description": "Filtra activitats amb dificultat superior o igual al valor indicat.",
+            "example": 1.0,
+        },
+    )
+    difficulty_max = fields.Float(
+        required=False,
+        validate=validate.Range(min=0, max=5),
+        metadata={
+            "description": "Filtra activitats amb dificultat inferior o igual al valor indicat.",
+            "example": 4.0,
+        },
+    )
+
+
+class ActivityIdSchema(Schema):
+    """
+    Esquema per a operacions que requereixen l'identificador d'una activitat.
+    """
+
+    class Meta:
+        description = "Paràmetre per indicar l'ID de l'activitat."
+        example = {"id": "8f0d1a2b-5678-4cde-9abc-444455556666"}
+
+    id = fields.UUID(
+        required=True,
+        metadata={
+            "description": "Identificador de l'activitat sobre la qual operar.",
+            "example": "8f0d1a2b-5678-4cde-9abc-444455556666",
+        },
+    )

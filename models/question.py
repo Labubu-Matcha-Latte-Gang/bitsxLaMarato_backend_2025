@@ -17,7 +17,7 @@ class Question(db.Model):
     )
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    text = db.Column(db.Text, nullable=False)
+    text = db.Column(db.Text, nullable=False, unique=True)
     question_type = db.Column(db.Enum(QuestionType), nullable=False)
     difficulty = db.Column(db.Float, nullable=False)
 
@@ -78,7 +78,7 @@ class Question(db.Model):
             ValueError: If the difficulty is outside the allowed range.
         """
         if new_difficulty < 0 or new_difficulty > 5:
-            raise ValueError("Difficulty must be between 0 and 5 inclusive.")
+            raise ValueError("La dificultat ha d'estar entre 0 i 5 (inclosos).")
         self.difficulty = new_difficulty
 
     def set_properties(self, data: dict) -> None:

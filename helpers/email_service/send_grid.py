@@ -31,14 +31,14 @@ class SendGridEmailAdapter(AbstractEmailAdapter):
     def send_email(self, to_emails: Sequence[str], from_email: str, subject: str, body: str) -> None:
         recipients = list(to_emails)
         if not recipients:
-            raise SendEmailException("No recipients provided for SendGrid email.")
+            raise SendEmailException("No s'ha proporcionat cap destinatari per al correu de SendGrid.")
         try:
             for recipient in recipients:
                 message = self.__build_email(recipient, from_email, subject, body)
                 response: Response = self.__client.send(message)
                 if response.status_code < 200 or response.status_code >= 300:
                     raise SendEmailException(
-                        f"Failed to send email via SendGrid. Status code: {response.status_code}, Body: {response.body.decode('utf-8')}"
+                        f"No s'ha pogut enviar el correu via SendGrid. Codi d'estat: {response.status_code}, Cos: {response.body.decode('utf-8')}"
                     )
             self.logger.info(
                 message="Email sent successfully via SendGrid",

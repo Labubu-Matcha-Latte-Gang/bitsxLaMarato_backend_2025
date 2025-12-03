@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any
+from typing import Any, Generator
 from uuid import uuid4
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from flask_jwt_extended import create_access_token
+from sqlalchemy.orm import Session
 from helpers.enums.gender import Gender
-from models.admin import Admin
-from models.doctor import Doctor
-from models.patient import Patient
-from models.user import User
+from application.container import ServiceFactory
+from domain.entities.user import User
 
 
 class BaseTest(ABC):
@@ -22,7 +23,12 @@ class BaseTest(ABC):
     default_password = "Password1"
 
     @pytest.fixture(autouse=True)
-    def _inject_dependencies(self, app, client, db_session):
+    def _inject_dependencies(
+        self,
+        app: Flask,
+        client: FlaskClient,
+        db_session: Session,
+    ) -> Generator[None, None, None]:
         self.app = app
         self.client = client
         self.db = db_session
@@ -86,17 +92,10 @@ class BaseTest(ABC):
     def create_admin(self, email: str | None = None, password: str | None = None) -> User:
         email = email or self.unique_email("admin")
         password = password or self.default_password
-        user = User(
-            email=email,
-            password=User.hash_password(password),
-            name="Admin",
-            surname="User",
-        )
-        admin = Admin(email=email, user=user)
-        self.db.add(user)
-        self.db.add(admin)
-        self.db.commit()
-        return user
+        factory = ServiceFactory.get_instance(refresh=True)
+        user_service = factory.build_user_service()
+        admin = user_service.register_admin(email, password, "Admin", "User")
+        return admin
 
     def create_patient_model(
         self,
@@ -107,26 +106,24 @@ class BaseTest(ABC):
     ) -> User:
         email = email or self.unique_email("patient")
         password = password or self.default_password
-        user = User(
-            email=email,
-            password=User.hash_password(password),
-            name=name,
-            surname=surname,
+        factory = ServiceFactory.get_instance(refresh=True)
+        user_service = factory.build_user_service()
+        patient = user_service.register_patient(
+            {
+                "email": email,
+                "password": password,
+                "name": name,
+                "surname": surname,
+                "ailments": None,
+                "gender": Gender.MALE,
+                "age": 30,
+                "treatments": None,
+                "height_cm": 180.0,
+                "weight_kg": 75.0,
+                "doctors": [],
+            }
         )
-        patient = Patient(
-            email=email,
-            ailments=None,
-            gender=Gender.MALE,
-            age=30,
-            treatments=None,
-            height_cm=180.0,
-            weight_kg=75.0,
-            user=user,
-        )
-        self.db.add(user)
-        self.db.add(patient)
-        self.db.commit()
-        return user
+        return patient
 
     def create_doctor_model(
         self,
@@ -137,17 +134,18 @@ class BaseTest(ABC):
     ) -> User:
         email = email or self.unique_email("doctor")
         password = password or self.default_password
-        user = User(
-            email=email,
-            password=User.hash_password(password),
-            name=name,
-            surname=surname,
+        factory = ServiceFactory.get_instance(refresh=True)
+        user_service = factory.build_user_service()
+        doctor = user_service.register_doctor(
+            {
+                "email": email,
+                "password": password,
+                "name": name,
+                "surname": surname,
+                "patients": [],
+            }
         )
-        doctor = Doctor(email=email, user=user)
-        self.db.add(user)
-        self.db.add(doctor)
-        self.db.commit()
-        return user
+        return doctor
 
     def generate_token(self, email: str) -> str:
         with self.app.app_context():

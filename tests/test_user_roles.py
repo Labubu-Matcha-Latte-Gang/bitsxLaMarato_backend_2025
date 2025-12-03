@@ -1,4 +1,5 @@
 from helpers.enums.gender import Gender
+from helpers.enums.user_role import UserRole
 from models.doctor import Doctor
 from models.patient import Patient
 from models.user import User
@@ -8,13 +9,15 @@ from tests.base_test import BaseTest
 class TestUserRoles(BaseTest):
     def test_login_without_role_returns_409(self):
         email = self.unique_email("norole")
-        user = User(
-            email=email,
-            password=User.hash_password(self.default_password),
-            name="No",
-            surname="Role",
+        self.db.execute(
+            User.__table__.insert().values(
+                email=email,
+                password=User.hash_password(self.default_password),
+                name="No",
+                surname="Role",
+                role=UserRole.PATIENT,
+            )
         )
-        self.db.add(user)
         self.db.commit()
 
         response = self.login(email, self.default_password)
@@ -23,24 +26,31 @@ class TestUserRoles(BaseTest):
 
     def test_get_me_with_multiple_roles_returns_409(self):
         email = self.unique_email("multi")
-        user = User(
-            email=email,
-            password=User.hash_password(self.default_password),
-            name="Multi",
-            surname="Role",
+        self.db.execute(
+            User.__table__.insert().values(
+                email=email,
+                password=User.hash_password(self.default_password),
+                name="Multi",
+                surname="Role",
+                role=UserRole.DOCTOR,
+            )
         )
-        patient = Patient(
-            email=email,
-            ailments=None,
-            gender=Gender.MALE,
-            age=25,
-            treatments=None,
-            height_cm=175.0,
-            weight_kg=70.0,
-            user=user,
+        self.db.execute(
+            Patient.__table__.insert().values(
+                email=email,
+                ailments=None,
+                gender=Gender.MALE,
+                age=25,
+                treatments=None,
+                height_cm=175.0,
+                weight_kg=70.0,
+            )
         )
-        doctor = Doctor(email=email, user=user)
-        self.db.add_all([user, patient, doctor])
+        self.db.execute(
+            Doctor.__table__.insert().values(
+                email=email,
+            )
+        )
         self.db.commit()
 
         token = self.generate_token(email)
@@ -53,13 +63,15 @@ class TestUserRoles(BaseTest):
 
     def test_get_me_with_no_role_returns_409(self):
         email = self.unique_email("norole2")
-        user = User(
-            email=email,
-            password=User.hash_password(self.default_password),
-            name="No",
-            surname="Role",
+        self.db.execute(
+            User.__table__.insert().values(
+                email=email,
+                password=User.hash_password(self.default_password),
+                name="No",
+                surname="Role",
+                role=UserRole.PATIENT,
+            )
         )
-        self.db.add(user)
         self.db.commit()
 
         token = self.generate_token(email)
@@ -72,24 +84,32 @@ class TestUserRoles(BaseTest):
 
     def test_login_with_multiple_roles_returns_409(self):
         email = self.unique_email("multi-login")
-        user = User(
-            email=email,
-            password=User.hash_password(self.default_password),
-            name="Multi",
-            surname="Role",
+        hashed = User.hash_password(self.default_password)
+        self.db.execute(
+            User.__table__.insert().values(
+                email=email,
+                password=hashed,
+                name="Multi",
+                surname="Role",
+                role=UserRole.DOCTOR,
+            )
         )
-        patient = Patient(
-            email=email,
-            ailments=None,
-            gender=Gender.FEMALE,
-            age=28,
-            treatments=None,
-            height_cm=165.0,
-            weight_kg=60.0,
-            user=user,
+        self.db.execute(
+            Patient.__table__.insert().values(
+                email=email,
+                ailments=None,
+                gender=Gender.FEMALE,
+                age=28,
+                treatments=None,
+                height_cm=165.0,
+                weight_kg=60.0,
+            )
         )
-        doctor = Doctor(email=email, user=user)
-        self.db.add_all([user, patient, doctor])
+        self.db.execute(
+            Doctor.__table__.insert().values(
+                email=email,
+            )
+        )
         self.db.commit()
 
         response = self.login(email, self.default_password)
