@@ -197,16 +197,6 @@ class _BaseRoleUpdater(ABC):
         self.uow = uow
         self.hasher = hasher
 
-    def _update_common_fields(self, user: User, update_data: dict) -> None:
-        """Update base user fields."""
-        base_fields = {k: v for k, v in update_data.items() if k in {"name", "surname", "password"}}
-        if base_fields.get("password") is not None:
-            user.set_password(base_fields["password"], self.hasher)
-        if base_fields.get("name") is not None:
-            user.name = base_fields["name"]
-        if base_fields.get("surname") is not None:
-            user.surname = base_fields["surname"]
-
     @abstractmethod
     def update(self, user: User, update_data: dict) -> User:
         ...
@@ -232,7 +222,6 @@ class _PatientUpdater(_BaseRoleUpdater):
             self.doctor_repo.fetch_by_emails(normalized)
             update_data = {**update_data, "doctors": normalized}
 
-        self._update_common_fields(patient, update_data)
         patient.set_properties(update_data, self.hasher)
 
         with self.uow:
@@ -261,7 +250,6 @@ class _DoctorUpdater(_BaseRoleUpdater):
             self.patient_repo.fetch_by_emails(normalized)
             update_data = {**update_data, "patients": normalized}
 
-        self._update_common_fields(doctor, update_data)
         doctor.set_properties(update_data, self.hasher)
 
         with self.uow:
@@ -282,7 +270,6 @@ class _AdminUpdater(_BaseRoleUpdater):
 
     def update(self, user: User, update_data: dict) -> Admin:
         admin: Admin = user
-        self._update_common_fields(admin, update_data)
         admin.set_properties(update_data, self.hasher)
 
         with self.uow:
