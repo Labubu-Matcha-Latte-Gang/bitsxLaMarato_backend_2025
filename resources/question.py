@@ -313,13 +313,11 @@ class DailyQuestionResource(MethodView):
                 metadata={"patient_email": email},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-
-            patient_controller = factory.get_patient_controller()
-            patient = patient_controller.get_patient(email)
-
-            question_controller = factory.get_question_controller()
-            question = question_controller.get_daily_question(patient)
+            factory = ServiceFactory()
+            user_service = factory.build_user_service()
+            patient = user_service.get_user(email)
+            question_service = factory.build_question_service()
+            question = question_service.get_daily_question(patient)  # type: ignore[arg-type]
 
             return jsonify(question.to_dict()), 200
         except QuestionNotFoundException as e:
