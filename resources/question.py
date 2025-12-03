@@ -13,6 +13,7 @@ from helpers.exceptions.question_exceptions import (
     QuestionNotFoundException,
     QuestionUpdateException,
 )
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
 from schemas import (
     QuestionBulkCreateSchema,
@@ -72,6 +73,10 @@ class QuestionResource(MethodView):
                 metadata={"count": len(data.get('questions', []))},
                 error=e,
             )
+            abort(422, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en crear preguntes", module="QuestionResource", error=e)
             abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
@@ -172,6 +177,10 @@ class QuestionResource(MethodView):
             db.session.rollback()
             self.logger.error("Pregunta no trobada en PUT", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en PUT de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            abort(422, message=str(e))
         except QuestionUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validació en PUT de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
@@ -224,6 +233,10 @@ class QuestionResource(MethodView):
             db.session.rollback()
             self.logger.error("Pregunta no trobada en PATCH", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en PATCH de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            abort(422, message=str(e))
         except QuestionUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validació en PATCH de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
@@ -270,6 +283,10 @@ class QuestionResource(MethodView):
             db.session.rollback()
             self.logger.error("Pregunta no trobada en DELETE", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en DELETE de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Error de base de dades en DELETE de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
