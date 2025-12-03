@@ -169,7 +169,7 @@ class UserService:
                 self.admin_repo.update(user)
                 self.uow.commit()
         else:
-            raise UserRoleConflictException("User must have exactly one role assigned.")
+            raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.")
         return user
 
     def delete_user(self, email: str) -> None:
