@@ -71,6 +71,8 @@ def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
         "activities_completed_pkey": "Ja s'ha registrat aquesta activitat com a completada pel pacient.",
     }
 
+    raw_message = str(getattr(exc, "orig", exc))
+
     if constraint and constraint in constraint_messages:
         return DataIntegrityException(constraint_messages[constraint])
 
@@ -88,6 +90,19 @@ def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
         if table in {"users", "patients", "doctors", "admins"}:
             return DataIntegrityException("Ja existeix un usuari amb aquest correu.")
         return DataIntegrityException("Ja existeix un registre amb aquest identificador.")
+
+    # Fallback per a motors sense diag (p.ex. SQLite)
+    for key, msg in constraint_messages.items():
+        if key in raw_message:
+            return DataIntegrityException(msg)
+
+    if "not null constraint failed" in raw_message.lower():
+        # Format SQLite: NOT NULL constraint failed: table.column
+        if "." in raw_message:
+            parts = raw_message.split(":")[-1].strip().split(".")
+            if len(parts) == 2:
+                _, col = parts
+                return DataIntegrityException(f"El camp '{col}' és obligatori.")
 
     if constraint:
         return DataIntegrityException(f"Les dades no compleixen el requisit d'integritat '{constraint}'.")
