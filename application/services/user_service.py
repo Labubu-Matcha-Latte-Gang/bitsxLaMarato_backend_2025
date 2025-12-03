@@ -193,6 +193,14 @@ class UserService:
 
 
 class _BaseRoleUpdater(ABC):
+    """
+    Abstract base class for role-specific user update strategies.
+    
+    Implements the Strategy pattern to handle updates for different user roles (Patient, Doctor, Admin).
+    Each concrete updater handles role-specific logic while this base class manages common fields.
+    This design enables clean separation of concerns and makes the update logic extensible.
+    """
+    
     def __init__(self, uow: IUnitOfWork, hasher: PasswordHasher) -> None:
         self.uow = uow
         self.hasher = hasher
@@ -213,6 +221,13 @@ class _BaseRoleUpdater(ABC):
 
 
 class _PatientUpdater(_BaseRoleUpdater):
+    """
+    Concrete strategy for updating Patient users.
+    
+    Handles patient-specific update logic including validation and synchronization of assigned doctors.
+    Validates that referenced doctors exist before updating the patient's doctor associations.
+    """
+    
     def __init__(
         self,
         patient_repo: IPatientRepository,
@@ -242,6 +257,13 @@ class _PatientUpdater(_BaseRoleUpdater):
 
 
 class _DoctorUpdater(_BaseRoleUpdater):
+    """
+    Concrete strategy for updating Doctor users.
+    
+    Handles doctor-specific update logic including validation and synchronization of assigned patients.
+    Validates that referenced patients exist before updating the doctor's patient associations.
+    """
+    
     def __init__(
         self,
         doctor_repo: IDoctorRepository,
@@ -271,6 +293,13 @@ class _DoctorUpdater(_BaseRoleUpdater):
 
 
 class _AdminUpdater(_BaseRoleUpdater):
+    """
+    Concrete strategy for updating Admin users.
+    
+    Handles admin-specific update logic. Admins have no role-specific associations,
+    so this strategy primarily updates common fields (name, surname, password).
+    """
+    
     def __init__(
         self,
         admin_repo: IAdminRepository,
