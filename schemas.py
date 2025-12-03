@@ -746,8 +746,6 @@ class QuestionCreateSchema(QuestionBaseSchema):
         description = "Cos per crear una nova pregunta."
         example = QuestionBaseSchema.Meta.example
 
-    pass
-
 
 class QuestionBulkCreateSchema(Schema):
     """
@@ -818,8 +816,6 @@ class QuestionUpdateSchema(QuestionBaseSchema):
     class Meta(QuestionBaseSchema.Meta):
         description = "Cos complet per actualitzar tots els camps d'una pregunta existent."
         example = QuestionBaseSchema.Meta.example
-
-    pass
 
 
 class QuestionPartialUpdateSchema(Schema):
@@ -993,8 +989,6 @@ class ActivityCreateSchema(ActivityBaseSchema):
         description = "Cos per crear una nova activitat."
         example = ActivityBaseSchema.Meta.example
 
-    pass
-
 
 class ActivityBulkCreateSchema(Schema):
     """
@@ -1062,8 +1056,6 @@ class ActivityUpdateSchema(ActivityBaseSchema):
     class Meta(ActivityBaseSchema.Meta):
         description = "Cos complet per actualitzar tots els camps d'una activitat existent."
         example = ActivityBaseSchema.Meta.example
-
-    pass
 
 
 class ActivityPartialUpdateSchema(Schema):
