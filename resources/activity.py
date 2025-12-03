@@ -13,7 +13,7 @@ from helpers.exceptions.activity_exceptions import (
     ActivityNotFoundException,
     ActivityUpdateException,
 )
-from helpers.factories.controller_factories import AbstractControllerFactory
+from application.container import ServiceFactory
 from schemas import (
     ActivityBulkCreateSchema,
     ActivityIdSchema,
@@ -59,13 +59,9 @@ class ActivityResource(MethodView):
                 metadata={"count": len(activities_data)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
+            activity_service = ServiceFactory().build_activity_service()
 
-            activities = activity_controller.create_activities(activities_data)
-            for activity in activities:
-                db.session.add(activity)
-            db.session.commit()
+            activities = activity_service.create_activities(activities_data)
 
             return jsonify([activity.to_dict() for activity in activities]), 201
         except (ActivityCreationException, ValueError) as e:
