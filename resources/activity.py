@@ -94,7 +94,7 @@ class ActivityResource(MethodView):
         ),
     )
     @blp.response(200, schema=ActivityResponseSchema(many=True), description="Activitats recuperades correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador o pacient per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
     @blp.response(500, description="Error inesperat del servidor en consultar les activitats.")
@@ -102,13 +102,13 @@ class ActivityResource(MethodView):
         """
         Obtenir activitats amb filtres opcionals.
 
-        Parametres de consulta:
-        - `id`: UUID exacte d'una activitat (retorna nomes aquesta o 404 si no existeix).
-        - `title`: Titol exacte de l'activitat.
+        Paràmetres de consulta:
+        - `id`: UUID exacte d'una activitat (retorna només aquesta o 404 si no existeix).
+        - `title`: Títol exacte de l'activitat.
         - `activity_type`: Valor de l'enum QuestionType.
         - `difficulty`: Valor exacte de dificultat (0-5).
-        - `difficulty_min`: Dificultat minima (>=).
-        - `difficulty_max`: Dificultat maxima (<=).
+        - `difficulty_min`: Dificultat mínima (>=).
+        - `difficulty_max`: Dificultat màxima (<=).
 
         Es poden combinar `difficulty`, `difficulty_min` i `difficulty_max`; tots els filtres aplicats alhora.
         Sense filtres retorna totes les activitats.
