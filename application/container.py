@@ -22,8 +22,23 @@ from infrastructure.sqlalchemy import (
 
 
 class ServiceFactory:
+    """
+    Simple factory that builds service instances with their dependencies.
+    Exposed as a singleton to share wiring (session, repos, UoW) across layers.
+    """
+    __instance: 'ServiceFactory' | None = None
+
     def __init__(self, session=None):
         self.session = session or db.session
+
+    @classmethod
+    def get_instance(cls, session=None, refresh: bool = False) -> 'ServiceFactory':
+        """
+        Return the singleton instance. Optionally refresh or inject a session.
+        """
+        if refresh or cls.__instance is None or (session is not None and cls.__instance.session is not session):
+            cls.__instance = cls(session)
+        return cls.__instance
 
     def build_user_service(self) -> UserService:
         uow = SQLAlchemyUnitOfWork(self.session)

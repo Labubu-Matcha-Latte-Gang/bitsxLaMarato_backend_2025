@@ -81,7 +81,7 @@ class PatientRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             patient = user_service.register_patient(data)
 
             return jsonify(patient.to_dict()), 201
@@ -151,7 +151,7 @@ class DoctorRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             doctor = user_service.register_doctor(data)
 
             return jsonify(doctor.to_dict()), 201
@@ -222,7 +222,7 @@ class UserLogin(MethodView):
         try:
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             access_token = user_service.login(data["email"], data["password"])
             return {"access_token": access_token}, 200
         except UserNotFoundException as e:
@@ -280,7 +280,7 @@ class UserCRUD(MethodView):
 
             email:str = get_jwt_identity()
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             user = user_service.get_user(email)
 
             return jsonify(user.to_dict()), 200
@@ -325,7 +325,7 @@ class UserCRUD(MethodView):
         try:
             email = get_jwt_identity()
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             user = user_service.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
@@ -398,7 +398,7 @@ class UserCRUD(MethodView):
         try:
             email = get_jwt_identity()
             
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             user = user_service.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
@@ -468,7 +468,7 @@ class UserCRUD(MethodView):
 
             self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             user_service.delete_user(email)
 
             return Response(status=204)
@@ -534,7 +534,7 @@ class PatientData(MethodView):
                 metadata={"patient_email": patient_email}
             )
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
 
             current_user = getattr(g, "current_user", None)
             if current_user is None:
@@ -616,7 +616,7 @@ class UserForgotPassword(MethodView):
                 self.logger.error("Failed to load reset password template", module="UserForgotPassword", error=e)
                 abort(500, message="No s'ha pogut carregar la plantilla del correu de restabliment.")
 
-            factory = ServiceFactory()
+            factory = ServiceFactory.get_instance()
             reset_service = factory.build_password_reset_service(RESET_CODE_VALIDITY_MINUTES)
             reset_code = reset_service.generate_reset_code(data["email"])
 
@@ -697,7 +697,7 @@ class UserForgotPassword(MethodView):
         try:
             self.logger.info("A user wants to reset their password", module="UserForgotPassword", metadata={"email": data['email']})
 
-            factory = ServiceFactory()
+            factory = ServiceFactory.get_instance()
             reset_service = factory.build_password_reset_service(RESET_CODE_VALIDITY_MINUTES)
             reset_service.reset_password(data["email"], data["reset_code"], data["new_password"])
 

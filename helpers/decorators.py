@@ -19,7 +19,7 @@ def roles_required(roles: Sequence[UserRole]):
             verify_jwt_in_request()
             email: str = get_jwt_identity()
 
-            user_service = ServiceFactory().build_user_service()
+            user_service = ServiceFactory.get_instance().build_user_service()
             try:
                 user = user_service.get_user(email)
             except UserNotFoundException:

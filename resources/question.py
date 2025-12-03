@@ -60,7 +60,7 @@ class QuestionResource(MethodView):
                 metadata={"count": len(questions_data)},
             )
 
-            question_service = ServiceFactory().build_question_service()
+            question_service = ServiceFactory.get_instance().build_question_service()
 
             questions = question_service.create_questions(questions_data)
 
@@ -125,7 +125,7 @@ class QuestionResource(MethodView):
                 metadata={"filters": filters},
             )
 
-            question_service = ServiceFactory().build_question_service()
+            question_service = ServiceFactory.get_instance().build_question_service()
             questions = question_service.list_questions(filters)
 
             return jsonify([question.to_dict() for question in questions]), 200
@@ -169,7 +169,7 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id)},
             )
 
-            question_service = ServiceFactory().build_question_service()
+            question_service = ServiceFactory.get_instance().build_question_service()
             question = question_service.update_question(question_id, data)
 
             return jsonify(question.to_dict()), 200
@@ -225,7 +225,7 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id), "fields": list(data.keys())},
             )
 
-            question_service = ServiceFactory().build_question_service()
+            question_service = ServiceFactory.get_instance().build_question_service()
             question = question_service.update_question(question_id, data)
 
             return jsonify(question.to_dict()), 200
@@ -275,7 +275,7 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id)},
             )
 
-            question_service = ServiceFactory().build_question_service()
+            question_service = ServiceFactory.get_instance().build_question_service()
             question_service.delete_question(question_id)
 
             return Response(status=204)
@@ -330,7 +330,7 @@ class DailyQuestionResource(MethodView):
                 metadata={"patient_email": email},
             )
 
-            factory = ServiceFactory()
+            factory = ServiceFactory.get_instance()
             user_service = factory.build_user_service()
             patient = user_service.get_user(email)
             question_service = factory.build_question_service()
