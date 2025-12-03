@@ -260,6 +260,15 @@ class SQLAlchemyDoctorRepository(IDoctorRepository):
     def update(self, doctor: DoctorDomain) -> None:
         self.user_repo.update(doctor)
 
+    def remove(self, doctor: DoctorDomain) -> None:
+        """
+        Delete a doctor from the database.
+
+        Args:
+            doctor (DoctorDomain): Doctor entity to delete.
+        """
+        self.user_repo.remove(doctor)
+
     def fetch_by_emails(self, emails: Iterable[str]) -> List[DoctorDomain]:
         clean_emails = [email for email in emails if email]
         if not clean_emails:

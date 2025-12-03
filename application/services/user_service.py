@@ -72,8 +72,8 @@ class UserService:
         doctor_emails = data.get("doctors", []) or []
         if doctor_emails:
             # Validate related doctors exist
-            self.doctor_repo.fetch_by_emails(doctor_emails)
-
+            doctors = self.doctor_repo.fetch_by_emails(doctor_emails)
+            
         patient = Patient(
             email=email,
             password_hash=self.hasher.hash(data["password"]),
@@ -90,6 +90,14 @@ class UserService:
 
         with self.uow:
             self.patient_repo.add(patient)
+            
+            # Create bidirectional associations
+            if doctor_emails:
+                for doctor in doctors:
+                    if patient.email not in doctor.patient_emails:
+                        doctor.patient_emails.append(patient.email)
+                        self.doctor_repo.update(doctor)
+            
             self.uow.commit()
         return patient
 
@@ -100,7 +108,7 @@ class UserService:
 
         patient_emails = data.get("patients", []) or []
         if patient_emails:
-            self.patient_repo.fetch_by_emails(patient_emails)
+            patients = self.patient_repo.fetch_by_emails(patient_emails)
 
         doctor = Doctor(
             email=email,
@@ -109,8 +117,17 @@ class UserService:
             surname=data["surname"],
             patient_emails=list(patient_emails),
         )
+        
         with self.uow:
             self.doctor_repo.add(doctor)
+            
+            # Create bidirectional associations
+            if patient_emails:
+                for patient in patients:
+                    if doctor.email not in patient.doctor_emails:
+                        patient.doctor_emails.append(doctor.email)
+                        self.patient_repo.update(patient)
+            
             self.uow.commit()
         return doctor
 
