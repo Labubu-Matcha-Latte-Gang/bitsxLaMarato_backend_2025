@@ -9,11 +9,12 @@ while ($true) {
     Write-Host "1. Start/Update environment (docker-compose up)"
     Write-Host "2. View live Output (Logs) [Ctrl+C to return]"
     Write-Host "3. Enter container terminal (Bash)"
-    Write-Host "4. Stop containers (Stop)"
-    Write-Host "5. Stop everything and Exit script"
+    Write-Host "4. Run Unit Tests (pytest)"
+    Write-Host "5. Stop containers (Stop)"
+    Write-Host "6. Stop everything and Exit script"
     Write-Host "----------------------------------------"
     
-    $selection = Read-Host "Select an option (1-5)"
+    $selection = Read-Host "Select an option (1-6)"
 
     switch ($selection) {
         "1" {
@@ -39,11 +40,21 @@ while ($true) {
             }
         }
         "4" {
+            Write-Host "Running Tests..." -ForegroundColor Cyan
+            try {
+                # Usamos 'run --rm' para crear un contenedor temporal solo para el test.
+                # Funciona aunque no hayas dado a la Opción 1.
+                docker-compose run --rm api pytest tests/
+            } catch {
+                Write-Host "Error running tests." -ForegroundColor Red
+            }
+        }
+        "5" {
             Write-Host "Stopping containers..." -ForegroundColor Magenta
             docker-compose stop
             Write-Host "Containers stopped." -ForegroundColor Green
         }
-        "5" {
+        "6" {
             Write-Host "Shutting down and removing containers..." -ForegroundColor Red
             docker-compose down
             exit
