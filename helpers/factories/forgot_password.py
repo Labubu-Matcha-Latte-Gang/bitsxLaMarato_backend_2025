@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 
-from helpers.forgot_password.forgot_password import ForgotPasswordFacade, AbstractForgotPasswordFacade
+from application.services.password_reset_service import PasswordResetService
+from helpers.forgot_password.forgot_password import (
+    AbstractForgotPasswordFacade,
+    ForgotPasswordFacade,
+)
 
 
 class AbstractForgotPasswordFactory(ABC):
@@ -15,7 +19,7 @@ class AbstractForgotPasswordFactory(ABC):
     @abstractmethod
     def get_password_facade(
         self,
-        user_service=None,
+        reset_service: PasswordResetService | None = None,
         email_service=None,
         refresh: bool = False
     ) -> AbstractForgotPasswordFacade:
@@ -27,5 +31,5 @@ class AbstractForgotPasswordFactory(ABC):
         raise NotImplementedError("get_password_facade method must be implemented by subclasses.")
 
 class ForgotPasswordFactory(AbstractForgotPasswordFactory):
-    def get_password_facade(self, user_service=None, email_service=None, refresh: bool = False) -> ForgotPasswordFacade:
-        return ForgotPasswordFacade.get_instance(user_service=user_service, email_service=email_service, refresh=refresh)
+    def get_password_facade(self, reset_service: PasswordResetService | None = None, email_service=None, refresh: bool = False) -> ForgotPasswordFacade:
+        return ForgotPasswordFacade.get_instance(reset_service=reset_service, email_service=email_service, refresh=refresh)
