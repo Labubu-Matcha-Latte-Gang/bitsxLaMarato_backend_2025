@@ -80,42 +80,10 @@ class PatientRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
+            user_service = ServiceFactory().build_user_service()
+            patient = user_service.register_patient(data)
 
-            user_payload = {
-                "email": data['email'],
-                "password": data['password'],
-                "name": data['name'],
-                "surname": data['surname'],
-            }
-            user = user_controller.create_user(user_payload)
-
-            doctor_controller = factory.get_doctor_controller()
-
-            doctor_emails:list[str] = data.get('doctors', []) or []
-            doctors = doctor_controller.fetch_doctors_by_email(doctor_emails)
-
-            patient_controller = factory.get_patient_controller()
-            patient_payload = {
-                "ailments": data.get('ailments'),
-                "gender": data['gender'],
-                "age": data['age'],
-                "treatments": data.get('treatments'),
-                "height_cm": data['height_cm'],
-                "weight_kg": data['weight_kg'],
-                "email": data['email'],
-                "user": user
-            }
-            patient = patient_controller.create_patient(patient_payload)
-
-            db.session.add(user)
-            db.session.add(patient)
-            db.session.flush()
-            patient.add_doctors(doctors)
-            db.session.commit()
-
-            return jsonify(user.to_dict()), 201
+            return jsonify(patient.to_dict()), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to missing field", module="PatientRegister", error=e)
