@@ -9,7 +9,7 @@ blp = Blueprint('health', __name__, description="Obtenir l'estat de salut de l'A
 
 @blp.route('')
 class Health(MethodView):
-    """Lightweight liveness probe for the API."""
+    """Prova de vida lleugera de l'API."""
 
     logger = AbstractLogger.get_instance()
 
@@ -22,12 +22,12 @@ class Health(MethodView):
     @blp.response(500, description="Error inesperat del servidor durant la comprovació de salut.")
     def get(self):
         """
-        Perform an unauthenticated health probe.
+        Realitza una comprovació de salut sense autenticació.
 
-        Returns an empty 200 response when the service is up.
-        Status codes:
-        - 200: Service reachable.
-        - 500: Unhandled error when processing the probe.
+        Retorna una resposta 200 buida quan el servei és actiu.
+        Codis d'estat:
+        - 200: Servei disponible.
+        - 500: Error no controlat en processar la comprovació.
         """
         try:
             self.logger.info("Health check requested", module="Health")
