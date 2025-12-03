@@ -76,7 +76,7 @@ class ActivityResource(MethodView):
             abort(422, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en crear activitats", module="ActivityResource", error=e)
+            self.logger.error("Integrity violation creating activities", module="ActivityResource", error=e)
             abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
@@ -180,7 +180,7 @@ class ActivityResource(MethodView):
             abort(404, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en PUT d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            self.logger.error("Integrity violation on activity PUT", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(422, message=str(e))
         except ActivityUpdateException as e:
             db.session.rollback()
@@ -236,7 +236,7 @@ class ActivityResource(MethodView):
             abort(404, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en PATCH d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            self.logger.error("Integrity violation on activity PATCH", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(422, message=str(e))
         except ActivityUpdateException as e:
             db.session.rollback()
@@ -286,7 +286,7 @@ class ActivityResource(MethodView):
             abort(404, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en DELETE d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            self.logger.error("Integrity violation on activity DELETE", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
