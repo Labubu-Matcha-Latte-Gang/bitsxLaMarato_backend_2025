@@ -138,6 +138,16 @@ class IDoctorRepository(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def remove(self, doctor: Doctor) -> None:
+        """
+        Delete a doctor.
+
+        Args:
+            doctor (Doctor): Doctor entity to delete.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
     def fetch_by_emails(self, emails: Iterable[str]) -> List[Doctor]:
         """
         Retrieve multiple doctors by email list.
