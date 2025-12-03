@@ -95,9 +95,9 @@ When analyzing a PR:
 
 ## 🗂 Location & Usage of this File
 
-- Save this file as `.github/copilot-instructions.md` at the root of the repository. :contentReference[oaicite:0]{index=0}  
-- Copilot (in supported editors/environments) will automatically load and apply these instructions during code review or when generating code. :contentReference[oaicite:1]{index=1}  
-- You can complement this with more specific instruction files (e.g. path-scoped or language-scoped) under `.github/instructions/` using glob patterns — but for now, this one file should cover the whole repo. :contentReference[oaicite:2]{index=2}  
+- Save this file as `.github/copilot-instructions.md` at the root of the repository. 
+- Copilot (in supported editors/environments) will automatically load and apply these instructions during code review or when generating code.  
+- You can complement this with more specific instruction files (e.g. path-scoped or language-scoped) under `.github/instructions/` using glob patterns — but for now, this one file should cover the whole repo.
 
 ---
 
