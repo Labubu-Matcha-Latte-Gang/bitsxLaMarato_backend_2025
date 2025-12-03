@@ -3,3 +3,17 @@ __pycache__
 *.pyc
 *.pyo
 .env
+
+# .dockerignore
+.git
+.gitignore
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+migrations/
+tests/
+data/

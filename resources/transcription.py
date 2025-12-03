@@ -1,5 +1,6 @@
 import os
 import tempfile
+import json
 from flask import request, current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
@@ -11,6 +12,7 @@ from db import db
 from models.transcription import TranscriptionChunk
 from helpers.debugger.logger import AbstractLogger
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from helpers.analysis_engine import analyze_audio_signal, analyze_linguistics, analyze_executive_functions
 from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 from schemas import TranscriptionChunkSchema, TranscriptionCompleteSchema, TranscriptionResponseSchema
 
@@ -33,7 +35,7 @@ def get_azure_client():
 @blp.route('/chunk')
 class TranscriptionChunkResource(MethodView):
     """
-    Gestió de la pujada de fragments d'àudio.
+    Gestió de la pujada de fragments d'àudio amb anàlisi cognitiu.
     """
     logger = AbstractLogger.get_instance()
 
@@ -41,7 +43,7 @@ class TranscriptionChunkResource(MethodView):
     @blp.arguments(TranscriptionChunkSchema, location='form')
     @blp.doc(
         summary="Pujar fragment d'àudio",
-        description="Rep un blob d'àudio, el transcriu i guarda el text a la base de dades PostgreSQL.",
+        description="Rep un blob d'àudio, l'analitza (física i lingüísticament), el transcriu i guarda el resultat.",
         parameters=[
             {
                 "name": "audio_blob",
@@ -70,41 +72,73 @@ class TranscriptionChunkResource(MethodView):
         try:
             self.logger.info(f"Processing DB chunk {chunk_index} for session {session_id}", module="Transcription")
             
-            # 1. Guardar temporalment al disc per a Whisper
+            # 1. Guardar temporalment al disc
             suffix = os.path.splitext(audio_file.filename)[1] or ".webm"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
                 audio_file.save(temp_audio.name)
                 temp_path = temp_audio.name
 
-            # 2. Transcriure amb OpenAI
+            # ---------------------------------------------------------
+            # 2. ANÀLISI DE SENYAL (Abans d'enviar a OpenAI)
+            # ---------------------------------------------------------
+            # Això ens dona mètriques de "Velocitat de Processament" reals (pauses, fonació)
+            acoustic_metrics = analyze_audio_signal(temp_path)
+
+            # ---------------------------------------------------------
+            # 3. TRANSCRIPCIÓ (Azure OpenAI)
+            # ---------------------------------------------------------
             client = get_azure_client()
             deployment_name = current_app.config.get("AZURE_OPENAI_DEPLOYMENT_NAME")
+            
             with open(temp_path, "rb") as file_to_send:
                 transcript = client.audio.transcriptions.create(
                     model=deployment_name,
                     file=file_to_send,
-                    language="ca" 
+                    language="ca",
+                    response_format="verbose_json"
                 )
                 text_result = transcript.text
+                segments = transcript.segments
 
-            # 3. Guardar a PostgreSQL
+            # ---------------------------------------------------------
+            # 4. ANÀLISI LINGÜÍSTIC (spaCy)
+            # ---------------------------------------------------------
+            # Això ens dona mètriques d'"Accés Lèxic" (Anomia, riquesa verbal)
+            linguistic_metrics = analyze_linguistics(text_result)
+
+            # ---------------------------------------------------------
+            # 5. UNIFICAR MÈTRIQUES
+            # ---------------------------------------------------------
+            combined_metrics = {
+                **acoustic_metrics,   # duration, phonation_ratio, pause_time...
+                **linguistic_metrics, # p_n_ratio, idea_density, noun_count...
+                "raw_latency": segments[0].start if segments else 0 # Access attribute, not dictionary
+            }
+
+            # 6. Guardar a PostgreSQL
             new_chunk = TranscriptionChunk(
                 session_id=session_id,
                 chunk_index=chunk_index,
-                text=text_result
+                text=text_result,
+                analysis=combined_metrics
             )
             db.session.add(new_chunk)
             db.session.commit()
 
-            return {"status": "success", "partial_text": text_result}, 200
-
+            # Retornem les dades perquè el Frontend pugui pintar gràfiques en temps real
+            return {
+                "status": "success", 
+                "partial_text": text_result,
+                "analysis": combined_metrics 
+            }, 200
+        
         except IntegrityError as e:
             db.session.rollback()
             mapped = map_integrity_error(e)
             self.logger.error("Integrity violation transcribing chunk", module="Transcription", error=mapped)
             abort(422, message=str(mapped))
         except Exception as e:
-            db.session.rollback() # Important fer rollback si falla
+            db.session.rollback()
             self.logger.error("Error transcribing chunk", module="Transcription", error=e)
             abort(500, message=f"S'ha produït un error inesperat: {str(e)}")
         finally:
@@ -124,7 +158,7 @@ class TranscriptionCompleteResource(MethodView):
     @blp.arguments(TranscriptionCompleteSchema, location='json')
     @blp.doc(
         summary="Finalitzar transcripció",
-        description="Recupera tots els fragments de la DB, els ordena i retorna el text final. Opcionalment neteja les dades.",
+        description="Recupera tots els fragments de la DB, els ordena i retorna el text final.",
     )
     @blp.response(200, schema=TranscriptionResponseSchema, description="Text complet retornat.")
     @blp.response(404, description="No s'han trobat fragments per a aquesta sessió.")
@@ -132,7 +166,7 @@ class TranscriptionCompleteResource(MethodView):
         session_id = data['session_id']
 
         try:
-            # 1. Recuperar fragments de PostgreSQL ordenats per índex
+            # 1. Recuperar chunks de la DB
             chunks = TranscriptionChunk.query.filter_by(session_id=session_id)\
                         .order_by(TranscriptionChunk.chunk_index.asc())\
                         .all()
@@ -140,20 +174,25 @@ class TranscriptionCompleteResource(MethodView):
             if not chunks:
                 abort(404, message="No s'ha trobat cap sessió activa amb aquest ID.")
 
-            # 2. Unir text
-            full_text = " ".join([chunk.text for chunk in chunks])
+            # 2. Unir el texto completo
+            # Añadimos espacio entre chunks para evitar palabras pegadas
+            full_text = " ".join([chunk.text.strip() for chunk in chunks])
             
-            # 3. Netejar la DB (Opcional: Si vols mantenir historial, comenta aquestes línies)
-            #    És recomanable esborrar-los per no omplir la DB de dades temporals
+            # 3. ANÁLISIS DE FUNCIONES EJECUTIVAS (Planificación)
+            # Analizamos el texto completo para ver la coherencia global
+            executive_metrics = analyze_executive_functions(full_text)
+
+            # 4. Limpieza DB
             for chunk in chunks:
                 db.session.delete(chunk)
             db.session.commit()
             
-            self.logger.info(f"Session {session_id} completed via DB. Length: {len(full_text)} chars", module="Transcription")
+            self.logger.info(f"Session {session_id} completed. Coherence: {executive_metrics['global_coherence']}", module="Transcription")
 
             return {
                 "status": "completed",
-                "transcription": full_text
+                "transcription": full_text,
+                "analysis": executive_metrics
             }, 200
 
         except IntegrityError as e:

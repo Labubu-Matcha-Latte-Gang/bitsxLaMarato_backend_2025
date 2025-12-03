@@ -1,24 +1,33 @@
-# 1. Usamos la imagen oficial de Python 3.13 (versión ligera 'slim')
+# Usa una imagen base un poco más completa para el build (evita compilar desde cero)
 FROM python:3.13-slim
 
-# 2. Evita que Python genere archivos .pyc y permite ver los logs en tiempo real
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# 3. Establecemos el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# 4. Copiamos PRIMERO los requerimientos (para aprovechar la caché de Docker)
+# 1. Instalar dependencias de sistema (ffmpeg, etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Copiar SOLO requirements.txt primero
 COPY requirements.txt .
 
-# 5. Instalamos las dependencias
-RUN pip install --no-cache-dir -r requirements.txt
+# 3. Instalar librerías usando CACHÉ DE DOCKER
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
 
-# 6. Copiamos el resto del código de tu carpeta al contenedor
+# 4. Descargar modelos de IA (Capa pesada pero estática)
+RUN python -m spacy download ca_core_news_md && \
+    python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
+
+# 5. FINALMENTE copiamos tu código
 COPY . .
 
-# 7. Exponemos el puerto 5000 (el estándar de Flask)
 EXPOSE 5000
 
-# 8. Comando para iniciar la app usando Gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
