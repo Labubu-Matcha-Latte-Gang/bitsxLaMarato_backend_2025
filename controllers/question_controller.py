@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import uuid
 from random import choice
 
+from db import db
 from models.patient import Patient
 from models.question import Question
 from helpers.exceptions.question_exceptions import (
@@ -107,7 +108,7 @@ class IQuestionController(ABC):
     
 class QuestionController(IQuestionController):
     def get_question(self, question_id: uuid.UUID) -> Question:
-        question = Question.query.get(question_id)
+        question = db.session.get(Question, question_id)
         if not question:
             raise QuestionNotFoundException(f"No s'ha trobat cap pregunta amb l'ID {question_id}.")
         return question

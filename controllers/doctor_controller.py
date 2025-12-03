@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 from helpers.exceptions.user_exceptions import RelatedUserNotFoundException, UserAlreadyExistsException, UserNotFoundException
 from helpers.factories.controller_factories import AbstractControllerFactory
+from db import db
 from models.doctor import Doctor
 from models.user import User
 
@@ -78,13 +79,13 @@ class IDoctorController(ABC):
     
 class DoctorController(IDoctorController):
     def get_doctor(self, email: str) -> Doctor:
-        doctor: Doctor | None = Doctor.query.get(email)
+        doctor: Doctor | None = db.session.get(Doctor, email)
         if not doctor:
             raise UserNotFoundException("Doctor no trobat.")
         return doctor
 
     def create_doctor(self, doctor_data: dict) -> Doctor:
-        potential_existing_patient = Doctor.query.get(doctor_data.get('email'))
+        potential_existing_patient = db.session.get(Doctor, doctor_data.get('email'))
         if potential_existing_patient:
             raise UserAlreadyExistsException("Ja existeix un doctor amb aquest correu.")
         
@@ -94,7 +95,7 @@ class DoctorController(IDoctorController):
     def fetch_doctors_by_email(self, emails: list[str]) -> set[Doctor]:
         patients:set[Doctor] = set()
         for email in emails:
-            doctor = Doctor.query.get(email)
+            doctor = db.session.get(Doctor, email)
             if doctor is None:
                 raise RelatedUserNotFoundException(f"No s'ha trobat cap doctor amb el correu: {email}")
             patients.add(doctor)

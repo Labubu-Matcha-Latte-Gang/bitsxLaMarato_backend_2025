@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 from helpers.exceptions.user_exceptions import RelatedUserNotFoundException, UserAlreadyExistsException, UserNotFoundException
 from helpers.factories.controller_factories import AbstractControllerFactory
+from db import db
 from models.patient import Patient
 from models.user import User
 
@@ -78,13 +79,13 @@ class IPatientController(ABC):
     
 class PatientController(IPatientController):
     def get_patient(self, email: str) -> Patient:
-        patient: Patient | None = Patient.query.get(email)
+        patient: Patient | None = db.session.get(Patient, email)
         if not patient:
             raise UserNotFoundException("Pacient no trobat.")
         return patient
 
     def create_patient(self, patient_data: dict) -> Patient:
-        potential_existing_patient = Patient.query.get(patient_data.get('email'))
+        potential_existing_patient = db.session.get(Patient, patient_data.get('email'))
         if potential_existing_patient:
             raise UserAlreadyExistsException("Ja existeix un pacient amb aquest correu.")
         
@@ -94,7 +95,7 @@ class PatientController(IPatientController):
     def fetch_patients_by_email(self, emails: list[str]) -> set[Patient]:
         patients:set[Patient] = set()
         for email in emails:
-            patient = Patient.query.get(email)
+            patient = db.session.get(Patient, email)
             if patient is None:
                 raise RelatedUserNotFoundException(f"No s'ha trobat cap pacient amb el correu: {email}")
             patients.add(patient)
