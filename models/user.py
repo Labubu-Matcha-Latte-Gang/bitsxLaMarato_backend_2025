@@ -1,188 +1,49 @@
-from models.interfaces import IUserRole
-from models.patient import Patient
-from models.doctor import Doctor
-from models.admin import Admin
+from __future__ import annotations
 
-from db import db
+from datetime import timedelta
+from typing import Optional
+
 import bcrypt
 from flask_jwt_extended import create_access_token
-from datetime import timedelta
-from helpers.exceptions.user_exceptions import UserRoleConflictException
+
+from db import db
+from helpers.enums.user_role import UserRole
 
 
 class User(db.Model):
-    __tablename__ = 'users'
+    """
+    Base SQLAlchemy model for users. Acts as the base table in a class-table inheritance hierarchy.
+    """
+
+    __tablename__ = "users"
     __allow_unmapped__ = True
+    __table_args__ = (
+        db.CheckConstraint(
+            "role IS NOT NULL",
+            name="ck_users_role_not_null",
+        ),
+    )
+
     email = db.Column(db.String(120), primary_key=True)
     password = db.Column(db.String(128), nullable=False)
     name = db.Column(db.String(80), nullable=False)
     surname = db.Column(db.String(80), nullable=False)
+    role = db.Column(db.Enum(UserRole), nullable=False)
 
-    patient: Patient | None = db.relationship('Patient', back_populates='user', uselist=False, cascade='all, delete-orphan')
-    doctor: Doctor | None = db.relationship('Doctor', back_populates='user', uselist=False, cascade='all, delete-orphan')
-    admin: Admin | None = db.relationship('Admin', back_populates='user', uselist=False, cascade='all, delete-orphan')
+    __mapper_args__ = {
+        "polymorphic_on": role,
+    }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<User {self.name} {self.surname}, email {self.email}>"
-    
-    def get_roles(self) -> list[IUserRole]:
-        """
-        Get all role instances associated with the user.
-        Returns:
-            list[IUserRole]: List of assigned role instances.
-        """
-        roles:list[IUserRole] = []
-        if self.patient:
-            roles.append(self.patient)
-        if self.doctor:
-            roles.append(self.doctor)
-        if self.admin:
-            roles.append(self.admin)
-        return roles
 
     @staticmethod
     def hash_password(password: str) -> str:
-        """
-        Hash a password
-        
-        Args:
-            password (str): The password to hash
-            
-        Returns:
-            str: The hashed password
-        """
-        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    
-    def check_password(self, password: str) -> bool:
-        """
-        Check a password against the stored hash
-        
-        Args:
-            password (str): The password to check
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-        Returns:
-            bool: True if the password matches, False otherwise
-        """
-        return bcrypt.checkpw(password.encode('utf-8'), self.password.encode('utf-8'))
-    
-    def generate_jwt(self, expiration: timedelta | None = None) -> str:
-        """
-        Generate a JWT for the user
-        Args:
-            expiration (timedelta | None): The expiration time for the token. If None, defaults to 4 weeks.
-        Returns:
-            str: The generated JWT
-        """
+    def check_password(self, password: str) -> bool:
+        return bcrypt.checkpw(password.encode("utf-8"), self.password.encode("utf-8"))
+
+    def generate_jwt(self, expiration: Optional[timedelta] = None) -> str:
         expires = expiration or timedelta(weeks=4)
         return create_access_token(identity=self.email, expires_delta=expires)
-    
-    def get_email(self) -> str:
-        """
-        Get the user's email
-        Returns:
-            str: The user's email
-        """
-        return self.email
-    
-    def get_name(self) -> str:
-        """
-        Get the user's name
-        Returns:
-            str: The user's name
-        """
-        return self.name
-    
-    def get_surname(self) -> str:
-        """
-        Get the user's surname
-        Returns:
-            str: The user's surname
-        """
-        return self.surname
-    
-    def set_password(self, new_password: str) -> None:
-        """
-        Set a new password for the user
-        Args:
-            new_password (str): The new password to set
-        """
-        self.password = self.hash_password(new_password)
-
-    def get_role_instance(self) -> IUserRole:
-        """
-        Get the role instance associated with the user
-        Returns:
-            IUserRole: The associated role instance
-        Raises:
-            UserRoleConflictException: If the user has zero or multiple roles assigned.
-        """
-        roles = self.get_roles()
-        if len(roles) != 1:
-            raise UserRoleConflictException("User must have exactly one role assigned.")
-        return roles[0]
-    
-    def set_email(self, new_email: str) -> None:
-        """
-        Set a new email for the user
-        Args:
-            new_email (str): The new email to set
-        """
-        self.email = new_email
-
-        if self.patient:
-            self.patient.email = new_email
-        if self.doctor:
-            self.doctor.email = new_email
-        if self.admin:
-            self.admin.email = new_email
-
-    def set_name(self, new_name: str) -> None:
-        """
-        Set a new name for the user
-        Args:
-            new_name (str): The new name to set
-        """
-        self.name = new_name
-
-    def set_surname(self, new_surname: str) -> None:
-        """
-        Set a new surname for the user
-        Args:
-            new_surname (str): The new surname to set
-        """
-        self.surname = new_surname
-
-    def to_dict(self) -> dict:
-        """
-        Convert the user to a dictionary representation
-        Returns:
-            dict: The dictionary representation of the user
-        """
-        role = self.get_role_instance()
-        if role is None:
-            return {
-                "email": self.email,
-                "name": self.name,
-                "surname": self.surname
-            }
-        return {
-            "email": self.email,
-            "name": self.name,
-            "surname": self.surname,
-            "role": role.to_dict()
-        }
-    
-    def set_properties(self, data: dict) -> None:
-        """
-        Set multiple properties of the user from a dictionary
-        Args:
-            data (dict): A dictionary containing the properties to set
-        """
-        if 'email' in data:
-            self.set_email(data['email'])
-        if 'name' in data:
-            self.set_name(data['name'])
-        if 'surname' in data:
-            self.set_surname(data['surname'])
-        if 'password' in data:
-            self.set_password(data['password'])
