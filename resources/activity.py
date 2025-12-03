@@ -60,7 +60,7 @@ class ActivityResource(MethodView):
                 metadata={"count": len(activities_data)},
             )
 
-            activity_service = ServiceFactory().build_activity_service()
+            activity_service = ServiceFactory.get_instance().build_activity_service()
 
             activities = activity_service.create_activities(activities_data)
 
@@ -126,7 +126,7 @@ class ActivityResource(MethodView):
                 metadata={"filters": filters},
             )
 
-            activity_service = ServiceFactory().build_activity_service()
+            activity_service = ServiceFactory.get_instance().build_activity_service()
             activities = activity_service.list_activities(filters)
 
             return jsonify([activity.to_dict() for activity in activities]), 200
@@ -170,7 +170,7 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id)},
             )
 
-            activity_service = ServiceFactory().build_activity_service()
+            activity_service = ServiceFactory.get_instance().build_activity_service()
             activity = activity_service.update_activity(activity_id, data)
 
             return jsonify(activity.to_dict()), 200
@@ -226,7 +226,7 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id), "fields": list(data.keys())},
             )
 
-            activity_service = ServiceFactory().build_activity_service()
+            activity_service = ServiceFactory.get_instance().build_activity_service()
             activity = activity_service.update_activity(activity_id, data)
 
             return jsonify(activity.to_dict()), 200
@@ -276,7 +276,7 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id)},
             )
 
-            activity_service = ServiceFactory().build_activity_service()
+            activity_service = ServiceFactory.get_instance().build_activity_service()
             activity_service.delete_activity(activity_id)
 
             return Response(status=204)
@@ -330,7 +330,7 @@ class RecommendedActivityResource(MethodView):
                 metadata={"patient_email": email},
             )
 
-            factory = ServiceFactory()
+            factory = ServiceFactory.get_instance()
             user_service = factory.build_user_service()
             patient = user_service.get_user(email)
 

@@ -15,6 +15,12 @@ class Activity:
     difficulty: float
 
     def set_properties(self, data: dict) -> None:
+        """
+        Update mutable fields from a payload, ignoring None values.
+
+        Args:
+            data (dict): Fields to update: title, description, activity_type, difficulty.
+        """
         if "title" in data and data["title"] is not None:
             self.title = data["title"]
         if "description" in data and data["description"] is not None:
@@ -25,11 +31,26 @@ class Activity:
             self.set_difficulty(data["difficulty"])
 
     def set_difficulty(self, new_difficulty: float) -> None:
+        """
+        Validate and set difficulty.
+
+        Args:
+            new_difficulty (float): Difficulty in range [0, 5].
+
+        Raises:
+            ValueError: If the difficulty is outside the valid range.
+        """
         if new_difficulty < 0 or new_difficulty > 5:
             raise ValueError("Difficulty must be between 0 and 5 inclusive.")
         self.difficulty = new_difficulty
 
     def to_dict(self) -> dict:
+        """
+        Serialize the activity to a dictionary.
+
+        Returns:
+            dict: Public representation of the activity.
+        """
         return {
             "id": str(self.id),
             "title": self.title,

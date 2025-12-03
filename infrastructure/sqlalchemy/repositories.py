@@ -5,6 +5,7 @@ from typing import Iterable, List, Optional
 import uuid
 
 from db import db
+from sqlalchemy.orm import Session
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
 from domain.entities.user import Admin as AdminDomain
@@ -38,8 +39,8 @@ from models.user import User
 
 
 class SQLAlchemyUserRepository(IUserRepository):
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
 
     def get_by_email(self, email: str) -> Optional[UserDomain]:
         model: User | None = self.session.get(User, email)
@@ -207,8 +208,8 @@ class SQLAlchemyUserRepository(IUserRepository):
 
 
 class SQLAlchemyPatientRepository(IPatientRepository):
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
         self.user_repo = SQLAlchemyUserRepository(self.session)
 
     def get_by_email(self, email: str) -> Optional[PatientDomain]:
@@ -242,8 +243,8 @@ class SQLAlchemyPatientRepository(IPatientRepository):
 
 
 class SQLAlchemyDoctorRepository(IDoctorRepository):
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
         self.user_repo = SQLAlchemyUserRepository(self.session)
 
     def get_by_email(self, email: str) -> Optional[DoctorDomain]:
@@ -277,8 +278,8 @@ class SQLAlchemyDoctorRepository(IDoctorRepository):
 
 
 class SQLAlchemyAdminRepository(IAdminRepository):
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
         self.user_repo = SQLAlchemyUserRepository(self.session)
 
     def get_by_email(self, email: str) -> Optional[AdminDomain]:
@@ -296,8 +297,8 @@ class SQLAlchemyAdminRepository(IAdminRepository):
 
 
 class SQLAlchemyQuestionRepository(IQuestionRepository):
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
 
     def get(self, question_id: uuid.UUID) -> Optional[QuestionDomain]:
         model: Question | None = self.session.get(Question, question_id)
@@ -361,8 +362,8 @@ class SQLAlchemyQuestionRepository(IQuestionRepository):
 
 
 class SQLAlchemyActivityRepository(IActivityRepository):
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
 
     def get(self, activity_id: uuid.UUID) -> Optional[ActivityDomain]:
         model: Activity | None = self.session.get(Activity, activity_id)
@@ -432,8 +433,8 @@ class SQLAlchemyActivityRepository(IActivityRepository):
 
 
 class SQLAlchemyResetCodeRepository(IResetCodeRepository):
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
 
     def save_code(self, email: str, hashed_code: str, expiration: datetime) -> None:
         existing: UserCodeAssociation | None = self.session.get(

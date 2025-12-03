@@ -92,7 +92,7 @@ class BaseTest(ABC):
     def create_admin(self, email: str | None = None, password: str | None = None) -> User:
         email = email or self.unique_email("admin")
         password = password or self.default_password
-        factory = ServiceFactory()
+        factory = ServiceFactory.get_instance(refresh=True)
         user_service = factory.build_user_service()
         admin = user_service.register_admin(email, password, "Admin", "User")
         return admin
@@ -106,7 +106,7 @@ class BaseTest(ABC):
     ) -> User:
         email = email or self.unique_email("patient")
         password = password or self.default_password
-        factory = ServiceFactory()
+        factory = ServiceFactory.get_instance(refresh=True)
         user_service = factory.build_user_service()
         patient = user_service.register_patient(
             {
@@ -134,7 +134,7 @@ class BaseTest(ABC):
     ) -> User:
         email = email or self.unique_email("doctor")
         password = password or self.default_password
-        factory = ServiceFactory()
+        factory = ServiceFactory.get_instance(refresh=True)
         user_service = factory.build_user_service()
         doctor = user_service.register_doctor(
             {

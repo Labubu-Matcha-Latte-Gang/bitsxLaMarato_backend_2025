@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from db import db
 from application.services import (
     ActivityService,
@@ -19,13 +21,39 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
 )
+from sqlalchemy.orm import Session
 
 
 class ServiceFactory:
-    def __init__(self, session=None):
-        self.session = session or db.session
+    """
+    Simple factory that builds service instances with their dependencies.
+    Exposed as a singleton to share wiring (session, repos, UoW) across layers.
+    """
+    __instance: 'ServiceFactory' | None = None
+
+    def __init__(self, session: Optional[Session] = None):
+        self.session: Session = session or db.session
+
+    @classmethod
+    def get_instance(cls, session: Optional[Session] = None, refresh: bool = False) -> 'ServiceFactory':
+        """
+        Return the singleton instance. Optionally refresh or inject a session.
+        Args:
+            session (Optional[Session]): SQLAlchemy session to use.
+            refresh (bool): If True, forces creation of a new instance.
+        Returns:
+            ServiceFactory: The singleton instance.
+        """
+        if refresh or cls.__instance is None or (session is not None and cls.__instance.session is not session):
+            cls.__instance = cls(session)
+        return cls.__instance
 
     def build_user_service(self) -> UserService:
+        """
+        Build a UserService with its dependencies.
+        Returns:
+            UserService: The constructed UserService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
         token_service = TokenService()
@@ -46,16 +74,33 @@ class ServiceFactory:
         )
 
     def build_question_service(self) -> QuestionService:
+        """
+        Build a QuestionService with its dependencies.
+        Returns:
+            QuestionService: The constructed QuestionService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         question_repo = SQLAlchemyQuestionRepository(self.session)
         return QuestionService(question_repo=question_repo, uow=uow)
 
     def build_activity_service(self) -> ActivityService:
+        """
+        Build an ActivityService with its dependencies.
+        Returns:
+            ActivityService: The constructed ActivityService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         activity_repo = SQLAlchemyActivityRepository(self.session)
         return ActivityService(activity_repo=activity_repo, uow=uow)
 
     def build_password_reset_service(self, validity_minutes: int) -> PasswordResetService:
+        """
+        Build a PasswordResetService with its dependencies.
+        Args:
+            validity_minutes (int): The validity duration for reset codes in minutes.
+        Returns:
+            PasswordResetService: The constructed PasswordResetService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
         user_repo = SQLAlchemyUserRepository(self.session)
