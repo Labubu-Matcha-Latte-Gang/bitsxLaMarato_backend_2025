@@ -200,7 +200,6 @@ class _BaseRoleUpdater(ABC):
     
     Implements the Strategy pattern to handle updates for different user roles (Patient, Doctor, Admin).
     Each concrete updater must implement the abstract `update` method for role-specific logic.
-    The base class provides `_update_common_fields` helper to update shared user attributes (name, surname, password).
     This design enables clean separation of concerns and makes the update logic extensible.
     """
     
