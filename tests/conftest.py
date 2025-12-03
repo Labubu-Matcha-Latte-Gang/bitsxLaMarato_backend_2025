@@ -43,8 +43,8 @@ def db_session(app, db_connection):
 
     yield session
 
-    session.remove()
     transaction.rollback()
+    session.remove()
     ctx.pop()
 
 
