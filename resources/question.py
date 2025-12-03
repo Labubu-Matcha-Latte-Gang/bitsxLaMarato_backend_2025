@@ -216,11 +216,9 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id), "fields": list(data.keys())},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
-            question = question_controller.update_question(question_id, data)
+            question_service = ServiceFactory().build_question_service()
+            question = question_service.update_question(question_id, data)
 
-            db.session.commit()
             return jsonify(question.to_dict()), 200
         except QuestionNotFoundException as e:
             db.session.rollback()
