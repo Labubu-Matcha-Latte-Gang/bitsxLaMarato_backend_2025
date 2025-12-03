@@ -9,7 +9,7 @@ from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
-from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES
+from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES, RESET_PASSWORD_FRONTEND_PATH
 from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
 from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
@@ -23,7 +23,6 @@ from helpers.exceptions.user_exceptions import (
 )
 from helpers.enums.user_role import UserRole
 from application.container import ServiceFactory
-from helpers.forgot_password.forgot_password import AbstractForgotPasswordFacade
 from helpers.email_service.adapter import AbstractEmailAdapter
 from schemas import (
     PatientRegisterSchema,
