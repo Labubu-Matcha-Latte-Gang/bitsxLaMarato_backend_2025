@@ -262,12 +262,8 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
-
-            question = question_controller.get_question(question_id)
-            db.session.delete(question)
-            db.session.commit()
+            question_service = ServiceFactory().build_question_service()
+            question_service.delete_question(question_id)
 
             return Response(status=204)
         except QuestionNotFoundException as e:
