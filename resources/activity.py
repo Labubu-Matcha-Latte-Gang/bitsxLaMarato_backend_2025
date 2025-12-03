@@ -190,20 +190,20 @@ class ActivityResource(MethodView):
     @blp.arguments(ActivityIdSchema, location='query')
     @blp.arguments(ActivityPartialUpdateSchema, location='json')
     @blp.doc(
-        summary="Actualitzacio parcial d'una activitat",
-        description="Actualitza nomes els camps indicats d'una activitat existent.",
+        summary="Actualització parcial d'una activitat",
+        description="Actualitza només els camps indicats d'una activitat existent.",
     )
     @blp.response(200, schema=ActivityResponseSchema, description="Activitat actualitzada parcialment.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en actualitzar l'activitat.")
     def patch(self, query_args: dict, data: dict):
         """
         Actualitzar parcialment una activitat.
 
-        Cal passar l'ID per query string (?id=<uuid>) i com a minim un camp al cos.
+        Cal passar l'ID per query string (?id=<uuid>) i com a mínim un camp al cos.
         """
         activity_id = query_args['id']
 
