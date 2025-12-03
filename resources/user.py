@@ -213,16 +213,9 @@ class UserLogin(MethodView):
         try:
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.get_user(data['email'])
-            if user.check_password(data['password']):
-                user.get_role_instance()
-                access_token = user.generate_jwt()
-                return {"access_token": access_token}, 200
-            else:
-                raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
+            user_service = ServiceFactory().build_user_service()
+            access_token = user_service.login(data["email"], data["password"])
+            return {"access_token": access_token}, 200
         except UserNotFoundException as e:
             self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
             abort(401, message="Correu o contrasenya no vàlids.")
