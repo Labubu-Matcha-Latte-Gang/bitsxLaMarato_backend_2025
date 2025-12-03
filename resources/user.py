@@ -44,7 +44,7 @@ blp = Blueprint('user', __name__, description="Operacions relacionades amb els u
 @blp.route('/patient')
 class PatientRegister(MethodView):
     """
-    Endpoints for registering patient accounts.
+    Endpoints per registrar comptes de pacients.
     """
 
     logger = AbstractLogger.get_instance()
@@ -62,18 +62,18 @@ class PatientRegister(MethodView):
     @blp.response(500, description="Error inesperat del servidor en crear el pacient.")
     def post(self, data: dict) -> Response:
         """
-        Register a new patient user.
+        Registra un nou usuari pacient.
 
-        Expects JSON that matches `PatientRegisterSchema`, including patient metrics and optional ailments,
-        treatments, and doctor associations. Creates the user, creates the patient profile, and assigns the
-        listed doctors.
+        Rep un JSON que segueix `PatientRegisterSchema` amb mètriques del pacient i opcionalment
+        malalties, tractaments i associacions de metges. Crea l'usuari, el perfil de pacient i
+        assigna els metges indicats.
 
-        Status codes:
-        - 201: Patient created; returns the created user payload.
-        - 400: Missing required fields or email already exists.
-        - 404: At least one doctor email could not be found.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error during creation.
+        Codis d'estat:
+        - 201: Pacient creat; retorna el payload de l'usuari creat.
+        - 400: Falta algun camp o el correu ja existeix.
+        - 404: No s'ha trobat algun correu de metge proporcionat.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat durant la creació.
         """
         try:
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
