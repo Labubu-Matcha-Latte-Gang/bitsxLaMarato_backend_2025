@@ -23,7 +23,7 @@ from schemas import (
     ActivityUpdateSchema,
 )
 
-blp = Blueprint('activity', __name__, description="Operacions CRUD per a les activitats de l'aplicacio.")
+blp = Blueprint('activity', __name__, description="Operacions CRUD per a les activitats de l'aplicació.")
 
 
 @blp.route('')
@@ -38,12 +38,12 @@ class ActivityResource(MethodView):
     @blp.arguments(ActivityBulkCreateSchema, location='json')
     @blp.doc(
         summary="Crear activitats",
-        description="Crea multiples activitats en un sol pas.",
+        description="Crea múltiples activitats en un sol pas.",
     )
     @blp.response(201, schema=ActivityResponseSchema(many=True), description="Activitats creades correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en crear les activitats.")
     def post(self, data: dict):
         """
