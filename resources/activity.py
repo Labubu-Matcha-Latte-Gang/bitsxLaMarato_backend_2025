@@ -13,6 +13,7 @@ from helpers.exceptions.activity_exceptions import (
     ActivityNotFoundException,
     ActivityUpdateException,
 )
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
 from schemas import (
     ActivityBulkCreateSchema,
@@ -72,6 +73,10 @@ class ActivityResource(MethodView):
                 metadata={"count": len(data.get('activities', []))},
                 error=e,
             )
+            abort(422, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en crear activitats", module="ActivityResource", error=e)
             abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
@@ -173,6 +178,10 @@ class ActivityResource(MethodView):
             db.session.rollback()
             self.logger.error("Activitat no trobada en PUT", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en PUT d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            abort(422, message=str(e))
         except ActivityUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validacio en PUT d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
@@ -225,6 +234,10 @@ class ActivityResource(MethodView):
             db.session.rollback()
             self.logger.error("Activitat no trobada en PATCH", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en PATCH d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            abort(422, message=str(e))
         except ActivityUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validacio en PATCH d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
@@ -271,6 +284,10 @@ class ActivityResource(MethodView):
             db.session.rollback()
             self.logger.error("Activitat no trobada en DELETE", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Violació d'integritat en DELETE d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Error de base de dades en DELETE d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
