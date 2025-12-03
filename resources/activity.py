@@ -121,9 +121,8 @@ class ActivityResource(MethodView):
                 metadata={"filters": filters},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
-            activities = activity_controller.list_activities(filters)
+            activity_service = ServiceFactory().build_activity_service()
+            activities = activity_service.list_activities(filters)
 
             return jsonify([activity.to_dict() for activity in activities]), 200
         except ActivityNotFoundException as e:
