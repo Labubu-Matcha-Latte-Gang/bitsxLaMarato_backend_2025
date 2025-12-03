@@ -1,12 +1,15 @@
 import secrets
 import string
+from sqlalchemy.exc import IntegrityError
 from db import db
 from globals import RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from helpers.exceptions.user_exceptions import InvalidResetCodeException, UserNotFoundException
 from models.user import User
 from models.associations import UserCodeAssociation
 from datetime import datetime, timedelta, timezone
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 
 class UserService:
     __instance: 'UserService' = None
@@ -42,7 +45,7 @@ class UserService:
         """
         user: User | None = User.query.get(email)
         if user is None:
-            raise UserNotFoundException(f"User with email {email} not found.")
+            raise UserNotFoundException(f"No s'ha trobat cap usuari amb el correu {email}.")
     
         reset_code = self.generate_reset_code()
         hashed_code = User.hash_password(reset_code)
@@ -56,6 +59,11 @@ class UserService:
             db.session.add(user_code_association)
             db.session.commit()
             return reset_code
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error(message="Integrity violation saving reset code", metadata={"email": email}, module=__name__, error=mapped)
+            raise mapped
         except Exception as e:
             db.session.rollback()
             self.logger.error(message=f"Error saving reset code for user {email}", metadata={"email": email}, module=__name__, error=e)
@@ -74,12 +82,12 @@ class UserService:
         """
         user: User | None = User.query.get(email)
         if user is None:
-            raise UserNotFoundException(f"User with email {email} not found.")
+            raise UserNotFoundException(f"No s'ha trobat cap usuari amb el correu {email}.")
         
         association: UserCodeAssociation | None = UserCodeAssociation.query.get(email)
 
         if association is None:
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
         
         if association.is_expired(datetime.now(timezone.utc)):
             try:
@@ -89,15 +97,20 @@ class UserService:
                 db.session.rollback()
                 self.logger.error(message=f"Error deleting expired reset code for user {email}", metadata={"email": email}, module=__name__, error=e)
                 raise e
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
         
         if not association.check_code(reset_code):
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
 
         try:
-            user.set_password(new_password)
+            user.password = User.hash_password(new_password)
             db.session.delete(association)
             db.session.commit()
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error(message=f"Integrity violation resetting password for user {email}", metadata={"email": email}, module=__name__, error=mapped)
+            raise mapped
         except Exception as e:
             db.session.rollback()
             self.logger.error(message=f"Error resetting password for user {email}", metadata={"email": email}, module=__name__, error=e)

@@ -5,10 +5,13 @@ from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from flask_jwt_extended import jwt_required
 from openai import AzureOpenAI
+from sqlalchemy.exc import IntegrityError
 
 from db import db
 from models.transcription import TranscriptionChunk
 from helpers.debugger.logger import AbstractLogger
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 from schemas import TranscriptionChunkSchema, TranscriptionCompleteSchema, TranscriptionResponseSchema
 
 blp = Blueprint('transcription', __name__, description="Operacions de transcripció d'àudio en temps real (Persistència en DB).")
@@ -19,7 +22,7 @@ def get_azure_client():
     api_version = current_app.config.get("AZURE_OPENAI_API_VERSION")
 
     if not api_key or not endpoint:
-        abort(500, message="Faltan credenciales de Azure OpenAI en la configuración.")
+        abort(500, message="Falten credencials d'Azure OpenAI a la configuració.")
 
     return AzureOpenAI(
         api_key=api_key,
@@ -95,10 +98,15 @@ class TranscriptionChunkResource(MethodView):
 
             return {"status": "success", "partial_text": text_result}, 200
 
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("Integrity violation transcribing chunk", module="Transcription", error=mapped)
+            abort(422, message=str(mapped))
         except Exception as e:
             db.session.rollback() # Important fer rollback si falla
             self.logger.error("Error transcribing chunk", module="Transcription", error=e)
-            abort(500, message=f"Error inesperat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat: {str(e)}")
         finally:
             # Esborrar fitxer temporal sempre
             if temp_path and os.path.exists(temp_path):
@@ -148,7 +156,12 @@ class TranscriptionCompleteResource(MethodView):
                 "transcription": full_text
             }, 200
 
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("Integrity violation finalizing transcription", module="Transcription", error=mapped)
+            abort(422, message=str(mapped))
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error finalizing transcription", module="Transcription", error=e)
-            abort(500, message=f"Error en finalitzar: {str(e)}")
+            abort(500, message=f"S'ha produït un error en finalitzar: {str(e)}")

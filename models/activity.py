@@ -93,7 +93,7 @@ class Activity(db.Model):
             ValueError: If the difficulty is outside the allowed range.
         """
         if new_difficulty < 0 or new_difficulty > 5:
-            raise ValueError("Difficulty must be between 0 and 5 inclusive.")
+            raise ValueError("La dificultat ha d'estar entre 0 i 5 (inclosos).")
         self.difficulty = new_difficulty
 
     def set_properties(self, data: dict) -> None:

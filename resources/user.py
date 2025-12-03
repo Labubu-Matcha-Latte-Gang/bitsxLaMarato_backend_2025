@@ -9,7 +9,7 @@ from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
-from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES
+from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES, RESET_PASSWORD_FRONTEND_PATH
 from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
 from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
@@ -21,9 +21,11 @@ from helpers.exceptions.user_exceptions import (
     UserRoleConflictException,
     RelatedUserNotFoundException,
 )
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 from helpers.enums.user_role import UserRole
-from helpers.factories.controller_factories import AbstractControllerFactory
-from helpers.factories.forgot_password import AbstractForgotPasswordFactory
+from application.container import ServiceFactory
+from helpers.email_service.adapter import AbstractEmailAdapter
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
@@ -44,7 +46,7 @@ blp = Blueprint('user', __name__, description="Operacions relacionades amb els u
 @blp.route('/patient')
 class PatientRegister(MethodView):
     """
-    Endpoints for registering patient accounts.
+    Endpoints per registrar comptes de pacients.
     """
 
     logger = AbstractLogger.get_instance()
@@ -62,59 +64,27 @@ class PatientRegister(MethodView):
     @blp.response(500, description="Error inesperat del servidor en crear el pacient.")
     def post(self, data: dict) -> Response:
         """
-        Register a new patient user.
+        Registra un nou usuari pacient.
 
-        Expects JSON that matches `PatientRegisterSchema`, including patient metrics and optional ailments,
-        treatments, and doctor associations. Creates the user, creates the patient profile, and assigns the
-        listed doctors.
+        Rep un JSON que segueix `PatientRegisterSchema` amb mètriques del pacient i opcionalment
+        malalties, tractaments i associacions de metges. Crea l'usuari, el perfil de pacient i
+        assigna els metges indicats.
 
-        Status codes:
-        - 201: Patient created; returns the created user payload.
-        - 400: Missing required fields or email already exists.
-        - 404: At least one doctor email could not be found.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error during creation.
+        Codis d'estat:
+        - 201: Pacient creat; retorna el payload de l'usuari creat.
+        - 400: Falta algun camp o el correu ja existeix.
+        - 404: No s'ha trobat algun correu de metge proporcionat.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat durant la creació.
         """
         try:
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
+            user_service = ServiceFactory().build_user_service()
+            patient = user_service.register_patient(data)
 
-            user_payload = {
-                "email": data['email'],
-                "password": data['password'],
-                "name": data['name'],
-                "surname": data['surname'],
-            }
-            user = user_controller.create_user(user_payload)
-
-            doctor_controller = factory.get_doctor_controller()
-
-            doctor_emails:list[str] = data.get('doctors', []) or []
-            doctors = doctor_controller.fetch_doctors_by_email(doctor_emails)
-
-            patient_controller = factory.get_patient_controller()
-            patient_payload = {
-                "ailments": data.get('ailments'),
-                "gender": data['gender'],
-                "age": data['age'],
-                "treatments": data.get('treatments'),
-                "height_cm": data['height_cm'],
-                "weight_kg": data['weight_kg'],
-                "email": data['email'],
-                "user": user
-            }
-            patient = patient_controller.create_patient(patient_payload)
-
-            db.session.add(user)
-            db.session.add(patient)
-            db.session.flush()
-            patient.add_doctors(doctors)
-            db.session.commit()
-
-            return jsonify(user.to_dict()), 201
+            return jsonify(patient.to_dict()), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to missing field", module="PatientRegister", error=e)
@@ -127,6 +97,10 @@ class PatientRegister(MethodView):
             db.session.rollback()
             self.logger.error("Patient register failed: Related doctor not found", module="PatientRegister", metadata={"email": data.get('email')}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Patient register failed: Integrity violation", module="PatientRegister", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to invalid data", module="PatientRegister", error=e)
@@ -143,7 +117,7 @@ class PatientRegister(MethodView):
 @blp.route('/doctor')
 class DoctorRegister(MethodView):
     """
-    Endpoints for registering doctor accounts.
+    Endpoints per registrar comptes de metges.
     """
 
     logger = AbstractLogger.get_instance()
@@ -161,53 +135,26 @@ class DoctorRegister(MethodView):
     @blp.response(500, description="Error inesperat del servidor en crear el metge.")
     def post(self, data: dict) -> Response:
         """
-        Register a new doctor user.
+        Registra un nou usuari metge.
 
-        Expects JSON that matches `DoctorRegisterSchema`, creates the user and doctor profile, and links the
-        provided patients when present.
+        Rep un JSON que segueix `DoctorRegisterSchema`, crea l'usuari i el perfil de metge i
+        enllaça els pacients indicats si n'hi ha.
 
-        Status codes:
-        - 201: Doctor created; returns the created user payload.
-        - 400: Missing required fields or email already exists.
-        - 404: At least one patient email could not be found.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error during creation.
+        Codis d'estat:
+        - 201: Metge creat; retorna el payload de l'usuari creat.
+        - 400: Falta algun camp o el correu ja existeix.
+        - 404: No s'ha trobat algun correu de pacient proporcionat.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat durant la creació.
         """
         try:
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
+            user_service = ServiceFactory().build_user_service()
+            doctor = user_service.register_doctor(data)
 
-            user_payload = {
-                "email": data['email'],
-                "password": data['password'],
-                "name": data['name'],
-                "surname": data['surname'],
-            }
-            user = user_controller.create_user(user_payload)
-
-            patient_controller = factory.get_patient_controller()
-
-            patient_emails:list[str] = data.get('patients', []) or []
-            patients = patient_controller.fetch_patients_by_email(patient_emails)
-
-            doctor_controller = factory.get_doctor_controller()
-
-            doctor_payload = {
-                "email": data['email'],
-                "user": user
-            }
-            doctor = doctor_controller.create_doctor(doctor_payload)
-
-            db.session.add(user)
-            db.session.add(doctor)
-            db.session.flush()
-            doctor.add_patients(patients)
-            db.session.commit()
-
-            return jsonify(user.to_dict()), 201
+            return jsonify(doctor.to_dict()), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to missing field", module="DoctorRegister", error=e)
@@ -220,6 +167,10 @@ class DoctorRegister(MethodView):
             db.session.rollback()
             self.logger.error("Doctor register failed: Related patient not found", module="DoctorRegister", metadata={"email": data.get('email')}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Doctor register failed: Integrity violation", module="DoctorRegister", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to invalid data", module="DoctorRegister", error=e)
@@ -236,7 +187,7 @@ class DoctorRegister(MethodView):
 @blp.route('/login')
 class UserLogin(MethodView):
     """
-    Authenticate users and issue JWT access tokens.
+    Autentica usuaris i emet tokens d'accés JWT.
     """
 
     logger = AbstractLogger.get_instance()
@@ -255,32 +206,25 @@ class UserLogin(MethodView):
     @blp.response(500, description="Error inesperat del servidor durant l'autenticació.")
     def post(self, data: dict) -> Response:
         """
-        Authenticate a user and issue a JWT.
+        Autentica un usuari i emet un JWT.
 
-        Expects JSON that matches `UserLoginSchema` with an email and password. On success, returns an
-        access token that can be used for authenticated endpoints.
+        Rep un JSON que segueix `UserLoginSchema` amb correu i contrasenya. Si és correcte,
+        retorna un token d'accés per usar als endpoints autenticats.
 
-        Status codes:
-        - 200: Valid credentials; returns the JWT access token.
-        - 400: Missing required login fields.
-        - 401: Invalid credentials.
-        - 409: User role state is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error during authentication.
+        Codis d'estat:
+        - 200: Credencials vàlides; retorna el token JWT.
+        - 400: Falta algun camp d'inici de sessió.
+        - 401: Credencials no vàlides.
+        - 409: Estat de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat durant l'autenticació.
         """
         try:
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.get_user(data['email'])
-            if user.check_password(data['password']):
-                user.get_role_instance()
-                access_token = user.generate_jwt()
-                return {"access_token": access_token}, 200
-            else:
-                raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
+            user_service = ServiceFactory().build_user_service()
+            access_token = user_service.login(data["email"], data["password"])
+            return {"access_token": access_token}, 200
         except UserNotFoundException as e:
             self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
             abort(401, message="Correu o contrasenya no vàlids.")
@@ -303,7 +247,7 @@ class UserLogin(MethodView):
 @blp.route('')
 class UserCRUD(MethodView):
     """
-    Authenticated CRUD operations for the current user.
+    Operacions CRUD autenticades per a l'usuari actual.
     """
 
     logger = AbstractLogger.get_instance()
@@ -320,26 +264,24 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en obtenir l'usuari.")
     def get(self):
         """
-        Retrieve the authenticated user's profile.
+        Recupera el perfil de l'usuari autenticat.
 
-        Returns the base user data plus role-specific information for the current identity.
+        Retorna les dades bàsiques i la informació específica del rol de la identitat actual.
 
-        Status codes:
-        - 200: User found and returned.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 500: Unexpected error while fetching the user.
+        Codis d'estat:
+        - 200: Usuari trobat i retornat.
+        - 401: Falta o és invàlid el token.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 500: Error inesperat en recuperar l'usuari.
         """
         try:
             self.logger.info("Fetching user information", module="UserCRUD")
 
             email:str = get_jwt_identity()
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.get_user(email)
+            user_service = ServiceFactory().build_user_service()
+            user = user_service.get_user(email)
 
             return jsonify(user.to_dict()), 200
         except UserRoleConflictException as e:
@@ -366,27 +308,25 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en actualitzar l'usuari.")
     def put(self, data: dict):
         """
-        Fully replace the authenticated user's profile.
+        Substitueix completament el perfil de l'usuari autenticat.
 
-        Expects JSON that matches `UserUpdateSchema`. Updates personal data, password when provided, and
-        replaces doctor/patient associations for the role with the provided values.
+        Rep un JSON que segueix `UserUpdateSchema`. Actualitza les dades personals, la contrasenya si s'envia
+        i reemplaça les associacions metge/pacient amb les llistes indicades.
 
-        Status codes:
-        - 200: User updated and returned.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist or related user not found.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error while updating the user.
+        Codis d'estat:
+        - 200: Usuari actualitzat i retornat.
+        - 401: Falta o és invàlid el token.
+        - 404: Usuari o relacionats no trobats.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat en l'actualització.
         """
         email: str | None = None
         try:
             email = get_jwt_identity()
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.update_user(email, data)
+            user_service = ServiceFactory().build_user_service()
+            user = user_service.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -409,6 +349,15 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("User update failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(422, message=str(e))
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("User update failed: Integrity error", module="UserCRUD", metadata={"email": email}, error=mapped)
+            abort(422, message=str(mapped))
         except HTTPException as e:
             db.session.rollback()
             raise e
@@ -431,28 +380,26 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en actualitzar parcialment l'usuari.")
     def patch(self, data: dict):
         """
-        Partially update the authenticated user's profile.
+        Actualitza parcialment el perfil de l'usuari autenticat.
 
-        Accepts any subset of fields from `UserPartialUpdateSchema`. Updates personal data and password when
-        provided. For patients/doctors, if association lists are provided, replaces them with the supplied
-        values.
+        Accepta qualsevol subconjunt de camps de `UserPartialUpdateSchema`. Actualitza dades personals i
+        contrasenya si s'indica. Per a pacients/metges, si s'envien llistes d'associacions, les reemplaça
+        amb els valors proporcionats.
 
-        Status codes:
-        - 200: User updated and returned.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist or related user not found.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error while updating the user.
+        Codis d'estat:
+        - 200: Usuari actualitzat i retornat.
+        - 401: Falta o és invàlid el token.
+        - 404: Usuari o relacionats no trobats.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat en l'actualització.
         """
         email: str | None = None
         try:
             email = get_jwt_identity()
             
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.update_user(email, data)
+            user_service = ServiceFactory().build_user_service()
+            user = user_service.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -475,6 +422,15 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Partial user update failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(422, message=str(e))
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("Partial user update failed: Integrity error", module="UserCRUD", metadata={"email": email}, error=mapped)
+            abort(422, message=str(mapped))
         except HTTPException as e:
             db.session.rollback()
             raise e
@@ -495,33 +451,25 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en eliminar l'usuari.")
     def delete(self):
         """
-        Delete the authenticated user's account.
+        Elimina el compte de l'usuari autenticat.
 
-        Removes any role associations, deletes the user record, and returns an empty 204 response.
+        Esborra les associacions de rol, elimina el registre d'usuari i retorna una resposta 204 buida.
 
-        Status codes:
-        - 204: User deleted.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 500: Unexpected error while deleting the user.
+        Codis d'estat:
+        - 204: Usuari eliminat.
+        - 401: Falta o és invàlid el token.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 500: Error inesperat en eliminar l'usuari.
         """
         email: str | None = None
         try:
             email = get_jwt_identity()
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.get_user(email)
-
             self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
 
-            role_instance = user.get_role_instance()
-            role_instance.remove_all_associations_between_user_roles()
-
-            db.session.delete(user)
-            db.session.commit()
+            user_service = ServiceFactory().build_user_service()
+            user_service.delete_user(email)
 
             return Response(status=204)
         except UserRoleConflictException as e:
@@ -532,6 +480,10 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Deleting user failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(422, message=str(e))
         except Exception as e:
             db.session.rollback()
             self.logger.error("Deleting user failed", module="UserCRUD", error=e)
@@ -540,7 +492,7 @@ class UserCRUD(MethodView):
 @blp.route('/<string:email>')
 class PatientData(MethodView):
     """
-    Patient data access endpoint for admins, assigned doctors, and the patient themselves.
+    Endpoint d'accés a dades de pacient per a administradors, metges assignats i el propi pacient.
     """
 
     logger = AbstractLogger.get_instance()
@@ -559,18 +511,18 @@ class PatientData(MethodView):
     @blp.response(500, description="Error inesperat del servidor en recuperar el pacient.")
     def get(self, path_args: dict, **kwargs):
         """
-        Retrieve patient information by email with role-based authorization.
+        Recupera informació d'un pacient pel correu amb autorització per rol.
 
-        Requires a valid JWT. Admins can view any patient. Doctors can view patients they are assigned to.
-        Patients can view their own record.
+        Cal un JWT vàlid. Els administradors poden veure qualsevol pacient. Els metges poden veure
+        pacients als quals estan assignats. Els pacients poden veure el seu propi registre.
 
-        Status codes:
-        - 200: Patient information returned.
-        - 401: Missing or invalid authentication token.
-        - 403: Authenticated user lacks permission to view the patient.
-        - 404: Patient does not exist.
-        - 409: User role configuration is inconsistent.
-        - 500: Unexpected error while fetching the patient.
+        Codis d'estat:
+        - 200: Informació del pacient retornada.
+        - 401: Falta o és invàlid el token.
+        - 403: L'usuari autenticat no té permís per veure el pacient.
+        - 404: El pacient no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 500: Error inesperat en recuperar el pacient.
         """
         patient_email = None
         try:
@@ -582,33 +534,18 @@ class PatientData(MethodView):
                 metadata={"patient_email": patient_email}
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            patient_controller = factory.get_patient_controller()
-            patient = patient_controller.get_patient(patient_email)
+            user_service = ServiceFactory().build_user_service()
 
             current_user = getattr(g, "current_user", None)
-            role_instance = getattr(g, "current_role_instance", None)
-
-            if current_user is None or role_instance is None:
-                current_user_email: str = get_jwt_identity()
-                user_controller = factory.get_user_controller()
+            if current_user is None:
+                current_email: str = get_jwt_identity()
                 try:
-                    current_user = user_controller.get_user(current_user_email)
+                    current_user = user_service.get_user(current_email)
                 except UserNotFoundException:
                     abort(401, message="Token d'autenticació no vàlid.")
-                role_instance = current_user.get_role_instance()
 
-            current_user_email: str = current_user.get_email()
-
-            authorized = (
-                current_user_email == patient_email
-                or role_instance.doctor_of_this_patient(patient)
-            )
-
-            if not authorized:
-                abort(403, message="No tens permís per accedir a les dades d'aquest pacient.")
-
-            patient_payload = patient.get_user().to_dict()
+            patient_domain = user_service.get_patient_data(current_user.email, patient_email)
+            patient_payload = patient_domain.to_dict()
             return jsonify(patient_payload), 200
 
         except UserRoleConflictException as e:
@@ -617,6 +554,9 @@ class PatientData(MethodView):
         except UserNotFoundException as e:
             self.logger.error("Patient not found", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(404, message=str(e))
+        except PermissionError as e:
+            self.logger.error("Unauthorized access to patient", module="PatientData", metadata={"patient_email": patient_email}, error=e)
+            abort(403, message=str(e))
         except HTTPException as e:
             self.logger.error("HTTP exception occurred", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             raise e
@@ -627,7 +567,7 @@ class PatientData(MethodView):
 @blp.route('/forgot-password')
 class UserForgotPassword(MethodView):
     """
-    Endpoints for requesting and completing password resets.
+    Endpoints per sol·licitar i completar restabliments de contrasenya.
     """
 
     logger = AbstractLogger.get_instance()
@@ -653,19 +593,19 @@ class UserForgotPassword(MethodView):
     @blp.response(500, description="No s'ha pogut carregar la plantilla o enviar el correu de restabliment.")
     def post(self, data: dict) -> Response:
         """
-        Initiate the password reset flow.
+        Inicia el flux de restabliment de contrasenya.
 
-        Expects JSON that matches `UserForgotPasswordSchema` with the user's email. Loads the reset email
-        template, generates and sends a reset code, and returns the validity window for the code.
+        Rep un JSON que segueix `UserForgotPasswordSchema` amb el correu de l'usuari. Carrega la
+        plantilla del correu, genera i envia un codi de restabliment i retorna la finestra de validesa.
 
-        Status codes:
-        - 200: Reset email sent successfully.
-        - 400: Required field missing.
-        - 401: Invalid credentials provided.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Failed to load the template or send the email.
+        Codis d'estat:
+        - 200: Correu de restabliment enviat correctament.
+        - 400: Falta un camp obligatori.
+        - 401: Credencials no vàlides.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: No s'ha pogut carregar la plantilla o enviar el correu.
         """
         try:
             self.logger.info("A user forgot their password", module="UserForgotPassword", metadata={"email": data['email']})
@@ -676,9 +616,24 @@ class UserForgotPassword(MethodView):
                 self.logger.error("Failed to load reset password template", module="UserForgotPassword", error=e)
                 abort(500, message="No s'ha pogut carregar la plantilla del correu de restabliment.")
 
-            factory = AbstractForgotPasswordFactory.get_instance()
-            forgot_password_facade = factory.get_password_facade()
-            forgot_password_facade.process_forgot_password(data['email'], APPLICATION_EMAIL, "Sol·licitud de canvi de contrasenya", template)
+            factory = ServiceFactory()
+            reset_service = factory.build_password_reset_service(RESET_CODE_VALIDITY_MINUTES)
+            reset_code = reset_service.generate_reset_code(data["email"])
+
+            email_adapter = AbstractEmailAdapter.get_instance()
+            body = (
+                template.replace("{reset_code}", reset_code)
+                .replace("{reset_url}", RESET_PASSWORD_FRONTEND_PATH)
+                .replace("{support_email}", APPLICATION_EMAIL)
+                .replace("{code_validity}", str(RESET_CODE_VALIDITY_MINUTES))
+            )
+
+            email_adapter.send_email(
+                [data["email"]],
+                APPLICATION_EMAIL,
+                "Sol·licitud de canvi de contrasenya",
+                body,
+            )
 
             response_payload = {"message": "El mail ha estat enviat exitosament a l'usuari.", "validity": RESET_CODE_VALIDITY_MINUTES}
             return jsonify(response_payload), 200
@@ -695,6 +650,9 @@ class UserForgotPassword(MethodView):
         except UserNotFoundException as e:
             self.logger.error("User forgot password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
             abort(404, message="No s'ha trobat cap usuari amb el correu proporcionat.")
+        except DataIntegrityException as e:
+            self.logger.error("User forgot password failed: Integrity violation", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except KeyError as e:
             self.logger.error("User forgot password failed due to missing field", module="UserForgotPassword", error=e)
             abort(400, message=f"Falta el camp: {str(e)}")
@@ -723,25 +681,25 @@ class UserForgotPassword(MethodView):
     @blp.response(500, description="Error inesperat del servidor en restablir la contrasenya.")
     def patch(self, data: dict) -> Response:
         """
-        Complete the password reset by validating the reset code and setting a new password.
+        Completa el restabliment validant el codi i establint una nova contrasenya.
 
-        Expects JSON that matches `UserResetPasswordSchema` with the email, reset code, and new password.
+        Rep un JSON que segueix `UserResetPasswordSchema` amb el correu, codi de restabliment i nova contrasenya.
 
-        Status codes:
-        - 200: Password reset successfully.
-        - 400: Missing field or reset code invalid/expired.
-        - 401: Invalid credentials provided.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error while resetting the password.
+        Codis d'estat:
+        - 200: Contrasenya restablerta correctament.
+        - 400: Falta algun camp o el codi és invàlid/caducat.
+        - 401: Credencials no vàlides.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat en restablir la contrasenya.
         """
         try:
             self.logger.info("A user wants to reset their password", module="UserForgotPassword", metadata={"email": data['email']})
 
-            factory = AbstractForgotPasswordFactory.get_instance()
-            forgot_password_facade = factory.get_password_facade()
-            forgot_password_facade.reset_password(data['email'], data['reset_code'], data['new_password'])
+            factory = ServiceFactory()
+            reset_service = factory.build_password_reset_service(RESET_CODE_VALIDITY_MINUTES)
+            reset_service.reset_password(data["email"], data["reset_code"], data["new_password"])
 
             response_payload = {"message": "Contrasenya restablerta correctament."}
             return jsonify(response_payload), 200
@@ -755,6 +713,9 @@ class UserForgotPassword(MethodView):
         except UserNotFoundException as e:
             self.logger.error("User reset password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
             abort(404, message="No s'ha trobat cap usuari amb el correu proporcionat.")
+        except DataIntegrityException as e:
+            self.logger.error("User reset password failed: Integrity violation", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except KeyError as e:
             self.logger.error("User reset password failed due to missing field", module="UserForgotPassword", error=e)
             abort(400, message=f"Falta el camp: {str(e)}")

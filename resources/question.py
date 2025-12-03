@@ -13,7 +13,8 @@ from helpers.exceptions.question_exceptions import (
     QuestionNotFoundException,
     QuestionUpdateException,
 )
-from helpers.factories.controller_factories import AbstractControllerFactory
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from application.container import ServiceFactory
 from schemas import (
     QuestionBulkCreateSchema,
     QuestionIdSchema,
@@ -59,13 +60,9 @@ class QuestionResource(MethodView):
                 metadata={"count": len(questions_data)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
+            question_service = ServiceFactory().build_question_service()
 
-            questions = question_controller.create_questions(questions_data)
-            for question in questions:
-                db.session.add(question)
-            db.session.commit()
+            questions = question_service.create_questions(questions_data)
 
             return jsonify([question.to_dict() for question in questions]), 201
         except (QuestionCreationException, ValueError) as e:
@@ -76,6 +73,10 @@ class QuestionResource(MethodView):
                 metadata={"count": len(data.get('questions', []))},
                 error=e,
             )
+            abort(422, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation creating questions", module="QuestionResource", error=e)
             abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
@@ -124,9 +125,8 @@ class QuestionResource(MethodView):
                 metadata={"filters": filters},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
-            questions = question_controller.list_questions(filters)
+            question_service = ServiceFactory().build_question_service()
+            questions = question_service.list_questions(filters)
 
             return jsonify([question.to_dict() for question in questions]), 200
         except QuestionNotFoundException as e:
@@ -169,16 +169,18 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
-            question = question_controller.update_question(question_id, data)
+            question_service = ServiceFactory().build_question_service()
+            question = question_service.update_question(question_id, data)
 
-            db.session.commit()
             return jsonify(question.to_dict()), 200
         except QuestionNotFoundException as e:
             db.session.rollback()
             self.logger.error("Pregunta no trobada en PUT", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation on question PUT", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            abort(422, message=str(e))
         except QuestionUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validació en PUT de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
@@ -223,16 +225,18 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id), "fields": list(data.keys())},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
-            question = question_controller.update_question(question_id, data)
+            question_service = ServiceFactory().build_question_service()
+            question = question_service.update_question(question_id, data)
 
-            db.session.commit()
             return jsonify(question.to_dict()), 200
         except QuestionNotFoundException as e:
             db.session.rollback()
             self.logger.error("Pregunta no trobada en PATCH", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation on question PATCH", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            abort(422, message=str(e))
         except QuestionUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validació en PATCH de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
@@ -271,18 +275,18 @@ class QuestionResource(MethodView):
                 metadata={"question_id": str(question_id)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
-
-            question = question_controller.get_question(question_id)
-            db.session.delete(question)
-            db.session.commit()
+            question_service = ServiceFactory().build_question_service()
+            question_service.delete_question(question_id)
 
             return Response(status=204)
         except QuestionNotFoundException as e:
             db.session.rollback()
             self.logger.error("Pregunta no trobada en DELETE", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation on question DELETE", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Error de base de dades en DELETE de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
@@ -326,13 +330,11 @@ class DailyQuestionResource(MethodView):
                 metadata={"patient_email": email},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-
-            patient_controller = factory.get_patient_controller()
-            patient = patient_controller.get_patient(email)
-
-            question_controller = factory.get_question_controller()
-            question = question_controller.get_daily_question(patient)
+            factory = ServiceFactory()
+            user_service = factory.build_user_service()
+            patient = user_service.get_user(email)
+            question_service = factory.build_question_service()
+            question = question_service.get_daily_question(patient)  # type: ignore[arg-type]
 
             return jsonify(question.to_dict()), 200
         except QuestionNotFoundException as e:

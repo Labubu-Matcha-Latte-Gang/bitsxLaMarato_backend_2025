@@ -13,7 +13,8 @@ from helpers.exceptions.activity_exceptions import (
     ActivityNotFoundException,
     ActivityUpdateException,
 )
-from helpers.factories.controller_factories import AbstractControllerFactory
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from application.container import ServiceFactory
 from schemas import (
     ActivityBulkCreateSchema,
     ActivityIdSchema,
@@ -23,7 +24,7 @@ from schemas import (
     ActivityUpdateSchema,
 )
 
-blp = Blueprint('activity', __name__, description="Operacions CRUD per a les activitats de l'aplicacio.")
+blp = Blueprint('activity', __name__, description="Operacions CRUD per a les activitats de l'aplicació.")
 
 
 @blp.route('')
@@ -38,12 +39,12 @@ class ActivityResource(MethodView):
     @blp.arguments(ActivityBulkCreateSchema, location='json')
     @blp.doc(
         summary="Crear activitats",
-        description="Crea multiples activitats en un sol pas.",
+        description="Crea múltiples activitats en un sol pas.",
     )
     @blp.response(201, schema=ActivityResponseSchema(many=True), description="Activitats creades correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en crear les activitats.")
     def post(self, data: dict):
         """
@@ -59,13 +60,9 @@ class ActivityResource(MethodView):
                 metadata={"count": len(activities_data)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
+            activity_service = ServiceFactory().build_activity_service()
 
-            activities = activity_controller.create_activities(activities_data)
-            for activity in activities:
-                db.session.add(activity)
-            db.session.commit()
+            activities = activity_service.create_activities(activities_data)
 
             return jsonify([activity.to_dict() for activity in activities]), 201
         except (ActivityCreationException, ValueError) as e:
@@ -77,6 +74,10 @@ class ActivityResource(MethodView):
                 error=e,
             )
             abort(422, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation creating activities", module="ActivityResource", error=e)
+            abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Error de base de dades en crear activitats", module="ActivityResource", error=e)
@@ -84,7 +85,7 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en crear activitats", module="ActivityResource", error=e)
-            abort(500, message=f"S'ha produit un error inesperat en crear les activitats: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en crear les activitats: {str(e)}")
 
     @roles_required([UserRole.ADMIN, UserRole.PATIENT])
     @blp.arguments(ActivityQuerySchema, location='query')
@@ -98,7 +99,7 @@ class ActivityResource(MethodView):
         ),
     )
     @blp.response(200, schema=ActivityResponseSchema(many=True), description="Activitats recuperades correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador o pacient per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
     @blp.response(500, description="Error inesperat del servidor en consultar les activitats.")
@@ -106,13 +107,13 @@ class ActivityResource(MethodView):
         """
         Obtenir activitats amb filtres opcionals.
 
-        Parametres de consulta:
-        - `id`: UUID exacte d'una activitat (retorna nomes aquesta o 404 si no existeix).
-        - `title`: Titol exacte de l'activitat.
+        Paràmetres de consulta:
+        - `id`: UUID exacte d'una activitat (retorna només aquesta o 404 si no existeix).
+        - `title`: Títol exacte de l'activitat.
         - `activity_type`: Valor de l'enum QuestionType.
         - `difficulty`: Valor exacte de dificultat (0-5).
-        - `difficulty_min`: Dificultat minima (>=).
-        - `difficulty_max`: Dificultat maxima (<=).
+        - `difficulty_min`: Dificultat mínima (>=).
+        - `difficulty_max`: Dificultat màxima (<=).
 
         Es poden combinar `difficulty`, `difficulty_min` i `difficulty_max`; tots els filtres aplicats alhora.
         Sense filtres retorna totes les activitats.
@@ -125,9 +126,8 @@ class ActivityResource(MethodView):
                 metadata={"filters": filters},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
-            activities = activity_controller.list_activities(filters)
+            activity_service = ServiceFactory().build_activity_service()
+            activities = activity_service.list_activities(filters)
 
             return jsonify([activity.to_dict() for activity in activities]), 200
         except ActivityNotFoundException as e:
@@ -140,24 +140,24 @@ class ActivityResource(MethodView):
             abort(404, message=str(e))
         except Exception as e:
             self.logger.error("Error inesperat en recuperar activitats", module="ActivityResource", error=e)
-            abort(500, message=f"S'ha produit un error inesperat en recuperar les activitats: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en recuperar les activitats: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
     @blp.arguments(ActivityIdSchema, location='query')
     @blp.arguments(ActivityUpdateSchema, location='json')
     @blp.doc(
-        summary="Reemplacar una activitat",
+        summary="Reemplaçar una activitat",
         description="Actualitza tots els camps d'una activitat existent.",
     )
     @blp.response(200, schema=ActivityResponseSchema, description="Activitat actualitzada correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en actualitzar l'activitat.")
     def put(self, query_args: dict, data: dict):
         """
-        Reemplacar completament una activitat.
+        Reemplaçar completament una activitat.
 
         Cal passar l'ID per query string (?id=<uuid>) i tots els camps al cos.
         """
@@ -170,16 +170,18 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
-            activity = activity_controller.update_activity(activity_id, data)
+            activity_service = ServiceFactory().build_activity_service()
+            activity = activity_service.update_activity(activity_id, data)
 
-            db.session.commit()
             return jsonify(activity.to_dict()), 200
         except ActivityNotFoundException as e:
             db.session.rollback()
             self.logger.error("Activitat no trobada en PUT", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation on activity PUT", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            abort(422, message=str(e))
         except ActivityUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validacio en PUT d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
@@ -191,26 +193,26 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en PUT d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
-            abort(500, message=f"S'ha produit un error inesperat en actualitzar l'activitat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en actualitzar l'activitat: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
     @blp.arguments(ActivityIdSchema, location='query')
     @blp.arguments(ActivityPartialUpdateSchema, location='json')
     @blp.doc(
-        summary="Actualitzacio parcial d'una activitat",
-        description="Actualitza nomes els camps indicats d'una activitat existent.",
+        summary="Actualització parcial d'una activitat",
+        description="Actualitza només els camps indicats d'una activitat existent.",
     )
     @blp.response(200, schema=ActivityResponseSchema, description="Activitat actualitzada parcialment.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en actualitzar l'activitat.")
     def patch(self, query_args: dict, data: dict):
         """
         Actualitzar parcialment una activitat.
 
-        Cal passar l'ID per query string (?id=<uuid>) i com a minim un camp al cos.
+        Cal passar l'ID per query string (?id=<uuid>) i com a mínim un camp al cos.
         """
         activity_id = query_args['id']
 
@@ -224,16 +226,18 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id), "fields": list(data.keys())},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
-            activity = activity_controller.update_activity(activity_id, data)
+            activity_service = ServiceFactory().build_activity_service()
+            activity = activity_service.update_activity(activity_id, data)
 
-            db.session.commit()
             return jsonify(activity.to_dict()), 200
         except ActivityNotFoundException as e:
             db.session.rollback()
             self.logger.error("Activitat no trobada en PATCH", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation on activity PATCH", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            abort(422, message=str(e))
         except ActivityUpdateException as e:
             db.session.rollback()
             self.logger.error("Error de validacio en PATCH d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
@@ -245,7 +249,7 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en PATCH d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
-            abort(500, message=f"S'ha produit un error inesperat en actualitzar l'activitat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en actualitzar l'activitat: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
     @blp.arguments(ActivityIdSchema, location='query')
@@ -254,10 +258,10 @@ class ActivityResource(MethodView):
         description="Esborra una activitat existent identificada per ID.",
     )
     @blp.response(204, description="Activitat eliminada correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en eliminar l'activitat.")
     def delete(self, query_args: dict):
         """
@@ -272,18 +276,18 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
-
-            activity = activity_controller.get_activity(activity_id)
-            db.session.delete(activity)
-            db.session.commit()
+            activity_service = ServiceFactory().build_activity_service()
+            activity_service.delete_activity(activity_id)
 
             return Response(status=204)
         except ActivityNotFoundException as e:
             db.session.rollback()
             self.logger.error("Activitat no trobada en DELETE", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Integrity violation on activity DELETE", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
+            abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
             self.logger.error("Error de base de dades en DELETE d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
@@ -291,7 +295,7 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en DELETE d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
-            abort(500, message=f"S'ha produit un error inesperat en eliminar l'activitat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en eliminar l'activitat: {str(e)}")
 
 
 @blp.route('/recommended')
@@ -305,12 +309,10 @@ class RecommendedActivityResource(MethodView):
     @roles_required([UserRole.PATIENT])
     @blp.doc(
         summary="Obtenir activitats recomanades",
-        description=(
-            "Obte una activitat recomanada per al pacient."
-        ),
+        description="Obtén una activitat recomanada per al pacient.",
     )
     @blp.response(200, schema=ActivityResponseSchema, description="Activitat recomanada recuperada correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
     @blp.response(500, description="Error inesperat del servidor en consultar les activitats.")
@@ -328,13 +330,12 @@ class RecommendedActivityResource(MethodView):
                 metadata={"patient_email": email},
             )
 
-            factory = AbstractControllerFactory.get_instance()
+            factory = ServiceFactory()
+            user_service = factory.build_user_service()
+            patient = user_service.get_user(email)
 
-            patient_controller = factory.get_patient_controller()
-            patient = patient_controller.get_patient(email)
-
-            activity_controller = factory.get_activity_controller()
-            activity = activity_controller.get_recommended_activities(patient)
+            activity_service = factory.build_activity_service()
+            activity = activity_service.get_recommended(patient)  # type: ignore[arg-type]
 
             return jsonify(activity.to_dict()), 200
         except ActivityNotFoundException as e:
@@ -347,4 +348,4 @@ class RecommendedActivityResource(MethodView):
             abort(404, message=str(e))
         except Exception as e:
             self.logger.error("Error inesperat en recuperar activitats", module="RecommendedActivityResource", error=e)
-            abort(500, message=f"S'ha produit un error inesperat en recuperar les activitats recomanades: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en recuperar les activitats recomanades: {str(e)}")

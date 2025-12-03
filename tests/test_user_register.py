@@ -63,3 +63,30 @@ class TestUserRegister(BaseTest):
         duplicate_response = self.register_patient(payload)
 
         assert duplicate_response.status_code == 400
+
+    def test_register_patient_age_out_of_range_returns_422_with_message(self):
+        payload = self.make_patient_payload(age=130)
+
+        response = self.register_patient(payload)
+
+        assert response.status_code == 422
+        body = response.get_json() or {}
+        assert "L'edat del pacient ha d'estar entre 0 i 120 anys." in body.get("message", "")
+
+    def test_register_patient_height_out_of_range_returns_422_with_message(self):
+        payload = self.make_patient_payload(height_cm=300.0)
+
+        response = self.register_patient(payload)
+
+        assert response.status_code == 422
+        body = response.get_json() or {}
+        assert "L'alçada del pacient ha d'estar entre 0 i 250 centímetres." in body.get("message", "")
+
+    def test_register_patient_weight_out_of_range_returns_422_with_message(self):
+        payload = self.make_patient_payload(weight_kg=700.0)
+
+        response = self.register_patient(payload)
+
+        assert response.status_code == 422
+        body = response.get_json() or {}
+        assert "El pes del pacient ha d'estar entre 0 i 600 quilograms." in body.get("message", "")

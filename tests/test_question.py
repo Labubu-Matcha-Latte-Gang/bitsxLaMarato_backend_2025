@@ -144,3 +144,22 @@ class TestQuestionResource(BaseTest):
         body = resp.get_json()
         assert body["id"]
         assert body["text"]
+
+    def test_create_duplicate_text_returns_422_with_message(self):
+        token = self.get_admin_token()
+        payload = {"questions": [self._make_question_payload(text="Enunciat únic")]}
+        first = self.client.post(
+            f"{self.api_prefix}/question",
+            headers=self.auth_headers(token),
+            json=payload,
+        )
+        assert first.status_code == 201
+
+        duplicate = self.client.post(
+            f"{self.api_prefix}/question",
+            headers=self.auth_headers(token),
+            json=payload,
+        )
+        assert duplicate.status_code == 422
+        body = duplicate.get_json() or {}
+        assert "Ja existeix una pregunta amb aquest enunciat." in body.get("message", "")

@@ -33,7 +33,7 @@ class SmtpEmailAdapter(AbstractEmailAdapter):
         self.__use_ssl = SMTP_USE_SSL if use_ssl is None else use_ssl
 
         if not self.__host or not self.__port:
-            raise SMTPCredentialsException("SMTP_HOST and SMTP_PORT must be configured.")
+            raise SMTPCredentialsException("S'han de configurar SMTP_HOST i SMTP_PORT.")
 
         # SSL and STARTTLS are mutually exclusive; SSL wins when explicitly requested.
         if self.__use_ssl:
@@ -76,12 +76,12 @@ class SmtpEmailAdapter(AbstractEmailAdapter):
                 module=__name__,
                 error=e,
             )
-            raise SMTPCredentialsException(f"Failed to connect to SMTP server: {e}") from e
+            raise SMTPCredentialsException(f"No s'ha pogut connectar amb el servidor SMTP: {e}") from e
 
     def send_email(self, to_emails: Sequence[str], from_email: str, subject: str, body: str) -> None:
         recipients = list(to_emails)
         if not recipients:
-            raise SendEmailException("No recipients provided for SMTP email.")
+            raise SendEmailException("No s'ha proporcionat cap destinatari per al correu SMTP.")
 
         try:
             with self.__connect() as smtp:
@@ -119,4 +119,4 @@ class SmtpEmailAdapter(AbstractEmailAdapter):
             )
             if isinstance(e, SendEmailException):
                 raise
-            raise SendEmailException(f"Error sending email via SMTP: {e}") from e
+            raise SendEmailException(f"Error en enviar el correu via SMTP: {e}") from e
