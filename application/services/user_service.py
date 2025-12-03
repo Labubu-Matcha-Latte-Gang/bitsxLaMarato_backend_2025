@@ -15,7 +15,6 @@ from domain.unit_of_work import IUnitOfWork
 from helpers.enums.gender import Gender
 from helpers.exceptions.user_exceptions import (
     InvalidCredentialsException,
-    RelatedUserNotFoundException,
     UserAlreadyExistsException,
     UserNotFoundException,
     UserRoleConflictException,
