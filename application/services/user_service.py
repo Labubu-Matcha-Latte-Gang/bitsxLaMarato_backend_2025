@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from abc import ABC, abstractmethod
+from typing import Dict, Optional
 
 from domain.entities.user import Admin, Doctor, Patient, User
 from domain.repositories import (
@@ -13,6 +14,7 @@ from domain.repositories import (
 from domain.services.security import PasswordHasher
 from domain.unit_of_work import IUnitOfWork
 from helpers.enums.gender import Gender
+from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     InvalidCredentialsException,
     UserAlreadyExistsException,
@@ -125,50 +127,8 @@ class UserService:
         if user is None:
             raise UserNotFoundException("Usuari no trobat.")
 
-        # Base fields
-        if "name" in update_data and update_data["name"] is not None:
-            user.name = update_data["name"]
-        if "surname" in update_data and update_data["surname"] is not None:
-            user.surname = update_data["surname"]
-        if "password" in update_data and update_data["password"] is not None:
-            user.set_password(update_data["password"], self.hasher)
-
-        if isinstance(user, Patient):
-            if "ailments" in update_data:
-                user.ailments = update_data.get("ailments")
-            if "gender" in update_data and update_data["gender"] is not None:
-                user.gender = update_data["gender"]
-            if "age" in update_data and update_data["age"] is not None:
-                user.age = update_data["age"]
-            if "treatments" in update_data:
-                user.treatments = update_data.get("treatments")
-            if "height_cm" in update_data and update_data["height_cm"] is not None:
-                user.height_cm = update_data["height_cm"]
-            if "weight_kg" in update_data and update_data["weight_kg"] is not None:
-                user.weight_kg = update_data["weight_kg"]
-            if "doctors" in update_data:
-                doctors_list = update_data.get("doctors") or []
-                # Validate doctors exist (even if empty)
-                self.doctor_repo.fetch_by_emails(doctors_list)
-                user.replace_doctors(doctors_list)
-            with self.uow:
-                self.patient_repo.update(user)
-                self.uow.commit()
-        elif isinstance(user, Doctor):
-            if "patients" in update_data:
-                patients_list = update_data.get("patients") or []
-                self.patient_repo.fetch_by_emails(patients_list)
-                user.replace_patients(patients_list)
-            with self.uow:
-                self.doctor_repo.update(user)
-                self.uow.commit()
-        elif isinstance(user, Admin):
-            with self.uow:
-                self.admin_repo.update(user)
-                self.uow.commit()
-        else:
-            raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.")
-        return user
+        updater = self._build_role_updater(user.role)
+        return updater.update(user, update_data)
 
     def delete_user(self, email: str) -> None:
         user = self.user_repo.get_by_email(email)
@@ -193,3 +153,139 @@ class UserService:
         if isinstance(requester, Patient) and requester.email == patient.email:
             return patient
         raise PermissionError("No tens permís per accedir a les dades d'aquest pacient.")
+
+    def _build_role_updater(self, role: UserRole) -> "_BaseRoleUpdater":
+        """
+        Factory for role-specific update handlers.
+
+        Args:
+            role (UserRole): Role of the user being updated.
+
+        Returns:
+            _BaseRoleUpdater: Handler that knows how to mutate and persist the role.
+
+        Raises:
+            UserRoleConflictException: If the role is unsupported.
+        """
+        updaters: Dict[UserRole, _BaseRoleUpdater] = {
+            UserRole.PATIENT: _PatientUpdater(
+                self.patient_repo,
+                self.doctor_repo,
+                self.uow,
+                self.hasher,
+            ),
+            UserRole.DOCTOR: _DoctorUpdater(
+                self.doctor_repo,
+                self.patient_repo,
+                self.uow,
+                self.hasher,
+            ),
+            UserRole.ADMIN: _AdminUpdater(
+                self.admin_repo,
+                self.uow,
+                self.hasher,
+            ),
+        }
+        try:
+            return updaters[role]
+        except KeyError as exc:
+            raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.") from exc
+
+
+class _BaseRoleUpdater(ABC):
+    def __init__(self, uow: IUnitOfWork, hasher: PasswordHasher) -> None:
+        self.uow = uow
+        self.hasher = hasher
+
+    def _update_common_fields(self, user: User, update_data: dict) -> None:
+        """Update base user fields."""
+        base_fields = {k: v for k, v in update_data.items() if k in {"name", "surname", "password"}}
+        if base_fields.get("password") is not None:
+            user.set_password(base_fields["password"], self.hasher)
+        if base_fields.get("name") is not None:
+            user.name = base_fields["name"]
+        if base_fields.get("surname") is not None:
+            user.surname = base_fields["surname"]
+
+    @abstractmethod
+    def update(self, user: User, update_data: dict) -> User:
+        ...
+
+
+class _PatientUpdater(_BaseRoleUpdater):
+    def __init__(
+        self,
+        patient_repo: IPatientRepository,
+        doctor_repo: IDoctorRepository,
+        uow: IUnitOfWork,
+        hasher: PasswordHasher,
+    ) -> None:
+        super().__init__(uow, hasher)
+        self.patient_repo = patient_repo
+        self.doctor_repo = doctor_repo
+
+    def update(self, user: User, update_data: dict) -> Patient:
+        patient: Patient = user
+        doctors_list = update_data.get("doctors")
+        if doctors_list is not None:
+            normalized = doctors_list or []
+            self.doctor_repo.fetch_by_emails(normalized)
+            update_data = {**update_data, "doctors": normalized}
+
+        self._update_common_fields(patient, update_data)
+        patient.set_properties(update_data, self.hasher)
+
+        with self.uow:
+            self.patient_repo.update(patient)
+            self.uow.commit()
+        return patient
+
+
+class _DoctorUpdater(_BaseRoleUpdater):
+    def __init__(
+        self,
+        doctor_repo: IDoctorRepository,
+        patient_repo: IPatientRepository,
+        uow: IUnitOfWork,
+        hasher: PasswordHasher,
+    ) -> None:
+        super().__init__(uow, hasher)
+        self.doctor_repo = doctor_repo
+        self.patient_repo = patient_repo
+
+    def update(self, user: User, update_data: dict) -> Doctor:
+        doctor: Doctor = user
+        patients_list = update_data.get("patients")
+        if patients_list is not None:
+            normalized = patients_list or []
+            self.patient_repo.fetch_by_emails(normalized)
+            update_data = {**update_data, "patients": normalized}
+
+        self._update_common_fields(doctor, update_data)
+        doctor.set_properties(update_data, self.hasher)
+
+        with self.uow:
+            self.doctor_repo.update(doctor)
+            self.uow.commit()
+        return doctor
+
+
+class _AdminUpdater(_BaseRoleUpdater):
+    def __init__(
+        self,
+        admin_repo: IAdminRepository,
+        uow: IUnitOfWork,
+        hasher: PasswordHasher,
+    ) -> None:
+        super().__init__(uow, hasher)
+        self.admin_repo = admin_repo
+
+    def update(self, user: User, update_data: dict) -> Admin:
+        admin: Admin = user
+        self._update_common_fields(admin, update_data)
+        admin.set_properties(update_data, self.hasher)
+
+        with self.uow:
+            self.admin_repo.update(admin)
+            self.uow.commit()
+        return admin
