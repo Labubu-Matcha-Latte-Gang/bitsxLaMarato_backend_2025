@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any
+from typing import Any, Generator
 from uuid import uuid4
 
 import pytest
@@ -28,7 +28,7 @@ class BaseTest(ABC):
         app: Flask,
         client: FlaskClient,
         db_session: Session,
-    ) -> None:
+    ) -> Generator[None, None, None]:
         self.app = app
         self.client = client
         self.db = db_session
