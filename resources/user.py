@@ -523,6 +523,9 @@ class PatientData(MethodView):
         except UserNotFoundException as e:
             self.logger.error("Patient not found", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(404, message=str(e))
+        except PermissionError as e:
+            self.logger.error("Unauthorized access to patient", module="PatientData", metadata={"patient_email": patient_email}, error=e)
+            abort(403, message=str(e))
         except HTTPException as e:
             self.logger.error("HTTP exception occurred", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             raise e
