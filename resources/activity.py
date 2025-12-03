@@ -315,13 +315,12 @@ class RecommendedActivityResource(MethodView):
                 metadata={"patient_email": email},
             )
 
-            factory = AbstractControllerFactory.get_instance()
+            factory = ServiceFactory()
+            user_service = factory.build_user_service()
+            patient = user_service.get_user(email)
 
-            patient_controller = factory.get_patient_controller()
-            patient = patient_controller.get_patient(email)
-
-            activity_controller = factory.get_activity_controller()
-            activity = activity_controller.get_recommended_activities(patient)
+            activity_service = factory.build_activity_service()
+            activity = activity_service.get_recommended(patient)  # type: ignore[arg-type]
 
             return jsonify(activity.to_dict()), 200
         except ActivityNotFoundException as e:
