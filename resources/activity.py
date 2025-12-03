@@ -165,11 +165,9 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
-            activity = activity_controller.update_activity(activity_id, data)
+            activity_service = ServiceFactory().build_activity_service()
+            activity = activity_service.update_activity(activity_id, data)
 
-            db.session.commit()
             return jsonify(activity.to_dict()), 200
         except ActivityNotFoundException as e:
             db.session.rollback()
