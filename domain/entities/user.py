@@ -162,6 +162,16 @@ class Patient(User):
             doctors (List[str]): Doctor emails to set.
         """
         self.doctor_emails = [email for email in doctors if email]
+        
+    def remove_doctor(self, doctor_email: str) -> None:
+        """
+        Remove a doctor association.
+        
+        Args:
+            doctor_email (str): Doctor email to remove.
+        """
+        if doctor_email in self.doctor_emails:
+            self.doctor_emails.remove(doctor_email)
 
     def role_payload(self) -> dict:
         """
