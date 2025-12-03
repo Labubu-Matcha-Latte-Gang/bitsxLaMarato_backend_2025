@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+
+from application.container import ServiceFactory
+from application.services.password_reset_service import PasswordResetService
 from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES, RESET_PASSWORD_FRONTEND_PATH
 from helpers.email_service.adapter import AbstractEmailAdapter
-from helpers.forgot_password.user_service import UserService
 
 class AbstractForgotPasswordFacade(ABC):
     """
@@ -12,20 +14,21 @@ class AbstractForgotPasswordFacade(ABC):
     @classmethod
     def get_instance(
         cls,
-        user_service: UserService | None = None,
+        reset_service: PasswordResetService | None = None,
         email_service: AbstractEmailAdapter | None = None,
         refresh: bool = False
     ) -> 'AbstractForgotPasswordFacade':
         """
         Get (or rebuild) the forgot password facade instance.
         Args:
-            user_service (UserService | None): Optional user service to inject.
+            reset_service (PasswordResetService | None): Optional reset service to inject.
             email_service (AbstractEmailAdapter | None): Optional email adapter to inject.
             refresh (bool): If True, forces recreation even when an instance already exists.
         """
-        if refresh or cls.__instance is None or user_service is not None or email_service is not None:
+        if refresh or cls.__instance is None or reset_service is not None or email_service is not None:
+            service = reset_service or ServiceFactory().build_password_reset_service(RESET_CODE_VALIDITY_MINUTES)
             cls.__instance = ForgotPasswordFacade(
-                user_service or UserService.get_instance(),
+                service,
                 email_service or AbstractEmailAdapter.get_instance()
             )
         return cls.__instance
@@ -60,18 +63,18 @@ class AbstractForgotPasswordFacade(ABC):
         raise NotImplementedError("reset_password method must be implemented by subclasses.")
 
 class ForgotPasswordFacade(AbstractForgotPasswordFacade):
-    __user_service: UserService
+    __reset_service: PasswordResetService
     __email_service: AbstractEmailAdapter
 
-    def __init__(self, user_service: UserService, email_service: AbstractEmailAdapter):
-        self.__user_service = user_service
+    def __init__(self, reset_service: PasswordResetService, email_service: AbstractEmailAdapter):
+        self.__reset_service = reset_service
         self.__email_service = email_service
 
     
     def process_forgot_password(self, email: str, from_email: str, subject: str, body_template: str) -> None:
-        reset_code = self.__user_service.user_forgot_password(email)
+        reset_code = self.__reset_service.generate_reset_code(email)
         body = body_template.replace("{reset_code}", reset_code).replace("{reset_url}", RESET_PASSWORD_FRONTEND_PATH).replace("{support_email}", from_email or APPLICATION_EMAIL).replace("{code_validity}", str(RESET_CODE_VALIDITY_MINUTES))
         self.__email_service.send_email([email], from_email, subject, body)
 
     def reset_password(self, email: str, reset_code: str, new_password: str) -> None:
-        return self.__user_service.user_reset_password(email, reset_code, new_password)
+        return self.__reset_service.reset_password(email, reset_code, new_password)
