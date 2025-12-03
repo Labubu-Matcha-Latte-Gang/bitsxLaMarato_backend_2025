@@ -241,3 +241,22 @@ class TestActivityResource(BaseTest):
             json={},
         )
         assert resp.status_code == 422
+
+    def test_create_duplicate_title_returns_422_with_message(self):
+        token = self.get_admin_token()
+        payload = {"activities": [self._make_activity_payload(title="Títol únic")]}
+        first = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json=payload,
+        )
+        assert first.status_code == 201
+
+        duplicate = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json=payload,
+        )
+        assert duplicate.status_code == 422
+        body = duplicate.get_json() or {}
+        assert "Ja existeix una activitat amb aquest títol." in body.get("message", "")
