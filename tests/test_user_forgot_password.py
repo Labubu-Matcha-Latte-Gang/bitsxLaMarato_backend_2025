@@ -70,7 +70,7 @@ class TestUserForgotPassword(BaseTest):
         assert sent["to"] == [user.email]
 
         reset_code = self._extract_code_from_email()
-        association = UserCodeAssociation.query.get(user.email)
+        association = self.db.get(UserCodeAssociation, user.email)
         assert association is not None
         assert association.check_code(reset_code)
         assert association.is_expired(datetime.now(timezone.utc)) is False
@@ -80,7 +80,7 @@ class TestUserForgotPassword(BaseTest):
 
         assert response.status_code == 404
         assert self.email_adapter.last_message is None
-        assert UserCodeAssociation.query.get("missing@example.com") is None
+        assert self.db.get(UserCodeAssociation, "missing@example.com") is None
 
     def test_multiple_requests_replace_previous_code(self):
         user = self.create_patient_model()
@@ -96,7 +96,7 @@ class TestUserForgotPassword(BaseTest):
         assert len(self.email_adapter.sent_messages) == 2
         assert first_code != second_code
 
-        association = UserCodeAssociation.query.get(user.email)
+        association = self.db.get(UserCodeAssociation, user.email)
         assert association is not None
         assert association.check_code(second_code)
         assert association.check_code(first_code) is False
@@ -113,7 +113,7 @@ class TestUserForgotPassword(BaseTest):
         reset_response = self._request_reset_password(user.email, reset_code, "BetterPass1")
 
         assert reset_response.status_code == 200
-        assert UserCodeAssociation.query.get(user.email) is None
+        assert self.db.get(UserCodeAssociation, user.email) is None
 
         login_response = self.login(user.email, "BetterPass1")
         assert login_response.status_code == 200
@@ -126,7 +126,7 @@ class TestUserForgotPassword(BaseTest):
         self._request_forgot_password(user.email)
         reset_code = self._extract_code_from_email()
 
-        association = UserCodeAssociation.query.get(user.email)
+        association = self.db.get(UserCodeAssociation, user.email)
         assert association is not None
         association.expiration = datetime.now(timezone.utc) - timedelta(minutes=1)
         self.db.commit()
@@ -134,7 +134,7 @@ class TestUserForgotPassword(BaseTest):
         response = self._request_reset_password(user.email, reset_code, "AnotherPass1")
 
         assert response.status_code == 400
-        assert UserCodeAssociation.query.get(user.email) is None
+        assert self.db.get(UserCodeAssociation, user.email) is None
 
     def test_reset_password_with_invalid_code_returns_400_and_keeps_association(self):
         user = self.create_patient_model()
@@ -143,7 +143,7 @@ class TestUserForgotPassword(BaseTest):
         response = self._request_reset_password(user.email, "Invalid1", "AnotherPass2")
 
         assert response.status_code == 400
-        association = UserCodeAssociation.query.get(user.email)
+        association = self.db.get(UserCodeAssociation, user.email)
         assert association is not None
         assert association.is_expired(datetime.now(timezone.utc)) is False
 
