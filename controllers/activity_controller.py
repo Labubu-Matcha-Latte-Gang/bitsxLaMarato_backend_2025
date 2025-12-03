@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import uuid
 from random import choice
 
+from db import db
 from helpers.exceptions.activity_exceptions import (
     ActivityCreationException,
     ActivityNotFoundException,
@@ -109,7 +110,7 @@ class IActivityController(ABC):
     
 class ActivityController(IActivityController):
     def get_activity(self, activity_id: uuid.UUID) -> Activity:
-        activity = Activity.query.get(activity_id)
+        activity = db.session.get(Activity, activity_id)
         if not activity:
             raise ActivityNotFoundException(f"No s'ha trobat cap activitat amb l'ID {activity_id}.")
         return activity
