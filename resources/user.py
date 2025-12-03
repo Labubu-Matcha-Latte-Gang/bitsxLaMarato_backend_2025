@@ -460,7 +460,7 @@ class UserCRUD(MethodView):
 @blp.route('/<string:email>')
 class PatientData(MethodView):
     """
-    Patient data access endpoint for admins, assigned doctors, and the patient themselves.
+    Endpoint d'accés a dades de pacient per a administradors, metges assignats i el propi pacient.
     """
 
     logger = AbstractLogger.get_instance()
@@ -479,18 +479,18 @@ class PatientData(MethodView):
     @blp.response(500, description="Error inesperat del servidor en recuperar el pacient.")
     def get(self, path_args: dict, **kwargs):
         """
-        Retrieve patient information by email with role-based authorization.
+        Recupera informació d'un pacient pel correu amb autorització per rol.
 
-        Requires a valid JWT. Admins can view any patient. Doctors can view patients they are assigned to.
-        Patients can view their own record.
+        Cal un JWT vàlid. Els administradors poden veure qualsevol pacient. Els metges poden veure
+        pacients als quals estan assignats. Els pacients poden veure el seu propi registre.
 
-        Status codes:
-        - 200: Patient information returned.
-        - 401: Missing or invalid authentication token.
-        - 403: Authenticated user lacks permission to view the patient.
-        - 404: Patient does not exist.
-        - 409: User role configuration is inconsistent.
-        - 500: Unexpected error while fetching the patient.
+        Codis d'estat:
+        - 200: Informació del pacient retornada.
+        - 401: Falta o és invàlid el token.
+        - 403: L'usuari autenticat no té permís per veure el pacient.
+        - 404: El pacient no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 500: Error inesperat en recuperar el pacient.
         """
         patient_email = None
         try:
