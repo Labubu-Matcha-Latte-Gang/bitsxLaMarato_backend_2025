@@ -80,7 +80,7 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en crear activitats", module="ActivityResource", error=e)
-            abort(500, message=f"S'ha produit un error inesperat en crear les activitats: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en crear les activitats: {str(e)}")
 
     @roles_required([UserRole.ADMIN, UserRole.PATIENT])
     @blp.arguments(ActivityQuerySchema, location='query')
@@ -135,7 +135,7 @@ class ActivityResource(MethodView):
             abort(404, message=str(e))
         except Exception as e:
             self.logger.error("Error inesperat en recuperar activitats", module="ActivityResource", error=e)
-            abort(500, message=f"S'ha produit un error inesperat en recuperar les activitats: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en recuperar les activitats: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
     @blp.arguments(ActivityIdSchema, location='query')
@@ -184,7 +184,7 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en PUT d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
-            abort(500, message=f"S'ha produit un error inesperat en actualitzar l'activitat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en actualitzar l'activitat: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
     @blp.arguments(ActivityIdSchema, location='query')
@@ -236,7 +236,7 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en PATCH d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
-            abort(500, message=f"S'ha produit un error inesperat en actualitzar l'activitat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en actualitzar l'activitat: {str(e)}")
 
     @roles_required([UserRole.ADMIN])
     @blp.arguments(ActivityIdSchema, location='query')
@@ -278,7 +278,7 @@ class ActivityResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en DELETE d'activitat", module="ActivityResource", metadata={"activity_id": str(activity_id)}, error=e)
-            abort(500, message=f"S'ha produit un error inesperat en eliminar l'activitat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en eliminar l'activitat: {str(e)}")
 
 
 @blp.route('/recommended')
@@ -292,9 +292,7 @@ class RecommendedActivityResource(MethodView):
     @roles_required([UserRole.PATIENT])
     @blp.doc(
         summary="Obtenir activitats recomanades",
-        description=(
-            "Obte una activitat recomanada per al pacient."
-        ),
+        description="Obtén una activitat recomanada per al pacient.",
     )
     @blp.response(200, schema=ActivityResponseSchema, description="Activitat recomanada recuperada correctament.")
     @blp.response(401, description="Falta o és invàlid el JWT.")
@@ -333,4 +331,4 @@ class RecommendedActivityResource(MethodView):
             abort(404, message=str(e))
         except Exception as e:
             self.logger.error("Error inesperat en recuperar activitats", module="RecommendedActivityResource", error=e)
-            abort(500, message=f"S'ha produit un error inesperat en recuperar les activitats recomanades: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat en recuperar les activitats recomanades: {str(e)}")
