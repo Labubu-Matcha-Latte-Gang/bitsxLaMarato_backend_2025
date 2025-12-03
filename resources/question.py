@@ -120,9 +120,8 @@ class QuestionResource(MethodView):
                 metadata={"filters": filters},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
-            questions = question_controller.list_questions(filters)
+            question_service = ServiceFactory().build_question_service()
+            questions = question_service.list_questions(filters)
 
             return jsonify([question.to_dict() for question in questions]), 200
         except QuestionNotFoundException as e:
