@@ -4,8 +4,6 @@ from datetime import datetime
 from typing import Iterable, List, Optional
 import uuid
 
-from sqlalchemy.orm import joinedload
-
 from db import db
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
@@ -180,7 +178,6 @@ class SQLAlchemyPatientRepository(IPatientRepository):
         patients: List[Patient] = (
             self.session.query(Patient)
             .filter(Patient.email.in_(clean_emails))
-            .options(joinedload(Patient.doctors))
             .all()
         )
         missing = set(clean_emails) - {p.email for p in patients}
@@ -197,13 +194,7 @@ class SQLAlchemyDoctorRepository(IDoctorRepository):
         self.user_repo = SQLAlchemyUserRepository(self.session)
 
     def get_by_email(self, email: str) -> Optional[DoctorDomain]:
-        model: Doctor | None = self.session.get(
-            Doctor,
-            email,
-            options=[
-                joinedload(Doctor.patients),
-            ],
-        )
+        model: Doctor | None = self.session.get(Doctor, email)
         if model is None:
             return None
         return self.user_repo._to_domain(model)  # type: ignore[arg-type]
