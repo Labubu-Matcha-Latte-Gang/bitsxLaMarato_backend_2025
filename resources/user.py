@@ -271,10 +271,8 @@ class UserCRUD(MethodView):
 
             email:str = get_jwt_identity()
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.get_user(email)
+            user_service = ServiceFactory().build_user_service()
+            user = user_service.get_user(email)
 
             return jsonify(user.to_dict()), 200
         except UserRoleConflictException as e:
