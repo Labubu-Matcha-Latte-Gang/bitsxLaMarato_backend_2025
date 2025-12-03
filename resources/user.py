@@ -503,33 +503,18 @@ class PatientData(MethodView):
                 metadata={"patient_email": patient_email}
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            patient_controller = factory.get_patient_controller()
-            patient = patient_controller.get_patient(patient_email)
+            user_service = ServiceFactory().build_user_service()
 
             current_user = getattr(g, "current_user", None)
-            role_instance = getattr(g, "current_role_instance", None)
-
-            if current_user is None or role_instance is None:
-                current_user_email: str = get_jwt_identity()
-                user_controller = factory.get_user_controller()
+            if current_user is None:
+                current_email: str = get_jwt_identity()
                 try:
-                    current_user = user_controller.get_user(current_user_email)
+                    current_user = user_service.get_user(current_email)
                 except UserNotFoundException:
                     abort(401, message="Token d'autenticació no vàlid.")
-                role_instance = current_user.get_role_instance()
 
-            current_user_email: str = current_user.get_email()
-
-            authorized = (
-                current_user_email == patient_email
-                or role_instance.doctor_of_this_patient(patient)
-            )
-
-            if not authorized:
-                abort(403, message="No tens permís per accedir a les dades d'aquest pacient.")
-
-            patient_payload = patient.get_user().to_dict()
+            patient_domain = user_service.get_patient_data(current_user.email, patient_email)
+            patient_payload = patient_domain.to_dict()
             return jsonify(patient_payload), 200
 
         except UserRoleConflictException as e:
