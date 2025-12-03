@@ -37,7 +37,7 @@ class EmailAdapterServiceLocator:
         """
         normalized_key = key.lower()
         if normalized_key not in self.__registry:
-            raise SendEmailException(f"No email adapter registered for key '{key}'")
+            raise SendEmailException(f"No hi ha cap adaptador de correu registrat per a la clau '{key}'")
         return self.__registry[normalized_key]()
     
     def __bootstrap_defaults(self) -> None:
