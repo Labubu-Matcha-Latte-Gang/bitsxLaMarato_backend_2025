@@ -59,13 +59,9 @@ class QuestionResource(MethodView):
                 metadata={"count": len(questions_data)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            question_controller = factory.get_question_controller()
+            question_service = ServiceFactory().build_question_service()
 
-            questions = question_controller.create_questions(questions_data)
-            for question in questions:
-                db.session.add(question)
-            db.session.commit()
+            questions = question_service.create_questions(questions_data)
 
             return jsonify([question.to_dict() for question in questions]), 201
         except (QuestionCreationException, ValueError) as e:
