@@ -297,7 +297,7 @@ class RecommendedActivityResource(MethodView):
         ),
     )
     @blp.response(200, schema=ActivityResponseSchema, description="Activitat recomanada recuperada correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
     @blp.response(500, description="Error inesperat del servidor en consultar les activitats.")
