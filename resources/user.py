@@ -316,10 +316,8 @@ class UserCRUD(MethodView):
         try:
             email = get_jwt_identity()
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.update_user(email, data)
+            user_service = ServiceFactory().build_user_service()
+            user = user_service.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
@@ -382,10 +380,8 @@ class UserCRUD(MethodView):
         try:
             email = get_jwt_identity()
             
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.update_user(email, data)
+            user_service = ServiceFactory().build_user_service()
+            user = user_service.update_user(email, data)
 
             update_fields = [field for field in data.keys() if field != "password"]
             self.logger.info(
