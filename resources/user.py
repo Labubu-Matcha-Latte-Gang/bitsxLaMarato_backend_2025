@@ -22,6 +22,7 @@ from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
 )
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 from helpers.enums.user_role import UserRole
 from application.container import ServiceFactory
 from helpers.email_service.adapter import AbstractEmailAdapter
@@ -352,6 +353,11 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("User update failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
             abort(422, message=str(e))
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("User update failed: Integrity error", module="UserCRUD", metadata={"email": email}, error=mapped)
+            abort(422, message=str(mapped))
         except HTTPException as e:
             db.session.rollback()
             raise e
@@ -420,6 +426,11 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("Partial user update failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
             abort(422, message=str(e))
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("Partial user update failed: Integrity error", module="UserCRUD", metadata={"email": email}, error=mapped)
+            abort(422, message=str(mapped))
         except HTTPException as e:
             db.session.rollback()
             raise e
