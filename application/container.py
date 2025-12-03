@@ -49,6 +49,11 @@ class ServiceFactory:
         return cls.__instance
 
     def build_user_service(self) -> UserService:
+        """
+        Build a UserService with its dependencies.
+        Returns:
+            UserService: The constructed UserService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
         token_service = TokenService()
@@ -69,16 +74,33 @@ class ServiceFactory:
         )
 
     def build_question_service(self) -> QuestionService:
+        """
+        Build a QuestionService with its dependencies.
+        Returns:
+            QuestionService: The constructed QuestionService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         question_repo = SQLAlchemyQuestionRepository(self.session)
         return QuestionService(question_repo=question_repo, uow=uow)
 
     def build_activity_service(self) -> ActivityService:
+        """
+        Build an ActivityService with its dependencies.
+        Returns:
+            ActivityService: The constructed ActivityService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         activity_repo = SQLAlchemyActivityRepository(self.session)
         return ActivityService(activity_repo=activity_repo, uow=uow)
 
     def build_password_reset_service(self, validity_minutes: int) -> PasswordResetService:
+        """
+        Build a PasswordResetService with its dependencies.
+        Args:
+            validity_minutes (int): The validity duration for reset codes in minutes.
+        Returns:
+            PasswordResetService: The constructed PasswordResetService instance.
+        """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
         user_repo = SQLAlchemyUserRepository(self.session)
