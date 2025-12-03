@@ -1,4 +1,4 @@
-name: CI/CD Pipeline Segura
+name: CI/CD Pipeline V3
 
 on:
   push:
@@ -12,27 +12,27 @@ jobs:
       - name: Bajar el código
         uses: actions/checkout@v3
 
-      # 2. Login en Docker Hub
+      # 2. Configurar Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Login en Docker Hub
       - name: Login en Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 3. Construir la imagen (¡Pero NO subirla todavía!)
-      # Usamos 'load: true' para que la imagen quede disponible en el runner local
+      # 4. Construir la imagen para testing
       - name: Construir imagen para testing
         uses: docker/build-push-action@v4
         with:
           context: .
-          load: true 
+          load: true  # Carga la imagen en el daemon local para usar 'docker run' luego
           tags: ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test
-          # Cache para ir más rápido
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
-      # 4. EJECUTAR TESTS AUTOMÁTICOS (Unit Tests)
-      # Esto corre pytest dentro del contenedor. Si falla, el pipeline se detiene.
+      # 5. EJECUTAR TESTS AUTOMÁTICOS (Unit Tests)
       - name: Correr Tests Unitarios
         run: |
           docker run --rm \
@@ -41,8 +41,7 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test \
             pytest tests/
 
-      # 5. PRUEBA DE ARRANQUE (Smoke Test)
-      # Arrancamos el contenedor y esperamos a ver si explota.
+      # 6. PRUEBA DE ARRANQUE (Smoke Test)
       - name: Verificar que la API arranca correctamente
         run: |
           echo "🚀 Arrancando contenedor de prueba..."
@@ -52,13 +51,16 @@ jobs:
             -e DB_PASSWORD=dummy \
             -e DB_HOST=localhost \
             -e DB_NAME=dummy_db \
-            -e OPENAI_API_KEY=dummy \
+            -e AZURE_OPENAI_ENDPOINT="https://dummy-resource.openai.azure.com/" \
+            -e AZURE_OPENAI_API_KEY="dummy_key_12345" \
+            -e AZURE_OPENAI_DEPLOYMENT_NAME="dummy-deployment" \
+            -e AZURE_OPENAI_API_VERSION="2023-05-15" \
+            -e JWT_SECRET_KEY="test_jwt_secret_super_seguro" \
             ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test
           
           echo "⏳ Esperando 10 segundos para ver si se mantiene estable..."
           sleep 10
 
-          # Verificamos si el contenedor sigue corriendo
           if [ "$(docker inspect -f '{{.State.Running}}' api-test)" = "true" ]; then
               echo "✅ El contenedor sigue vivo. ¡Parece estable!"
               docker logs api-test
@@ -66,10 +68,10 @@ jobs:
               echo "❌ El contenedor se ha muerto al arrancar."
               echo "🔍 LOGS DEL ERROR:"
               docker logs api-test
-              exit 1 # Esto rompe el pipeline y evita el deploy
+              exit 1
           fi
 
-      # 6. Si todo lo anterior pasó, construimos y subimos la versión FINAL
+      # 7. Construir y Subir imagen Final (Push)
       - name: Construir y Subir imagen Final (Push)
         uses: docker/build-push-action@v4
         with:
@@ -77,3 +79,4 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:latest
           cache-from: type=gha
+          cache-to: type=gha,mode=max
