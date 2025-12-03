@@ -4,7 +4,6 @@ from sqlalchemy.exc import IntegrityError
 from db import db
 from globals import RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
-from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from helpers.exceptions.user_exceptions import InvalidResetCodeException, UserNotFoundException
 from models.user import User
 from models.associations import UserCodeAssociation
