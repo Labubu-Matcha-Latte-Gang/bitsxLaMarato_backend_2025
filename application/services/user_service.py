@@ -42,6 +42,27 @@ class UserService:
         self.uow = uow
         self.hasher = hasher
         self.token_service = token_service
+        
+        # Initialize role updaters once for reuse
+        self._role_updaters: Dict[UserRole, "_BaseRoleUpdater"] = {
+            UserRole.PATIENT: _PatientUpdater(
+                self.patient_repo,
+                self.doctor_repo,
+                self.uow,
+                self.hasher,
+            ),
+            UserRole.DOCTOR: _DoctorUpdater(
+                self.doctor_repo,
+                self.patient_repo,
+                self.uow,
+                self.hasher,
+            ),
+            UserRole.ADMIN: _AdminUpdater(
+                self.admin_repo,
+                self.uow,
+                self.hasher,
+            ),
+        }
 
     def register_patient(self, data: dict) -> Patient:
         email = data["email"]
@@ -156,7 +177,7 @@ class UserService:
 
     def _build_role_updater(self, role: UserRole) -> "_BaseRoleUpdater":
         """
-        Factory for role-specific update handlers.
+        Retrieves the role-specific update handler.
 
         Args:
             role (UserRole): Role of the user being updated.
@@ -167,27 +188,8 @@ class UserService:
         Raises:
             UserRoleConflictException: If the role is unsupported.
         """
-        updaters: Dict[UserRole, _BaseRoleUpdater] = {
-            UserRole.PATIENT: _PatientUpdater(
-                self.patient_repo,
-                self.doctor_repo,
-                self.uow,
-                self.hasher,
-            ),
-            UserRole.DOCTOR: _DoctorUpdater(
-                self.doctor_repo,
-                self.patient_repo,
-                self.uow,
-                self.hasher,
-            ),
-            UserRole.ADMIN: _AdminUpdater(
-                self.admin_repo,
-                self.uow,
-                self.hasher,
-            ),
-        }
         try:
-            return updaters[role]
+            return self._role_updaters[role]
         except KeyError as exc:
             raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.") from exc
 
