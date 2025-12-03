@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict
 
 from domain.entities.user import Admin, Doctor, Patient, User
 from domain.repositories import (
