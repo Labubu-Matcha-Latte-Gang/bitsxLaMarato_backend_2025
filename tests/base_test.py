@@ -131,9 +131,11 @@ class BaseTest(ABC):
         password: str | None = None,
         name: str = "Doc",
         surname: str = "Tor",
+        patients: list[str] | None = None,
     ) -> User:
         email = email or self.unique_email("doctor")
         password = password or self.default_password
+        patients = patients or []
         factory = ServiceFactory.get_instance(refresh=True)
         user_service = factory.build_user_service()
         doctor = user_service.register_doctor(
@@ -142,7 +144,7 @@ class BaseTest(ABC):
                 "password": password,
                 "name": name,
                 "surname": surname,
-                "patients": [],
+                "patients": patients,
             }
         )
         return doctor
