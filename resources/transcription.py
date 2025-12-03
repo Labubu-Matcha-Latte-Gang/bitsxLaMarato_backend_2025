@@ -98,7 +98,7 @@ class TranscriptionChunkResource(MethodView):
         except Exception as e:
             db.session.rollback() # Important fer rollback si falla
             self.logger.error("Error transcribing chunk", module="Transcription", error=e)
-            abort(500, message=f"Error inesperat: {str(e)}")
+            abort(500, message=f"S'ha produït un error inesperat: {str(e)}")
         finally:
             # Esborrar fitxer temporal sempre
             if temp_path and os.path.exists(temp_path):
@@ -151,4 +151,4 @@ class TranscriptionCompleteResource(MethodView):
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error finalizing transcription", module="Transcription", error=e)
-            abort(500, message=f"Error en finalitzar: {str(e)}")
+            abort(500, message=f"S'ha produït un error en finalitzar: {str(e)}")
