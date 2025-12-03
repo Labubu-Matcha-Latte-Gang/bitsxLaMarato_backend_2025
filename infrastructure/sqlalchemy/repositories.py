@@ -311,6 +311,14 @@ class SQLAlchemyQuestionRepository(IQuestionRepository):
         for question in questions:
             self.session.add(self._from_domain(question))
 
+    def update(self, question: QuestionDomain) -> None:
+        model: Question | None = self.session.get(Question, question.id)
+        if model is None:
+            raise UserNotFoundException("Pregunta no trobada.")
+        model.text = question.text
+        model.question_type = question.question_type
+        model.difficulty = question.difficulty
+
     def remove(self, question: QuestionDomain) -> None:
         model: Question | None = self.session.get(Question, question.id)
         if model is not None:
@@ -370,6 +378,15 @@ class SQLAlchemyActivityRepository(IActivityRepository):
     def add_many(self, activities: Iterable[ActivityDomain]) -> None:
         for activity in activities:
             self.session.add(self._from_domain(activity))
+
+    def update(self, activity: ActivityDomain) -> None:
+        model: Activity | None = self.session.get(Activity, activity.id)
+        if model is None:
+            raise UserNotFoundException("Activitat no trobada.")
+        model.title = activity.title
+        model.description = activity.description
+        model.activity_type = activity.activity_type
+        model.difficulty = activity.difficulty
 
     def remove(self, activity: ActivityDomain) -> None:
         model: Activity | None = self.session.get(Activity, activity.id)
