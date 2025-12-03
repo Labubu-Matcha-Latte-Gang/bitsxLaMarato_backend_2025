@@ -64,7 +64,7 @@ class SQLAlchemyUserRepository(IUserRepository):
 
     def _to_domain(self, model: User) -> UserDomain:
         if self._role_count(model.email) != 1:
-            raise UserRoleConflictException("User must have exactly one role assigned.")
+            raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.")
         role = model.role
         if role == UserRole.PATIENT and isinstance(model, Patient):
             return PatientDomain(
@@ -95,7 +95,7 @@ class SQLAlchemyUserRepository(IUserRepository):
                 name=model.name,
                 surname=model.surname,
             )
-        raise UserRoleConflictException("User must have exactly one valid role.")
+        raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol vàlid.")
 
     def _role_count(self, email: str) -> int:
         patient_exists = (
@@ -147,7 +147,7 @@ class SQLAlchemyUserRepository(IUserRepository):
                 surname=user.surname,
                 role=UserRole.ADMIN,
             )
-        raise UserRoleConflictException("Unknown user role.")
+        raise UserRoleConflictException("Rol d'usuari desconegut.")
 
     def _apply_updates(self, user: UserDomain, model: User) -> None:
         model.name = user.name
@@ -155,7 +155,7 @@ class SQLAlchemyUserRepository(IUserRepository):
         model.password = user.password_hash
         if isinstance(user, PatientDomain):
             if not isinstance(model, Patient):
-                raise UserRoleConflictException("User role mismatch for patient.")
+                raise UserRoleConflictException("El rol d'usuari no correspon amb pacient.")
             model.ailments = user.ailments
             model.gender = user.gender
             model.age = user.age
@@ -165,13 +165,13 @@ class SQLAlchemyUserRepository(IUserRepository):
             model.doctors = self._fetch_doctors(user.doctor_emails)
         elif isinstance(user, DoctorDomain):
             if not isinstance(model, Doctor):
-                raise UserRoleConflictException("User role mismatch for doctor.")
+                raise UserRoleConflictException("El rol d'usuari no correspon amb metge.")
             model.patients = self._fetch_patients(user.patient_emails)
         elif isinstance(user, AdminDomain):
             if not isinstance(model, Admin):
-                raise UserRoleConflictException("User role mismatch for admin.")
+                raise UserRoleConflictException("El rol d'usuari no correspon amb administrador.")
         else:
-            raise UserRoleConflictException("Unknown user role.")
+            raise UserRoleConflictException("Rol d'usuari desconegut.")
 
     def _fetch_doctors(self, emails: Iterable[str]) -> List[Doctor]:
         clean_emails = [e for e in emails if e]
