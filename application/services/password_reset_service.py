@@ -32,7 +32,7 @@ class PasswordResetService:
     def generate_reset_code(self, email: str) -> str:
         user = self.user_repo.get_by_email(email)
         if user is None:
-            raise UserNotFoundException(f"User with email {email} not found.")
+            raise UserNotFoundException(f"No s'ha trobat cap usuari amb el correu {email}.")
 
         reset_code = self._random_code()
         hashed_code = self.hasher.hash(reset_code)
@@ -46,11 +46,11 @@ class PasswordResetService:
     def reset_password(self, email: str, reset_code: str, new_password: str) -> None:
         user = self.user_repo.get_by_email(email)
         if user is None:
-            raise UserNotFoundException(f"User with email {email} not found.")
+            raise UserNotFoundException(f"No s'ha trobat cap usuari amb el correu {email}.")
 
         stored = self.code_repo.get_code(email)
         if stored is None:
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
         hashed_code, expiration = stored
 
         now = datetime.now(timezone.utc)
@@ -58,10 +58,10 @@ class PasswordResetService:
             with self.uow:
                 self.code_repo.delete_code(email)
                 self.uow.commit()
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
 
         if not self.hasher.verify(reset_code, hashed_code):
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
 
         user.set_password(new_password, self.hasher)
         with self.uow:
