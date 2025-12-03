@@ -245,10 +245,10 @@ class ActivityResource(MethodView):
         description="Esborra una activitat existent identificada per ID.",
     )
     @blp.response(204, description="Activitat eliminada correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en eliminar l'activitat.")
     def delete(self, query_args: dict):
         """
