@@ -26,6 +26,8 @@ from helpers.exceptions.user_exceptions import (
     UserNotFoundException,
     UserRoleConflictException,
 )
+from helpers.exceptions.question_exceptions import QuestionNotFoundException
+from helpers.exceptions.activity_exceptions import ActivityNotFoundException
 from models.activity import Activity
 from models.admin import Admin
 from models.associations import UserCodeAssociation
@@ -314,7 +316,7 @@ class SQLAlchemyQuestionRepository(IQuestionRepository):
     def update(self, question: QuestionDomain) -> None:
         model: Question | None = self.session.get(Question, question.id)
         if model is None:
-            raise UserNotFoundException("Pregunta no trobada.")
+            raise QuestionNotFoundException("Pregunta no trobada.")
         model.text = question.text
         model.question_type = question.question_type
         model.difficulty = question.difficulty
@@ -382,7 +384,7 @@ class SQLAlchemyActivityRepository(IActivityRepository):
     def update(self, activity: ActivityDomain) -> None:
         model: Activity | None = self.session.get(Activity, activity.id)
         if model is None:
-            raise UserNotFoundException("Activitat no trobada.")
+            raise ActivityNotFoundException("Activitat no trobada.")
         model.title = activity.title
         model.description = activity.description
         model.activity_type = activity.activity_type
