@@ -76,7 +76,7 @@ class QuestionResource(MethodView):
             abort(422, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en crear preguntes", module="QuestionResource", error=e)
+            self.logger.error("Integrity violation creating questions", module="QuestionResource", error=e)
             abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
@@ -179,7 +179,7 @@ class QuestionResource(MethodView):
             abort(404, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en PUT de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            self.logger.error("Integrity violation on question PUT", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(422, message=str(e))
         except QuestionUpdateException as e:
             db.session.rollback()
@@ -235,7 +235,7 @@ class QuestionResource(MethodView):
             abort(404, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en PATCH de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            self.logger.error("Integrity violation on question PATCH", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(422, message=str(e))
         except QuestionUpdateException as e:
             db.session.rollback()
@@ -285,7 +285,7 @@ class QuestionResource(MethodView):
             abort(404, message=str(e))
         except DataIntegrityException as e:
             db.session.rollback()
-            self.logger.error("Violació d'integritat en DELETE de pregunta", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
+            self.logger.error("Integrity violation on question DELETE", module="QuestionResource", metadata={"question_id": str(question_id)}, error=e)
             abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
