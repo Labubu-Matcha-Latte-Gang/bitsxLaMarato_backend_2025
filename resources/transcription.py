@@ -5,10 +5,13 @@ from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from flask_jwt_extended import jwt_required
 from openai import AzureOpenAI
+from sqlalchemy.exc import IntegrityError
 
 from db import db
 from models.transcription import TranscriptionChunk
 from helpers.debugger.logger import AbstractLogger
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 from schemas import TranscriptionChunkSchema, TranscriptionCompleteSchema, TranscriptionResponseSchema
 
 blp = Blueprint('transcription', __name__, description="Operacions de transcripció d'àudio en temps real (Persistència en DB).")
@@ -95,6 +98,11 @@ class TranscriptionChunkResource(MethodView):
 
             return {"status": "success", "partial_text": text_result}, 200
 
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("Integrity violation transcribing chunk", module="Transcription", error=mapped)
+            abort(422, message=str(mapped))
         except Exception as e:
             db.session.rollback() # Important fer rollback si falla
             self.logger.error("Error transcribing chunk", module="Transcription", error=e)
@@ -148,6 +156,11 @@ class TranscriptionCompleteResource(MethodView):
                 "transcription": full_text
             }, 200
 
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error("Integrity violation finalizing transcription", module="Transcription", error=mapped)
+            abort(422, message=str(mapped))
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error finalizing transcription", module="Transcription", error=e)
