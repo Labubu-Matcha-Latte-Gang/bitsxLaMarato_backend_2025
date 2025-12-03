@@ -42,7 +42,7 @@ class UserService:
         """
         user: User | None = User.query.get(email)
         if user is None:
-            raise UserNotFoundException(f"User with email {email} not found.")
+            raise UserNotFoundException(f"No s'ha trobat cap usuari amb el correu {email}.")
     
         reset_code = self.generate_reset_code()
         hashed_code = User.hash_password(reset_code)
@@ -74,12 +74,12 @@ class UserService:
         """
         user: User | None = User.query.get(email)
         if user is None:
-            raise UserNotFoundException(f"User with email {email} not found.")
+            raise UserNotFoundException(f"No s'ha trobat cap usuari amb el correu {email}.")
         
         association: UserCodeAssociation | None = UserCodeAssociation.query.get(email)
 
         if association is None:
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
         
         if association.is_expired(datetime.now(timezone.utc)):
             try:
@@ -89,10 +89,10 @@ class UserService:
                 db.session.rollback()
                 self.logger.error(message=f"Error deleting expired reset code for user {email}", metadata={"email": email}, module=__name__, error=e)
                 raise e
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
         
         if not association.check_code(reset_code):
-            raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
+            raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
 
         try:
             user.password = User.hash_password(new_password)
