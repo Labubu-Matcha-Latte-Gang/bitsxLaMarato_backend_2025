@@ -1,12 +1,15 @@
 import secrets
 import string
+from sqlalchemy.exc import IntegrityError
 from db import db
 from globals import RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from helpers.exceptions.user_exceptions import InvalidResetCodeException, UserNotFoundException
 from models.user import User
 from models.associations import UserCodeAssociation
 from datetime import datetime, timedelta, timezone
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 
 class UserService:
     __instance: 'UserService' = None
@@ -56,6 +59,11 @@ class UserService:
             db.session.add(user_code_association)
             db.session.commit()
             return reset_code
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error(message="Integrity violation saving reset code", metadata={"email": email}, module=__name__, error=mapped)
+            raise mapped
         except Exception as e:
             db.session.rollback()
             self.logger.error(message=f"Error saving reset code for user {email}", metadata={"email": email}, module=__name__, error=e)
@@ -98,6 +106,11 @@ class UserService:
             user.password = User.hash_password(new_password)
             db.session.delete(association)
             db.session.commit()
+        except IntegrityError as e:
+            db.session.rollback()
+            mapped = map_integrity_error(e)
+            self.logger.error(message=f"Integrity violation resetting password for user {email}", metadata={"email": email}, module=__name__, error=mapped)
+            raise mapped
         except Exception as e:
             db.session.rollback()
             self.logger.error(message=f"Error resetting password for user {email}", metadata={"email": email}, module=__name__, error=e)
