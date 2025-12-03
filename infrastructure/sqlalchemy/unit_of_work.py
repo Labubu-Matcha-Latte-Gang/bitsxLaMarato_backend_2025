@@ -91,13 +91,19 @@ def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
             return DataIntegrityException("Ja existeix un usuari amb aquest correu.")
         return DataIntegrityException("Ja existeix un registre amb aquest identificador.")
 
-    # Fallback per a motors sense diag (p.ex. SQLite)
+    # Fallback per a motors sense diag
     for key, msg in constraint_messages.items():
         if key in raw_message:
             return DataIntegrityException(msg)
 
+    lowered_raw = raw_message.lower()
+    if "check constraint failed" in lowered_raw:
+        for key, msg in constraint_messages.items():
+            if key.lower() in lowered_raw:
+                return DataIntegrityException(msg)
+        return DataIntegrityException("Les dades no compleixen una restricció de validació.")
+
     if "not null constraint failed" in raw_message.lower():
-        # Format SQLite: NOT NULL constraint failed: table.column
         if "." in raw_message:
             parts = raw_message.split(":")[-1].strip().split(".")
             if len(parts) == 2:
