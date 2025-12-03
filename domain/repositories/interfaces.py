@@ -92,6 +92,10 @@ class IQuestionRepository(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def update(self, question: Question) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
     def remove(self, question: Question) -> None:
         raise NotImplementedError()
 
@@ -107,6 +111,10 @@ class IActivityRepository(ABC):
 
     @abstractmethod
     def add_many(self, activities: Iterable[Activity]) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def update(self, activity: Activity) -> None:
         raise NotImplementedError()
 
     @abstractmethod
