@@ -5,7 +5,10 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from flask_jwt_extended import create_access_token
+from sqlalchemy.orm import Session
 from helpers.enums.gender import Gender
 from application.container import ServiceFactory
 from domain.entities.user import User
@@ -20,7 +23,12 @@ class BaseTest(ABC):
     default_password = "Password1"
 
     @pytest.fixture(autouse=True)
-    def _inject_dependencies(self, app, client, db_session):
+    def _inject_dependencies(
+        self,
+        app: Flask,
+        client: FlaskClient,
+        db_session: Session,
+    ) -> None:
         self.app = app
         self.client = client
         self.db = db_session
