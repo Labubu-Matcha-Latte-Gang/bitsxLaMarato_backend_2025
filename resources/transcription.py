@@ -19,7 +19,7 @@ def get_azure_client():
     api_version = current_app.config.get("AZURE_OPENAI_API_VERSION")
 
     if not api_key or not endpoint:
-        abort(500, message="Faltan credenciales de Azure OpenAI en la configuración.")
+        abort(500, message="Falten credencials d'Azure OpenAI a la configuració.")
 
     return AzureOpenAI(
         api_key=api_key,
