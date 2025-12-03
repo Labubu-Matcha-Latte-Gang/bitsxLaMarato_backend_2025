@@ -610,6 +610,11 @@ class UserForgotPassword(MethodView):
         try:
             self.logger.info("A user forgot their password", module="UserForgotPassword", metadata={"email": data['email']})
 
+            # Validate email configuration
+            if APPLICATION_EMAIL is None or APPLICATION_EMAIL.strip() == "":
+                self.logger.error("Application email not configured", module="UserForgotPassword")
+                abort(500, message="Configuració del correu electrònic no disponible. Contacta amb l'administrador.")
+
             try:
                 template = self._load_reset_password_template()
             except OSError as e:
@@ -623,7 +628,7 @@ class UserForgotPassword(MethodView):
             email_adapter = AbstractEmailAdapter.get_instance()
             body = (
                 template.replace("{reset_code}", reset_code)
-                .replace("{reset_url}", RESET_PASSWORD_FRONTEND_PATH)
+                .replace("{reset_url}", RESET_PASSWORD_FRONTEND_PATH or "")
                 .replace("{support_email}", APPLICATION_EMAIL)
                 .replace("{code_validity}", str(RESET_CODE_VALIDITY_MINUTES))
             )

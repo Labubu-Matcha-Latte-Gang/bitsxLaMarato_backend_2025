@@ -47,6 +47,10 @@ class PasswordResetService:
         if user is None:
             raise UserNotFoundException(f"No s'ha trobat cap usuari amb el correu {email}.")
 
+        # Validate new password before processing reset code
+        if not new_password or len(new_password.strip()) == 0:
+            raise ValueError("La nova contrasenya no pot estar buida.")
+
         stored = self.code_repo.get_code(email)
         if stored is None:
             raise InvalidResetCodeException("El codi de restabliment proporcionat no és vàlid o ha caducat.")
