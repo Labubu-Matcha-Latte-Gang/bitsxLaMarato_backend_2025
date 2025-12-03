@@ -1,4 +1,4 @@
-name: CI/CD Pipeline V3
+name: CI/CD Pipeline V4
 
 on:
   push:
@@ -23,21 +23,30 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 4. Construir la imagen para testing
+      # 4. Construir imagen para testing
       - name: Construir imagen para testing
         uses: docker/build-push-action@v4
         with:
           context: .
-          load: true  # Carga la imagen en el daemon local para usar 'docker run' luego
+          load: true
           tags: ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test
           cache-from: type=gha
 
-      # 5. EJECUTAR TESTS AUTOMÁTICOS (Unit Tests)
+      # 5. EJECUTAR TESTS AUTOMÁTICOS
       - name: Correr Tests Unitarios
         run: |
           docker run --rm \
             -e FLASK_ENV=testing \
-            -e SECRET_KEY=test_key \
+            -e SECRET_KEY=${{ secrets.SECRET_KEY }} \
+            -e DB_USER=${{ secrets.DB_USER }} \
+            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            -e DB_HOST=${{ secrets.DB_HOST }} \
+            -e DB_NAME=${{ secrets.DB_NAME }} \
+            -e AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }} \
+            -e AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }} \
+            -e AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }} \
+            -e AZURE_OPENAI_API_VERSION=${{ secrets.AZURE_OPENAI_API_VERSION }} \
+            -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
             ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test \
             pytest tests/
 
@@ -46,16 +55,16 @@ jobs:
         run: |
           echo "🚀 Arrancando contenedor de prueba..."
           docker run -d --name api-test -p 5000:5000 \
-            -e SECRET_KEY=ci_test_key \
-            -e DB_USER=dummy \
-            -e DB_PASSWORD=dummy \
-            -e DB_HOST=localhost \
-            -e DB_NAME=dummy_db \
-            -e AZURE_OPENAI_ENDPOINT="https://dummy-resource.openai.azure.com/" \
-            -e AZURE_OPENAI_API_KEY="dummy_key_12345" \
-            -e AZURE_OPENAI_DEPLOYMENT_NAME="dummy-deployment" \
-            -e AZURE_OPENAI_API_VERSION="2023-05-15" \
-            -e JWT_SECRET_KEY="test_jwt_secret_super_seguro" \
+            -e SECRET_KEY=${{ secrets.SECRET_KEY }} \
+            -e DB_USER=${{ secrets.DB_USER }} \
+            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            -e DB_HOST=${{ secrets.DB_HOST }} \
+            -e DB_NAME=${{ secrets.DB_NAME }} \
+            -e AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }} \
+            -e AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }} \
+            -e AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }} \
+            -e AZURE_OPENAI_API_VERSION=${{ secrets.AZURE_OPENAI_API_VERSION }} \
+            -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
             ${{ secrets.DOCKER_USERNAME }}/bitsxlamarato_backend_2025:test
           
           echo "⏳ Esperando 10 segundos para ver si se mantiene estable..."
