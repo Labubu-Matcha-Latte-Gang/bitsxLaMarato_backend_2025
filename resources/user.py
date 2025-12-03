@@ -21,6 +21,7 @@ from helpers.exceptions.user_exceptions import (
     UserRoleConflictException,
     RelatedUserNotFoundException,
 )
+from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from helpers.enums.user_role import UserRole
 from application.container import ServiceFactory
 from helpers.email_service.adapter import AbstractEmailAdapter
@@ -95,6 +96,10 @@ class PatientRegister(MethodView):
             db.session.rollback()
             self.logger.error("Patient register failed: Related doctor not found", module="PatientRegister", metadata={"email": data.get('email')}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Patient register failed: Integrity violation", module="PatientRegister", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to invalid data", module="PatientRegister", error=e)
@@ -161,6 +166,10 @@ class DoctorRegister(MethodView):
             db.session.rollback()
             self.logger.error("Doctor register failed: Related patient not found", module="DoctorRegister", metadata={"email": data.get('email')}, error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Doctor register failed: Integrity violation", module="DoctorRegister", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except ValueError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to invalid data", module="DoctorRegister", error=e)
@@ -339,6 +348,10 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("User update failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(422, message=str(e))
         except HTTPException as e:
             db.session.rollback()
             raise e
@@ -403,6 +416,10 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Partial user update failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(422, message=str(e))
         except HTTPException as e:
             db.session.rollback()
             raise e
@@ -452,6 +469,10 @@ class UserCRUD(MethodView):
             db.session.rollback()
             self.logger.error("User not found", module="UserCRUD", error=e)
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error("Deleting user failed: Integrity violation", module="UserCRUD", metadata={"email": email}, error=e)
+            abort(422, message=str(e))
         except Exception as e:
             db.session.rollback()
             self.logger.error("Deleting user failed", module="UserCRUD", error=e)
@@ -618,6 +639,9 @@ class UserForgotPassword(MethodView):
         except UserNotFoundException as e:
             self.logger.error("User forgot password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
             abort(404, message="No s'ha trobat cap usuari amb el correu proporcionat.")
+        except DataIntegrityException as e:
+            self.logger.error("User forgot password failed: Integrity violation", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except KeyError as e:
             self.logger.error("User forgot password failed due to missing field", module="UserForgotPassword", error=e)
             abort(400, message=f"Falta el camp: {str(e)}")
@@ -678,6 +702,9 @@ class UserForgotPassword(MethodView):
         except UserNotFoundException as e:
             self.logger.error("User reset password failed: User not found", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
             abort(404, message="No s'ha trobat cap usuari amb el correu proporcionat.")
+        except DataIntegrityException as e:
+            self.logger.error("User reset password failed: Integrity violation", module="UserForgotPassword", metadata={"email": data.get('email')}, error=e)
+            abort(422, message=str(e))
         except KeyError as e:
             self.logger.error("User reset password failed due to missing field", module="UserForgotPassword", error=e)
             abort(400, message=f"Falta el camp: {str(e)}")
