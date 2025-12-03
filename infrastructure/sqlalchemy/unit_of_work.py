@@ -32,13 +32,13 @@ class SQLAlchemyUnitOfWork(IUnitOfWork):
             self.session.commit()
         except IntegrityError as exc:
             self.session.rollback()
-            raise _map_integrity_error(exc) from exc
+            raise map_integrity_error(exc) from exc
 
     def rollback(self) -> None:
         self.session.rollback()
 
 
-def _map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
+def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
     """
     Converteix errors d'integritat de la base de dades en excepcions de domini amb missatges en català.
     """
