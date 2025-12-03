@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import UserAlreadyExistsException, UserNotFoundException
 from helpers.factories.controller_factories import AbstractControllerFactory
+from db import db
 from models.user import User
 
 class IUserController(ABC):
@@ -65,13 +66,13 @@ class IUserController(ABC):
     
 class UserController(IUserController):
     def get_user(self, email: str) -> User:
-        user: User | None = User.query.get(email)
+        user: User | None = db.session.get(User, email)
         if not user:
             raise UserNotFoundException("Usuari no trobat.")
         return user
 
     def create_user(self, user_data: dict) -> User:
-        potential_existing_user = User.query.get(user_data.get('email'))
+        potential_existing_user = db.session.get(User, user_data.get('email'))
         if potential_existing_user:
             raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
         
@@ -85,7 +86,7 @@ class UserController(IUserController):
         return new_user
 
     def update_user(self, email: str, update_data: dict) -> User:
-        user: User | None = User.query.get(email)
+        user: User | None = db.session.get(User, email)
         if not user:
             raise UserNotFoundException("Usuari no trobat.")
         
