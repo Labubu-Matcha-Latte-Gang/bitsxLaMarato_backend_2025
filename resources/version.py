@@ -9,7 +9,7 @@ blp = Blueprint('version', __name__, description="Obtenir la versió actual de l
 
 @blp.route('')
 class Version(MethodView):
-    """Expose the current API version from configuration."""
+    """Exposa la versió actual de l'API definida a la configuració."""
 
     logger = AbstractLogger.get_instance()
     
@@ -22,12 +22,12 @@ class Version(MethodView):
     @blp.response(500, description="Error inesperat del servidor en obtenir la versió.")
     def get(self):
         """
-        Return the current API version.
+        Retorna la versió actual de l'API.
 
-        Reads `API_VERSION` from the Flask configuration and sends it as plain text.
-        Status codes:
-        - 200: Version string returned.
-        - 500: Failed to retrieve or return the version value.
+        Llegeix `API_VERSION` de la configuració de Flask i l'envia en text pla.
+        Codis d'estat:
+        - 200: Cadena de versió retornada.
+        - 500: No s'ha pogut recuperar o retornar el valor de la versió.
         """
         try:
             version: str = app.config.get('API_VERSION')
