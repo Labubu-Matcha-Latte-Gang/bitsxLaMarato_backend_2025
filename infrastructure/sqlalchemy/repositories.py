@@ -23,6 +23,7 @@ from domain.repositories import (
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
+    UserNotFoundException,
     UserRoleConflictException,
 )
 from models.activity import Activity
@@ -52,6 +53,12 @@ class SQLAlchemyUserRepository(IUserRepository):
         model: User | None = self.session.get(User, user.email)
         if model is not None:
             self.session.delete(model)
+
+    def update(self, user: UserDomain) -> None:
+        model: User | None = self.session.get(User, user.email)
+        if model is None:
+            raise UserNotFoundException("Usuari no trobat.")
+        self._apply_updates(user, model)
 
     def _to_domain(self, model: User) -> UserDomain:
         role = model.role
@@ -123,6 +130,30 @@ class SQLAlchemyUserRepository(IUserRepository):
             )
         raise UserRoleConflictException("Unknown user role.")
 
+    def _apply_updates(self, user: UserDomain, model: User) -> None:
+        model.name = user.name
+        model.surname = user.surname
+        model.password = user.password_hash
+        if isinstance(user, PatientDomain):
+            if not isinstance(model, Patient):
+                raise UserRoleConflictException("User role mismatch for patient.")
+            model.ailments = user.ailments
+            model.gender = user.gender
+            model.age = user.age
+            model.treatments = user.treatments
+            model.height_cm = user.height_cm
+            model.weight_kg = user.weight_kg
+            model.doctors = self._fetch_doctors(user.doctor_emails)
+        elif isinstance(user, DoctorDomain):
+            if not isinstance(model, Doctor):
+                raise UserRoleConflictException("User role mismatch for doctor.")
+            model.patients = self._fetch_patients(user.patient_emails)
+        elif isinstance(user, AdminDomain):
+            if not isinstance(model, Admin):
+                raise UserRoleConflictException("User role mismatch for admin.")
+        else:
+            raise UserRoleConflictException("Unknown user role.")
+
     def _fetch_doctors(self, emails: Iterable[str]) -> List[Doctor]:
         clean_emails = [e for e in emails if e]
         if not clean_emails:
@@ -171,6 +202,9 @@ class SQLAlchemyPatientRepository(IPatientRepository):
         model = self.user_repo._from_domain(patient)
         self.session.add(model)
 
+    def update(self, patient: PatientDomain) -> None:
+        self.user_repo.update(patient)
+
     def fetch_by_emails(self, emails: Iterable[str]) -> List[PatientDomain]:
         clean_emails = [email for email in emails if email]
         if not clean_emails:
@@ -203,6 +237,9 @@ class SQLAlchemyDoctorRepository(IDoctorRepository):
         model = self.user_repo._from_domain(doctor)
         self.session.add(model)
 
+    def update(self, doctor: DoctorDomain) -> None:
+        self.user_repo.update(doctor)
+
     def fetch_by_emails(self, emails: Iterable[str]) -> List[DoctorDomain]:
         clean_emails = [email for email in emails if email]
         if not clean_emails:
@@ -234,6 +271,9 @@ class SQLAlchemyAdminRepository(IAdminRepository):
     def add(self, admin: AdminDomain) -> None:
         model = self.user_repo._from_domain(admin)
         self.session.add(model)
+
+    def update(self, admin: AdminDomain) -> None:
+        self.user_repo.update(admin)
 
 
 class SQLAlchemyQuestionRepository(IQuestionRepository):
