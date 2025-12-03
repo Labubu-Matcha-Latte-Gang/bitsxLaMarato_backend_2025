@@ -82,7 +82,7 @@ def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
     if column and ("null value" in lowered_primary or "not-null" in lowered_primary):
         return DataIntegrityException(f"El camp '{column}' és obligatori.")
 
-    if "duplicate key value" in lowered_primary or "duplicate" in detail_lower:
+    if "duplicate key value" in lowered_primary or "duplicate" in detail_lower or "unique constraint failed" in raw_message.lower():
         if table == "activities":
             return DataIntegrityException("Ja existeix una activitat amb aquestes dades.")
         if table == "questions":
