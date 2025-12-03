@@ -63,6 +63,8 @@ class SQLAlchemyUserRepository(IUserRepository):
         self._apply_updates(user, model)
 
     def _to_domain(self, model: User) -> UserDomain:
+        if self._role_count(model.email) != 1:
+            raise UserRoleConflictException("User must have exactly one role assigned.")
         role = model.role
         if role == UserRole.PATIENT and isinstance(model, Patient):
             return PatientDomain(
@@ -94,6 +96,21 @@ class SQLAlchemyUserRepository(IUserRepository):
                 surname=model.surname,
             )
         raise UserRoleConflictException("User must have exactly one valid role.")
+
+    def _role_count(self, email: str) -> int:
+        patient_exists = (
+            self.session.query(Patient.email).filter(Patient.email == email).first()
+            is not None
+        )
+        doctor_exists = (
+            self.session.query(Doctor.email).filter(Doctor.email == email).first()
+            is not None
+        )
+        admin_exists = (
+            self.session.query(Admin.email).filter(Admin.email == email).first()
+            is not None
+        )
+        return sum(int(flag) for flag in (patient_exists, doctor_exists, admin_exists))
 
     def _from_domain(self, user: UserDomain) -> User:
         if isinstance(user, PatientDomain):
