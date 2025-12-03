@@ -95,7 +95,7 @@ class UserService:
             raise InvalidResetCodeException("The provided reset code is invalid or has expired.")
 
         try:
-            user.set_password(new_password)
+            user.password = User.hash_password(new_password)
             db.session.delete(association)
             db.session.commit()
         except Exception as e:
