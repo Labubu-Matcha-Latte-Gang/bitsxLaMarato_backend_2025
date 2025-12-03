@@ -20,6 +20,10 @@ class IUserRepository(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def update(self, user: User) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
     def remove(self, user: User) -> None:
         raise NotImplementedError()
 
@@ -31,6 +35,10 @@ class IPatientRepository(ABC):
 
     @abstractmethod
     def add(self, patient: Patient) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def update(self, patient: Patient) -> None:
         raise NotImplementedError()
 
     @abstractmethod
@@ -48,6 +56,10 @@ class IDoctorRepository(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def update(self, doctor: Doctor) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
     def fetch_by_emails(self, emails: Iterable[str]) -> List[Doctor]:
         raise NotImplementedError()
 
@@ -59,6 +71,10 @@ class IAdminRepository(ABC):
 
     @abstractmethod
     def add(self, admin: Admin) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def update(self, admin: Admin) -> None:
         raise NotImplementedError()
 
 
