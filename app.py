@@ -124,7 +124,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
         response = {
             "error_message": str(error),
             "code": 501,
-            "status": "Not Implemented"
+            "status": "No implementat"
         }
         return jsonify(response), 501
     
