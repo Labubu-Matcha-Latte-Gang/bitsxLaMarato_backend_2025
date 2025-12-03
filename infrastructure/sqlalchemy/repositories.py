@@ -41,15 +41,7 @@ class SQLAlchemyUserRepository(IUserRepository):
         self.session = session or db.session
 
     def get_by_email(self, email: str) -> Optional[UserDomain]:
-        model: User | None = self.session.get(
-            User,
-            email,
-            options=[
-                joinedload(User.patient),
-                joinedload(User.doctor),
-                joinedload(User.admin),
-            ],
-        )
+        model: User | None = self.session.get(User, email)
         if model is None:
             return None
         return self._to_domain(model)
@@ -172,13 +164,7 @@ class SQLAlchemyPatientRepository(IPatientRepository):
         self.user_repo = SQLAlchemyUserRepository(self.session)
 
     def get_by_email(self, email: str) -> Optional[PatientDomain]:
-        model: Patient | None = self.session.get(
-            Patient,
-            email,
-            options=[
-                joinedload(Patient.doctors),
-            ],
-        )
+        model: Patient | None = self.session.get(Patient, email)
         if model is None:
             return None
         return self.user_repo._to_domain(model)  # type: ignore[arg-type]
@@ -233,7 +219,6 @@ class SQLAlchemyDoctorRepository(IDoctorRepository):
         doctors: List[Doctor] = (
             self.session.query(Doctor)
             .filter(Doctor.email.in_(clean_emails))
-            .options(joinedload(Doctor.patients))
             .all()
         )
         missing = set(clean_emails) - {d.email for d in doctors}
