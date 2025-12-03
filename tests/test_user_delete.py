@@ -14,7 +14,7 @@ class TestUserDelete(BaseTest):
         )
 
         assert response.status_code == 204
-        assert User.query.get(patient_payload["email"]) is None
+        assert self.db.get(User, patient_payload["email"]) is None
 
     def test_delete_missing_user_returns_404(self):
         token = self.generate_token("ghost@example.com")
