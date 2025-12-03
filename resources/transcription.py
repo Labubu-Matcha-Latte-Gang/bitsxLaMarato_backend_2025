@@ -83,7 +83,7 @@ class TranscriptionChunkResource(MethodView):
                 transcript = client.audio.transcriptions.create(
                     model=deployment_name,
                     file=file_to_send,
-                    language="es" 
+                    language="ca" 
                 )
                 text_result = transcript.text
 
