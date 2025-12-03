@@ -439,18 +439,10 @@ class UserCRUD(MethodView):
         try:
             email = get_jwt_identity()
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
-
-            user = user_controller.get_user(email)
-
             self.logger.info("Deleting user", module="UserCRUD", metadata={"email": email})
 
-            role_instance = user.get_role_instance()
-            role_instance.remove_all_associations_between_user_roles()
-
-            db.session.delete(user)
-            db.session.commit()
+            user_service = ServiceFactory().build_user_service()
+            user_service.delete_user(email)
 
             return Response(status=204)
         except UserRoleConflictException as e:
