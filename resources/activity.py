@@ -141,18 +141,18 @@ class ActivityResource(MethodView):
     @blp.arguments(ActivityIdSchema, location='query')
     @blp.arguments(ActivityUpdateSchema, location='json')
     @blp.doc(
-        summary="Reemplacar una activitat",
+        summary="Reemplaçar una activitat",
         description="Actualitza tots els camps d'una activitat existent.",
     )
     @blp.response(200, schema=ActivityResponseSchema, description="Activitat actualitzada correctament.")
-    @blp.response(401, description="Falta o es invalid el JWT.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser administrador per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
-    @blp.response(422, description="El cos de la sollicitud no ha superat la validacio.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en actualitzar l'activitat.")
     def put(self, query_args: dict, data: dict):
         """
-        Reemplacar completament una activitat.
+        Reemplaçar completament una activitat.
 
         Cal passar l'ID per query string (?id=<uuid>) i tots els camps al cos.
         """
