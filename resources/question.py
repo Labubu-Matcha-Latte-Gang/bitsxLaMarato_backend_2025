@@ -13,7 +13,7 @@ from helpers.exceptions.question_exceptions import (
     QuestionNotFoundException,
     QuestionUpdateException,
 )
-from helpers.factories.controller_factories import AbstractControllerFactory
+from application.container import ServiceFactory
 from schemas import (
     QuestionBulkCreateSchema,
     QuestionIdSchema,
