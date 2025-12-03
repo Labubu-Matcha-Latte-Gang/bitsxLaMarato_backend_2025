@@ -584,9 +584,24 @@ class UserForgotPassword(MethodView):
                 self.logger.error("Failed to load reset password template", module="UserForgotPassword", error=e)
                 abort(500, message="No s'ha pogut carregar la plantilla del correu de restabliment.")
 
-            factory = AbstractForgotPasswordFactory.get_instance()
-            forgot_password_facade = factory.get_password_facade()
-            forgot_password_facade.process_forgot_password(data['email'], APPLICATION_EMAIL, "Sol·licitud de canvi de contrasenya", template)
+            factory = ServiceFactory()
+            reset_service = factory.build_password_reset_service(RESET_CODE_VALIDITY_MINUTES)
+            reset_code = reset_service.generate_reset_code(data["email"])
+
+            email_adapter = AbstractEmailAdapter.get_instance()
+            body = (
+                template.replace("{reset_code}", reset_code)
+                .replace("{reset_url}", RESET_PASSWORD_FRONTEND_PATH)
+                .replace("{support_email}", APPLICATION_EMAIL)
+                .replace("{code_validity}", str(RESET_CODE_VALIDITY_MINUTES))
+            )
+
+            email_adapter.send_email(
+                [data["email"]],
+                APPLICATION_EMAIL,
+                "Sol·licitud de canvi de contrasenya",
+                body,
+            )
 
             response_payload = {"message": "El mail ha estat enviat exitosament a l'usuari.", "validity": RESET_CODE_VALIDITY_MINUTES}
             return jsonify(response_payload), 200
