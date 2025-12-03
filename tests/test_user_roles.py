@@ -1,4 +1,5 @@
 from helpers.enums.gender import Gender
+from helpers.enums.user_role import UserRole
 from models.doctor import Doctor
 from models.patient import Patient
 from models.user import User
@@ -13,6 +14,7 @@ class TestUserRoles(BaseTest):
             password=User.hash_password(self.default_password),
             name="No",
             surname="Role",
+            role=UserRole.PATIENT,
         )
         self.db.add(user)
         self.db.commit()
@@ -28,6 +30,7 @@ class TestUserRoles(BaseTest):
             password=User.hash_password(self.default_password),
             name="Multi",
             surname="Role",
+            role=UserRole.DOCTOR,
         )
         patient = Patient(
             email=email,
@@ -37,9 +40,8 @@ class TestUserRoles(BaseTest):
             treatments=None,
             height_cm=175.0,
             weight_kg=70.0,
-            user=user,
         )
-        doctor = Doctor(email=email, user=user)
+        doctor = Doctor(email=email, name="Multi", surname="Role", password=user.password, role=UserRole.DOCTOR)
         self.db.add_all([user, patient, doctor])
         self.db.commit()
 
@@ -58,6 +60,7 @@ class TestUserRoles(BaseTest):
             password=User.hash_password(self.default_password),
             name="No",
             surname="Role",
+            role=UserRole.PATIENT,
         )
         self.db.add(user)
         self.db.commit()
@@ -77,6 +80,7 @@ class TestUserRoles(BaseTest):
             password=User.hash_password(self.default_password),
             name="Multi",
             surname="Role",
+            role=UserRole.DOCTOR,
         )
         patient = Patient(
             email=email,
@@ -86,9 +90,8 @@ class TestUserRoles(BaseTest):
             treatments=None,
             height_cm=165.0,
             weight_kg=60.0,
-            user=user,
         )
-        doctor = Doctor(email=email, user=user)
+        doctor = Doctor(email=email, name="Multi", surname="Role", password=user.password, role=UserRole.DOCTOR)
         self.db.add_all([user, patient, doctor])
         self.db.commit()
 
