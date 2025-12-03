@@ -3,7 +3,6 @@ from sqlalchemy.dialects.postgresql import UUID
 
 import bcrypt
 from db import db
-from models.activity import Activity
 
 class DoctorPatientAssociation(db.Model):
     __tablename__ = 'doctor_patient'
