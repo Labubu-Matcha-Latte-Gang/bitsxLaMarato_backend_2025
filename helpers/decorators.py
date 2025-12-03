@@ -24,6 +24,8 @@ def roles_required(roles: Sequence[UserRole]):
                 user = user_service.get_user(email)
             except UserNotFoundException:
                 abort(401, message="Token d'autenticació no vàlid.")
+            except Exception as exc:
+                abort(409, message=str(exc))
 
             role = user.role
             if role not in roles:
