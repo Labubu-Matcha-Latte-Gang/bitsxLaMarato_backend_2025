@@ -662,9 +662,9 @@ class UserForgotPassword(MethodView):
         try:
             self.logger.info("A user wants to reset their password", module="UserForgotPassword", metadata={"email": data['email']})
 
-            factory = AbstractForgotPasswordFactory.get_instance()
-            forgot_password_facade = factory.get_password_facade()
-            forgot_password_facade.reset_password(data['email'], data['reset_code'], data['new_password'])
+            factory = ServiceFactory()
+            reset_service = factory.build_password_reset_service(RESET_CODE_VALIDITY_MINUTES)
+            reset_service.reset_password(data["email"], data["reset_code"], data["new_password"])
 
             response_payload = {"message": "Contrasenya restablerta correctament."}
             return jsonify(response_payload), 200
