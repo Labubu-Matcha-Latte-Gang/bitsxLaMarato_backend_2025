@@ -208,6 +208,7 @@ __marimo__/
 
 migrations/*
 test_audio.mp3
+request.py
 
 
 mock
