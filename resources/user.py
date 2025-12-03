@@ -111,7 +111,7 @@ class PatientRegister(MethodView):
 @blp.route('/doctor')
 class DoctorRegister(MethodView):
     """
-    Endpoints for registering doctor accounts.
+    Endpoints per registrar comptes de metges.
     """
 
     logger = AbstractLogger.get_instance()
@@ -129,17 +129,17 @@ class DoctorRegister(MethodView):
     @blp.response(500, description="Error inesperat del servidor en crear el metge.")
     def post(self, data: dict) -> Response:
         """
-        Register a new doctor user.
+        Registra un nou usuari metge.
 
-        Expects JSON that matches `DoctorRegisterSchema`, creates the user and doctor profile, and links the
-        provided patients when present.
+        Rep un JSON que segueix `DoctorRegisterSchema`, crea l'usuari i el perfil de metge i
+        enllaça els pacients indicats si n'hi ha.
 
-        Status codes:
-        - 201: Doctor created; returns the created user payload.
-        - 400: Missing required fields or email already exists.
-        - 404: At least one patient email could not be found.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error during creation.
+        Codis d'estat:
+        - 201: Metge creat; retorna el payload de l'usuari creat.
+        - 400: Falta algun camp o el correu ja existeix.
+        - 404: No s'ha trobat algun correu de pacient proporcionat.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat durant la creació.
         """
         try:
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
