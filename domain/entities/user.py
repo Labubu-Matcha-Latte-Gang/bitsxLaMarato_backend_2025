@@ -115,6 +115,12 @@ class Patient(User):
     def remove_role_associations(self) -> None:
         self.doctor_emails.clear()
 
+    def get_daily_question_filters(self) -> dict:
+        return {}
+
+    def get_recommended_activity_filters(self) -> dict:
+        return {}
+
     def set_properties(self, data: dict, hasher: PasswordHasher) -> None:
         super().set_properties(data, hasher)
         if "ailments" in data:
