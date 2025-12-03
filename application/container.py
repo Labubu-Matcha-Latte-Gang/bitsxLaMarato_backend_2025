@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from db import db
 from application.services import (
     ActivityService,
@@ -19,6 +21,7 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
 )
+from sqlalchemy.orm import Session
 
 
 class ServiceFactory:
@@ -28,13 +31,18 @@ class ServiceFactory:
     """
     __instance: 'ServiceFactory' | None = None
 
-    def __init__(self, session=None):
-        self.session = session or db.session
+    def __init__(self, session: Optional[Session] = None):
+        self.session: Session = session or db.session
 
     @classmethod
-    def get_instance(cls, session=None, refresh: bool = False) -> 'ServiceFactory':
+    def get_instance(cls, session: Optional[Session] = None, refresh: bool = False) -> 'ServiceFactory':
         """
         Return the singleton instance. Optionally refresh or inject a session.
+        Args:
+            session (Optional[Session]): SQLAlchemy session to use.
+            refresh (bool): If True, forces creation of a new instance.
+        Returns:
+            ServiceFactory: The singleton instance.
         """
         if refresh or cls.__instance is None or (session is not None and cls.__instance.session is not session):
             cls.__instance = cls(session)
