@@ -22,8 +22,9 @@ from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
 )
 from helpers.enums.user_role import UserRole
-from helpers.factories.controller_factories import AbstractControllerFactory
-from helpers.factories.forgot_password import AbstractForgotPasswordFactory
+from application.container import ServiceFactory
+from helpers.forgot_password.forgot_password import AbstractForgotPasswordFacade
+from helpers.email_service.adapter import AbstractEmailAdapter
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
