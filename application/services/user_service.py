@@ -13,7 +13,6 @@ from domain.repositories import (
 from domain.services.security import PasswordHasher
 from domain.unit_of_work import IUnitOfWork
 from helpers.enums.gender import Gender
-from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     InvalidCredentialsException,
     RelatedUserNotFoundException,
