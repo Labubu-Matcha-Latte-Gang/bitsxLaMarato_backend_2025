@@ -177,7 +177,7 @@ class DoctorRegister(MethodView):
 @blp.route('/login')
 class UserLogin(MethodView):
     """
-    Authenticate users and issue JWT access tokens.
+    Autentica usuaris i emet tokens d'accés JWT.
     """
 
     logger = AbstractLogger.get_instance()
@@ -196,18 +196,18 @@ class UserLogin(MethodView):
     @blp.response(500, description="Error inesperat del servidor durant l'autenticació.")
     def post(self, data: dict) -> Response:
         """
-        Authenticate a user and issue a JWT.
+        Autentica un usuari i emet un JWT.
 
-        Expects JSON that matches `UserLoginSchema` with an email and password. On success, returns an
-        access token that can be used for authenticated endpoints.
+        Rep un JSON que segueix `UserLoginSchema` amb correu i contrasenya. Si és correcte,
+        retorna un token d'accés per usar als endpoints autenticats.
 
-        Status codes:
-        - 200: Valid credentials; returns the JWT access token.
-        - 400: Missing required login fields.
-        - 401: Invalid credentials.
-        - 409: User role state is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error during authentication.
+        Codis d'estat:
+        - 200: Credencials vàlides; retorna el token JWT.
+        - 400: Falta algun camp d'inici de sessió.
+        - 401: Credencials no vàlides.
+        - 409: Estat de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat durant l'autenticació.
         """
         try:
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
