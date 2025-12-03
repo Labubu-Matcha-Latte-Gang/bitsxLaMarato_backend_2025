@@ -4,7 +4,6 @@ import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
-from domain.entities.user import User
 from domain.repositories import IResetCodeRepository, IUserRepository
 from domain.services.security import PasswordHasher
 from domain.unit_of_work import IUnitOfWork
