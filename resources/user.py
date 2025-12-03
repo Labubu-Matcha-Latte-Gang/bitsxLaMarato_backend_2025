@@ -237,7 +237,7 @@ class UserLogin(MethodView):
 @blp.route('')
 class UserCRUD(MethodView):
     """
-    Authenticated CRUD operations for the current user.
+    Operacions CRUD autenticades per a l'usuari actual.
     """
 
     logger = AbstractLogger.get_instance()
@@ -254,16 +254,16 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en obtenir l'usuari.")
     def get(self):
         """
-        Retrieve the authenticated user's profile.
+        Recupera el perfil de l'usuari autenticat.
 
-        Returns the base user data plus role-specific information for the current identity.
+        Retorna les dades bàsiques i la informació específica del rol de la identitat actual.
 
-        Status codes:
-        - 200: User found and returned.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 500: Unexpected error while fetching the user.
+        Codis d'estat:
+        - 200: Usuari trobat i retornat.
+        - 401: Falta o és invàlid el token.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 500: Error inesperat en recuperar l'usuari.
         """
         try:
             self.logger.info("Fetching user information", module="UserCRUD")
@@ -298,18 +298,18 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en actualitzar l'usuari.")
     def put(self, data: dict):
         """
-        Fully replace the authenticated user's profile.
+        Substitueix completament el perfil de l'usuari autenticat.
 
-        Expects JSON that matches `UserUpdateSchema`. Updates personal data, password when provided, and
-        replaces doctor/patient associations for the role with the provided values.
+        Rep un JSON que segueix `UserUpdateSchema`. Actualitza les dades personals, la contrasenya si s'envia
+        i reemplaça les associacions metge/pacient amb les llistes indicades.
 
-        Status codes:
-        - 200: User updated and returned.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist or related user not found.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error while updating the user.
+        Codis d'estat:
+        - 200: Usuari actualitzat i retornat.
+        - 401: Falta o és invàlid el token.
+        - 404: Usuari o relacionats no trobats.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat en l'actualització.
         """
         email: str | None = None
         try:
@@ -361,19 +361,19 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en actualitzar parcialment l'usuari.")
     def patch(self, data: dict):
         """
-        Partially update the authenticated user's profile.
+        Actualitza parcialment el perfil de l'usuari autenticat.
 
-        Accepts any subset of fields from `UserPartialUpdateSchema`. Updates personal data and password when
-        provided. For patients/doctors, if association lists are provided, replaces them with the supplied
-        values.
+        Accepta qualsevol subconjunt de camps de `UserPartialUpdateSchema`. Actualitza dades personals i
+        contrasenya si s'indica. Per a pacients/metges, si s'envien llistes d'associacions, les reemplaça
+        amb els valors proporcionats.
 
-        Status codes:
-        - 200: User updated and returned.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist or related user not found.
-        - 409: User role configuration is inconsistent.
-        - 422: Payload failed schema validation.
-        - 500: Unexpected error while updating the user.
+        Codis d'estat:
+        - 200: Usuari actualitzat i retornat.
+        - 401: Falta o és invàlid el token.
+        - 404: Usuari o relacionats no trobats.
+        - 409: Configuració de rol inconsistent.
+        - 422: El payload no supera la validació d'esquema.
+        - 500: Error inesperat en l'actualització.
         """
         email: str | None = None
         try:
@@ -423,16 +423,16 @@ class UserCRUD(MethodView):
     @blp.response(500, description="Error inesperat del servidor en eliminar l'usuari.")
     def delete(self):
         """
-        Delete the authenticated user's account.
+        Elimina el compte de l'usuari autenticat.
 
-        Removes any role associations, deletes the user record, and returns an empty 204 response.
+        Esborra les associacions de rol, elimina el registre d'usuari i retorna una resposta 204 buida.
 
-        Status codes:
-        - 204: User deleted.
-        - 401: Missing or invalid authentication token.
-        - 404: User does not exist.
-        - 409: User role configuration is inconsistent.
-        - 500: Unexpected error while deleting the user.
+        Codis d'estat:
+        - 204: Usuari eliminat.
+        - 401: Falta o és invàlid el token.
+        - 404: L'usuari no existeix.
+        - 409: Configuració de rol inconsistent.
+        - 500: Error inesperat en eliminar l'usuari.
         """
         email: str | None = None
         try:
