@@ -263,12 +263,8 @@ class ActivityResource(MethodView):
                 metadata={"activity_id": str(activity_id)},
             )
 
-            factory = AbstractControllerFactory.get_instance()
-            activity_controller = factory.get_activity_controller()
-
-            activity = activity_controller.get_activity(activity_id)
-            db.session.delete(activity)
-            db.session.commit()
+            activity_service = ServiceFactory().build_activity_service()
+            activity_service.delete_activity(activity_id)
 
             return Response(status=204)
         except ActivityNotFoundException as e:
