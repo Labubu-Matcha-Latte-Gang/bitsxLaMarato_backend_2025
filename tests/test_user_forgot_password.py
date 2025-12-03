@@ -6,8 +6,6 @@ import pytest
 
 from globals import RESET_CODE_VALIDITY_MINUTES
 from helpers.email_service.adapter import AbstractEmailAdapter
-from helpers.factories.forgot_password import AbstractForgotPasswordFactory
-from helpers.forgot_password.forgot_password import AbstractForgotPasswordFacade
 from models.associations import UserCodeAssociation
 from tests.base_test import BaseTest
 
@@ -36,18 +34,11 @@ class TestUserForgotPassword(BaseTest):
     @pytest.fixture(autouse=True)
     def _setup_forgot_password_facade(self):
         # Reset singletons and inject in-memory email adapter to avoid external calls
-        AbstractForgotPasswordFacade._AbstractForgotPasswordFacade__instance = None
-        AbstractForgotPasswordFactory._AbstractForgotPasswordFactory__instance = None
         AbstractEmailAdapter._AbstractEmailAdapter__instance = None
 
         self.email_adapter = InMemoryEmailAdapter()
-        AbstractForgotPasswordFactory.get_instance().get_password_facade(
-            email_service=self.email_adapter,
-            refresh=True,
-        )
+        AbstractEmailAdapter._AbstractEmailAdapter__instance = self.email_adapter
         yield
-        AbstractForgotPasswordFacade._AbstractForgotPasswordFacade__instance = None
-        AbstractForgotPasswordFactory._AbstractForgotPasswordFactory__instance = None
         AbstractEmailAdapter._AbstractEmailAdapter__instance = None
 
     def _request_forgot_password(self, email: str):
