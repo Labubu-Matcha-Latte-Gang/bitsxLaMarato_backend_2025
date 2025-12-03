@@ -146,37 +146,10 @@ class DoctorRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            factory = AbstractControllerFactory.get_instance()
-            user_controller = factory.get_user_controller()
+            user_service = ServiceFactory().build_user_service()
+            doctor = user_service.register_doctor(data)
 
-            user_payload = {
-                "email": data['email'],
-                "password": data['password'],
-                "name": data['name'],
-                "surname": data['surname'],
-            }
-            user = user_controller.create_user(user_payload)
-
-            patient_controller = factory.get_patient_controller()
-
-            patient_emails:list[str] = data.get('patients', []) or []
-            patients = patient_controller.fetch_patients_by_email(patient_emails)
-
-            doctor_controller = factory.get_doctor_controller()
-
-            doctor_payload = {
-                "email": data['email'],
-                "user": user
-            }
-            doctor = doctor_controller.create_doctor(doctor_payload)
-
-            db.session.add(user)
-            db.session.add(doctor)
-            db.session.flush()
-            doctor.add_patients(patients)
-            db.session.commit()
-
-            return jsonify(user.to_dict()), 201
+            return jsonify(doctor.to_dict()), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to missing field", module="DoctorRegister", error=e)
