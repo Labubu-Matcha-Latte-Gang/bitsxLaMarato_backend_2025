@@ -234,6 +234,7 @@ class GraphFileSchema(Schema):
         required=True,
         metadata={
             "description": "Fragment HTML (div + script Plotly) codificat en base64, pensat per injectar-se en un iframe via `srcdoc` o en un contenidor que executi scripts.",
+            "description": "Fragment HTML (div + script Plotly) codificat en base64; en Flutter es pot decodificar i passar a una WebView (p. ex. `controller.loadHtmlString(fragment)`).",
             "example": "PGRpdiBpZD0icGxvdF9leGFtcGxlIj48L2Rpdj48c2NyaXB0Pi8qIHBsb3QgKi88L3NjcmlwdD4=",
         },
     )
