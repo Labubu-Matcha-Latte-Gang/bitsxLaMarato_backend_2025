@@ -548,7 +548,6 @@ class PatientData(MethodView):
             patient_service = factory.build_patient_service()
             patient = patient_service.get_patient(patient_email)
 
-            # The user_service now returns a dictionary rather than a domain object
             patient_payload = user_service.get_patient_data(current_user, patient)
             return jsonify(patient_payload), 200
         except UserRoleConflictException as e:
