@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Iterable, List, Optional
 import uuid
 
+from domain.entities.score import Score
 from domain.entities.user import User, Patient, Doctor, Admin
 from domain.entities.question import Question
 from domain.entities.activity import Activity
@@ -345,5 +346,28 @@ class IResetCodeRepository(ABC):
 
         Args:
             email (str): Target user email.
+        """
+        raise NotImplementedError()
+
+class IScoreRepository(ABC):
+    @abstractmethod
+    def add(self, score: Score) -> None:
+        """
+        Persist a new score.
+
+        Args:
+            score (Score): Score entity to add.
+        """
+        raise NotImplementedError()
+    
+    @abstractmethod
+    def list_by_patient(self, patient_email: str) -> List[Score]:
+        """
+        List scores for a given patient.
+
+        Args:
+            patient_email (str): Email of the patient.
+        Returns:
+            List[Score]: List of scores for the patient.
         """
         raise NotImplementedError()
