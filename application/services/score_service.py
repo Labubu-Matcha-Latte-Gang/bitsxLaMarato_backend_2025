@@ -7,8 +7,6 @@ from domain.entities.score import Score
 from domain.entities.user import Patient
 from domain.repositories import IActivityRepository, IScoreRepository
 from domain.unit_of_work import IUnitOfWork
-from helpers.exceptions.activity_exceptions import ActivityNotFoundException
-
 
 class ScoreService:
     """
