@@ -56,7 +56,7 @@ class QuestionAnsweredAssociation(db.Model):
         db.CheckConstraint(
             'answered_at <= CURRENT_TIMESTAMP',
             name='check_answered_at_not_future',
-        )
+        ),
     )
 
     patient_email = db.Column(db.String(120), db.ForeignKey('patients.email', onupdate='CASCADE'), primary_key=True)
