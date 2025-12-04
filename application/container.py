@@ -15,6 +15,7 @@ from application.services import (
     UserService,
 )
 from domain.services.security import PasswordHasher
+from helpers.factories.adapter_factories import AbstractAdapterFactory
 from infrastructure.sqlalchemy import (
     SQLAlchemyActivityRepository,
     SQLAlchemyAdminRepository,
@@ -27,7 +28,6 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
 )
-from helpers.plotly_adapter import SimplePlotlyAdapter
 from sqlalchemy.orm import Session
 
 
@@ -91,7 +91,7 @@ class ServiceFactory:
         # Additional repositories used directly by UserService
         score_repo = SQLAlchemyScoreRepository(self.session)
         question_answer_repo = SQLAlchemyQuestionAnswerRepository(self.session)
-        plotly_adapter = SimplePlotlyAdapter()
+        adapter_factory = AbstractAdapterFactory.get_instance()
 
         return UserService(
             user_repo=user_repo,
@@ -103,7 +103,7 @@ class ServiceFactory:
             token_service=token_service,
             score_repo=score_repo,
             question_answer_repo=question_answer_repo,
-            plotly_adapter=plotly_adapter,
+            adapter_factory=adapter_factory,
         )
 
     def build_question_service(self) -> QuestionService:
