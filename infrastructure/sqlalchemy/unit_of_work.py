@@ -73,6 +73,7 @@ def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
         "check_score_range": "La puntuació ha d'estar entre 0 i 10.",
         "non_negative_seconds_to_finish": "El temps per completar l'activitat ha de ser positiu.",
         "check_completed_at_not_future": "La data de completat no pot ser futura.",
+        "check_answered_at_not_future": "La data de resposta no pot ser futura.",
     }
 
     raw_message = str(getattr(exc, "orig", exc))
