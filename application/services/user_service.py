@@ -19,7 +19,7 @@ from application.services.doctor_service import DoctorService
 from application.services.patient_service import PatientService
 from application.services.token_service import TokenService
 from typing import Dict
-from helpers.plotly_adapter import AbstractPlotlyAdapter
+from helpers.factories.adapter_factories import AbstractAdapterFactory
 
 
 class UserService:
@@ -39,7 +39,7 @@ class UserService:
         token_service: TokenService,
         score_repo: IScoreRepository,
         question_answer_repo: IQuestionAnswerRepository,
-        plotly_adapter: AbstractPlotlyAdapter,
+        adapter_factory: AbstractAdapterFactory,
     ):
         self.user_repo = user_repo
         self.patient_service = patient_service
@@ -50,7 +50,7 @@ class UserService:
         self.token_service = token_service
         self.score_repo = score_repo
         self.question_answer_repo = question_answer_repo
-        self.plotly_adapter = plotly_adapter
+        self.adapter_factory = adapter_factory
 
     def register_patient(self, data: dict) -> Patient:
         return self.patient_service.register_patient(data)
@@ -100,7 +100,7 @@ class UserService:
         """
         Assemble a comprehensive payload for the given patient including basic
         demographics, activity scores, answered questions and graph
-        definitions for Plotly.  The caller must supply a user (requester)
+        definitions.  The caller must supply a user (requester)
         authorized to view the patient.
 
         Args:
@@ -114,7 +114,7 @@ class UserService:
                   ``Patient.to_dict()``.
                 - ``scores``: list of score objects with activity metadata.
                 - ``questions``: list of answered questions with analysis metrics.
-                - ``graphs``: a mapping of Plotly-compatible chart definitions.
+                - ``graphs``: a mapping of chart definitions.
 
         Raises:
             PermissionError: If the requester is not authorized to view the
@@ -157,9 +157,10 @@ class UserService:
 
         # Build graph definitions using the adapter
         graphs: Dict[str, dict] = {}
+        graphic_adapter = self.adapter_factory.get_graphic_adapter()
         try:
-            graphs.update(self.plotly_adapter.create_score_graphs(score_objects))
-            graphs.update(self.plotly_adapter.create_question_graphs(answered))
+            graphs.update(graphic_adapter.create_score_graphs(score_objects))
+            graphs.update(graphic_adapter.create_question_graphs(answered))
         except Exception:
             # Graph generation is optional; if it fails, leave graphs empty
             graphs = {}
