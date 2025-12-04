@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+from uuid import uuid4
 
 from helpers.enums.question_types import QuestionType
 from tests.base_test import BaseTest
@@ -9,7 +9,7 @@ from tests.base_test import BaseTest
 class TestQuestionResource(BaseTest):
     def _make_question_payload(self, **overrides) -> dict:
         return {
-            "text": overrides.get("text", f"Pregunta de prova {uuid.uuid4().hex[:8]}"),
+            "text": overrides.get("text", f"Pregunta de prova {uuid4().hex[:8]}"),
             "question_type": overrides.get("question_type", QuestionType.CONCENTRATION.value),
             "difficulty": overrides.get("difficulty", 2.5),
         }
@@ -22,7 +22,7 @@ class TestQuestionResource(BaseTest):
         token = token or self.get_admin_token()
         payload = {
             "questions": [
-                self._make_question_payload(text=f"Pregunta {i} {uuid.uuid4().hex[:8]}") for i in range(count)
+                self._make_question_payload(text=f"Pregunta {i} {uuid4().hex[:8]}") for i in range(count)
             ]
         }
         return self.client.post(
@@ -88,7 +88,7 @@ class TestQuestionResource(BaseTest):
         question = create_resp.get_json()[0]
 
         update_payload = self._make_question_payload(
-            text=f"Pregunta actualitzada {uuid.uuid4().hex[:8]}",
+            text=f"Pregunta actualitzada {uuid4().hex[:8]}",
             difficulty=3.0,
         )
         put_resp = self.client.put(
@@ -107,7 +107,7 @@ class TestQuestionResource(BaseTest):
         create_resp = self._create_questions(count=1, token=token)
         question = create_resp.get_json()[0]
 
-        new_text = f"Nou text {uuid.uuid4().hex[:8]}"
+        new_text = f"Nou text {uuid4().hex[:8]}"
         patch_resp = self.client.patch(
             f"{self.api_prefix}/question",
             headers=self.auth_headers(token),
@@ -164,7 +164,7 @@ class TestQuestionResource(BaseTest):
 
     def test_create_duplicate_text_returns_422_with_message(self):
         token = self.get_admin_token()
-        unique_text = f"Enunciat únic {uuid.uuid4().hex[:8]}"
+        unique_text = f"Enunciat únic {uuid4().hex[:8]}"
         payload = {"questions": [self._make_question_payload(text=unique_text)]}
         first = self.client.post(
             f"{self.api_prefix}/question",
