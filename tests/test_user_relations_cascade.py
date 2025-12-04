@@ -8,6 +8,7 @@ from models.associations import DoctorPatientAssociation, QuestionAnsweredAssoci
 from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
+from models.score import Score
 from tests.base_test import BaseTest
 
 
@@ -30,8 +31,27 @@ class TestUserRelationsCascade(BaseTest):
         assert resp.status_code == 201
         return resp.get_json()[0]["id"]
 
+    def _create_activity(self, admin_token: str) -> str:
+        payload = {
+            "activities": [
+                {
+                    "title": f"Activitat cascada {uuid.uuid4().hex[:8]}",
+                    "description": "Descripcio de prova",
+                    "activity_type": QuestionType.CONCENTRATION.value,
+                    "difficulty": 2.0,
+                }
+            ]
+        }
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(admin_token),
+            json=payload,
+        )
+        assert resp.status_code == 201
+        return resp.get_json()[0]["id"]
+
     def test_delete_patient_clears_doctors_and_answers(self):
-        # Arrange: doctor, patient linked to doctor, answered question
+        # Arrange: doctor, patient linked to doctor, answered question, and completed activity with score
         doctor_payload = self.make_doctor_payload()
         doctor_resp = self.register_doctor(doctor_payload)
         assert doctor_resp.status_code == 201
@@ -46,6 +66,7 @@ class TestUserRelationsCascade(BaseTest):
         admin = self.create_admin()
         admin_token = self.login_and_get_token(admin.email, self.default_password)
         question_id = self._create_question(admin_token)
+        activity_id = self._create_activity(admin_token)
 
         patient_model = self.db.get(Patient, patient_payload["email"])
         question_model = self.db.get(Question, uuid.UUID(question_id))
@@ -53,7 +74,29 @@ class TestUserRelationsCascade(BaseTest):
         patient_model.add_answered_questions({question_model}, answered_at=datetime.now(timezone.utc))
         self.db.flush()
 
-        # Act: delete patient (should cascade associations/answers)
+        # Complete activity to create a Score
+        complete_resp = self.client.post(
+            f"{self.api_prefix}/activity/complete",
+            headers=self.auth_headers(patient_token),
+            json={
+                "id": activity_id,
+                "score": 8.0,
+                "seconds_to_finish": 20.0,
+            },
+        )
+        assert complete_resp.status_code == 200
+
+        # Verify Score exists before deletion
+        activity_uuid = uuid.UUID(activity_id)
+        pre_delete_score_count = (
+            self.db.query(Score)
+            .filter(Score.patient_email == patient_payload["email"])
+            .filter(Score.activity_id == activity_uuid)
+            .count()
+        )
+        assert pre_delete_score_count == 1
+
+        # Act: delete patient (should cascade associations/answers/scores)
         delete_resp = self.client.delete(
             f"{self.api_prefix}/user",
             headers=self.auth_headers(patient_token),
@@ -73,6 +116,13 @@ class TestUserRelationsCascade(BaseTest):
         assert (
             self.db.query(QuestionAnsweredAssociation)
             .filter(QuestionAnsweredAssociation.patient_email == patient_payload["email"])
+            .count()
+            == 0
+        )
+        # Verify Score is also deleted
+        assert (
+            self.db.query(Score)
+            .filter(Score.patient_email == patient_payload["email"])
             .count()
             == 0
         )
