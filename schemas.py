@@ -96,6 +96,193 @@ class UserResponseSchema(Schema):
     )
 
 
+class ScoreSummarySchema(Schema):
+    """
+    Resum de puntuacions d'activitats d'un pacient.
+    """
+
+    class Meta:
+        description = "Puntuacions realitzades pel pacient amb informació de l'activitat."
+        example = {
+            "activity_id": "6f37f5b4-1c2d-4f3e-9a0b-123456789abc",
+            "activity_title": "Memòria curta",
+            "activity_type": "memory",
+            "completed_at": "2024-01-15T10:30:00",
+            "score": 8.5,
+            "seconds_to_finish": 120.0,
+        }
+
+    activity_id = fields.String(
+        required=True,
+        metadata={
+            "description": "Identificador de l'activitat.",
+            "example": "6f37f5b4-1c2d-4f3e-9a0b-123456789abc",
+        },
+    )
+    activity_title = fields.String(
+        required=True,
+        metadata={
+            "description": "Títol de l'activitat realitzada.",
+            "example": "Memòria curta",
+        },
+    )
+    activity_type = fields.String(
+        required=False,
+        allow_none=True,
+        metadata={
+            "description": "Tipus d'activitat (valor enum) o null si no hi ha tipus.",
+            "example": "memory",
+        },
+    )
+    completed_at = fields.String(
+        required=True,
+        metadata={
+            "description": "Data de finalització en format ISO 8601.",
+            "example": "2024-01-15T10:30:00",
+        },
+    )
+    score = fields.Float(
+        required=True,
+        metadata={
+            "description": "Puntuació obtinguda.",
+            "example": 8.5,
+        },
+    )
+    seconds_to_finish = fields.Float(
+        required=True,
+        metadata={
+            "description": "Segons necessaris per completar l'activitat.",
+            "example": 120.0,
+        },
+    )
+
+
+class QuestionAnswerWithAnalysisSchema(Schema):
+    """
+    Pregunta contestada amb metadades d'anàlisi.
+    """
+
+    class Meta:
+        description = "Resposta a preguntes amb mètriques analitzades sobre el text."
+        example = {
+            "question": {
+                "id": "7e9c5a2c-1234-4b1f-9a77-111122223333",
+                "text": "Quants dies té una setmana?",
+                "question_type": "concentration",
+                "difficulty": 1.0,
+            },
+            "answered_at": "2024-01-20T09:15:00",
+            "analysis": {
+                "pronoun_noun_ratio": 0.4,
+                "idea_density": 0.6,
+            },
+        }
+
+    question = fields.Nested(
+        "QuestionResponseSchema",
+        required=True,
+        metadata={
+            "description": "Pregunta contestada amb les seves dades bàsiques.",
+        },
+    )
+    answered_at = fields.String(
+        required=True,
+        metadata={
+            "description": "Data en què es va contestar la pregunta.",
+            "example": "2024-01-20T09:15:00",
+        },
+    )
+    analysis = fields.Dict(
+        keys=fields.String(),
+        values=fields.Float(),
+        required=True,
+        metadata={
+            "description": "Mètriques derivades del text (coherència, densitat lèxica, etc.).",
+            "example": {"pronoun_noun_ratio": 0.4, "idea_density": 0.6},
+        },
+    )
+
+
+class GraphFileSchema(Schema):
+    """
+    Fitxer de gràfic generat per al pacient.
+    """
+
+    class Meta:
+        description = "Fitxers HTML dels gràfics codificats en base64."
+        example = {
+            "filename": "scores_memory.html",
+            "content_type": "text/html",
+            "content": "PGh0bWw+PC9odG1sPg==",
+        }
+
+    filename = fields.String(
+        required=True,
+        metadata={
+            "description": "Nom del fitxer generat.",
+            "example": "scores_memory.html",
+        },
+    )
+    content_type = fields.String(
+        required=True,
+        metadata={
+            "description": "Tipus MIME del fitxer.",
+            "example": "text/html",
+        },
+    )
+    content = fields.String(
+        required=True,
+        metadata={
+            "description": "Contingut del fitxer en base64.",
+            "example": "PGh0bWw+PC9odG1sPg==",
+        },
+    )
+
+
+class PatientDataResponseSchema(Schema):
+    """
+    Resposta completa amb dades del pacient, puntuacions, preguntes i gràfics.
+    """
+
+    class Meta:
+        description = "Dades enriquides del pacient amb les puntuacions, preguntes i fitxers de gràfics."
+        example = {
+            "patient": UserResponseSchema.Meta.example,
+            "scores": [ScoreSummarySchema.Meta.example],
+            "questions": [QuestionAnswerWithAnalysisSchema.Meta.example],
+            "graph_files": [GraphFileSchema.Meta.example],
+        }
+
+    patient = fields.Nested(
+        UserResponseSchema,
+        required=True,
+        metadata={
+            "description": "Informació bàsica del pacient amb el seu rol.",
+        },
+    )
+    scores = fields.List(
+        fields.Nested(ScoreSummarySchema),
+        required=True,
+        metadata={
+            "description": "Puntuacions d'activitats del pacient (pot ser una llista buida).",
+        },
+    )
+    questions = fields.List(
+        fields.Nested(QuestionAnswerWithAnalysisSchema),
+        required=True,
+        metadata={
+            "description": "Preguntes contestades amb mètriques d'anàlisi (pot ser buit).",
+        },
+    )
+    graph_files = fields.List(
+        fields.Nested(GraphFileSchema),
+        required=True,
+        metadata={
+            "description": "Fitxers HTML dels gràfics en base64 (pot ser buit).",
+        },
+    )
+
+
 class UserUpdateSchema(Schema):
     """
     Esquema per a actualitzacions completes de l'usuari (PUT).
