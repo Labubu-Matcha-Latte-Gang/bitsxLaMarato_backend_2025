@@ -371,6 +371,7 @@ class ActivityCompleteResource(MethodView):
     @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
     @blp.response(404, description="No s'ha trobat l'activitat indicada.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en marcar l'activitat com a completada.")
     def post(self, data: dict):
         """
