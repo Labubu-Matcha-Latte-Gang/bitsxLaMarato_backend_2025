@@ -1184,3 +1184,40 @@ class ActivityIdSchema(Schema):
             "example": "8f0d1a2b-5678-4cde-9abc-444455556666",
         },
     )
+
+class ActivityCompleteSchema(Schema):
+    """
+    Esquema per marcar una activitat com a completada.
+    """
+
+    class Meta:
+        description = "Paràmetres per indicar l'activitat completada i les dades associades."
+        example = {
+            "activity_id": "8f0d1a2b-5678-4cde-9abc-444455556666",
+            "score": 8.5,
+            "seconds_to_finish": 120.3,
+        }
+
+    id = fields.UUID(
+        required=True,
+        metadata={
+            "description": "Identificador de l'activitat que s'ha completat.",
+            "example": "8f0d1a2b-5678-4cde-9abc-444455556666",
+        },
+    )
+
+    score = fields.Float(
+        required=True,
+        metadata={
+            "description": "Puntuació obtinguda en completar l'activitat.",
+            "example": 8.5,
+        },
+    )
+
+    seconds_to_finish = fields.Float(
+        required=True,
+        metadata={
+            "description": "Temps en segons que ha trigat l'usuari a completar l'activitat.",
+            "example": 120.3,
+        },
+    )
