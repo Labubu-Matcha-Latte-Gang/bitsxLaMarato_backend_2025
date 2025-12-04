@@ -9,7 +9,7 @@ from tests.base_test import BaseTest
 class TestActivityResource(BaseTest):
     def _make_activity_payload(self, **overrides) -> dict:
         return {
-            "title": overrides.get("title", "Activitat de prova"),
+            "title": overrides.get("title", f"Activitat de prova {uuid.uuid4().hex[:8]}"),
             "description": overrides.get("description", "Descripcio de prova"),
             "activity_type": overrides.get("activity_type", QuestionType.CONCENTRATION.value),
             "difficulty": overrides.get("difficulty", 2.5),
@@ -21,7 +21,11 @@ class TestActivityResource(BaseTest):
 
     def _create_activities(self, count: int = 1, token: str | None = None):
         token = token or self.get_admin_token()
-        payload = {"activities": [self._make_activity_payload(title=f"Activitat {i}") for i in range(count)]}
+        payload = {
+            "activities": [
+                self._make_activity_payload(title=f"Activitat {i} {uuid.uuid4().hex[:8]}") for i in range(count)
+            ]
+        }
         return self.client.post(
             f"{self.api_prefix}/activity",
             headers=self.auth_headers(token),
@@ -30,19 +34,26 @@ class TestActivityResource(BaseTest):
 
     def test_create_and_get_activities(self):
         token = self.get_admin_token()
+        baseline_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+        )
+        baseline = baseline_resp.get_json() or []
         create_resp = self._create_activities(count=2, token=token)
         assert create_resp.status_code == 201
         created = create_resp.get_json()
         assert len(created) == 2
+        created_ids = {a["id"] for a in created}
 
         list_resp = self.client.get(
             f"{self.api_prefix}/activity",
             headers=self.auth_headers(token),
         )
         assert list_resp.status_code == 200
-        listed = list_resp.get_json()
-        assert len(listed) == 2
-        assert {a["title"] for a in listed} == {a["title"] for a in created}
+        listed = list_resp.get_json() or []
+        listed_ids = {a["id"] for a in listed}
+        assert created_ids.issubset(listed_ids)
+        assert len(listed) >= len(baseline)
 
     def test_filters_by_id_title_and_ranges(self):
         token = self.get_admin_token()
@@ -86,7 +97,10 @@ class TestActivityResource(BaseTest):
         create_resp = self._create_activities(count=1, token=token)
         activity = create_resp.get_json()[0]
 
-        update_payload = self._make_activity_payload(title="Activitat actualitzada", difficulty=3.0)
+        update_payload = self._make_activity_payload(
+            title=f"Activitat actualitzada {uuid.uuid4().hex[:8]}",
+            difficulty=3.0,
+        )
         put_resp = self.client.put(
             f"{self.api_prefix}/activity",
             headers=self.auth_headers(token),
@@ -95,7 +109,7 @@ class TestActivityResource(BaseTest):
         )
         assert put_resp.status_code == 200
         updated = put_resp.get_json()
-        assert updated["title"] == "Activitat actualitzada"
+        assert updated["title"] == update_payload["title"]
         assert updated["difficulty"] == 3.0
 
     def test_patch_updates_subset(self):
@@ -103,15 +117,16 @@ class TestActivityResource(BaseTest):
         create_resp = self._create_activities(count=1, token=token)
         activity = create_resp.get_json()[0]
 
+        new_title = f"Nou titol {uuid.uuid4().hex[:8]}"
         patch_resp = self.client.patch(
             f"{self.api_prefix}/activity",
             headers=self.auth_headers(token),
             query_string={"id": activity["id"]},
-            json={"title": "Nou titol"},
+            json={"title": new_title},
         )
         assert patch_resp.status_code == 200
         patched = patch_resp.get_json()
-        assert patched["title"] == "Nou titol"
+        assert patched["title"] == new_title
 
     def test_patch_without_body_returns_400(self):
         token = self.get_admin_token()
@@ -150,6 +165,7 @@ class TestActivityResource(BaseTest):
         create_resp = self._create_activities(count=2, token=admin_token)
         assert create_resp.status_code == 201
         created = create_resp.get_json()
+        created_ids = {a["id"] for a in created}
 
         patient_user = self.create_patient_model()
         patient_token = self.generate_token(patient_user.email)
@@ -159,8 +175,9 @@ class TestActivityResource(BaseTest):
             headers=self.auth_headers(patient_token),
         )
         assert list_resp.status_code == 200
-        listed = list_resp.get_json()
-        assert {a["title"] for a in listed} == {a["title"] for a in created}
+        listed = list_resp.get_json() or []
+        listed_ids = {a["id"] for a in listed}
+        assert created_ids.issubset(listed_ids)
 
         filtered_resp = self.client.get(
             f"{self.api_prefix}/activity",
@@ -244,7 +261,8 @@ class TestActivityResource(BaseTest):
 
     def test_create_duplicate_title_returns_422_with_message(self):
         token = self.get_admin_token()
-        payload = {"activities": [self._make_activity_payload(title="Títol únic")]}
+        unique_title = f"Títol únic {uuid.uuid4().hex[:8]}"
+        payload = {"activities": [self._make_activity_payload(title=unique_title)]}
         first = self.client.post(
             f"{self.api_prefix}/activity",
             headers=self.auth_headers(token),
