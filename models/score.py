@@ -19,7 +19,7 @@ class Score(db.Model):
         ),
     )
 
-    patient_email = db.Column(db.String(120), db.ForeignKey('patients.email', onupdate='CASCADE'), primary_key=True)
+    patient_email = db.Column(db.String(120), db.ForeignKey('patients.email', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
     activity_id = db.Column(
         UUID(as_uuid=True),
         db.ForeignKey('activities.id', onupdate='CASCADE', ondelete='CASCADE'),
