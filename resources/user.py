@@ -39,7 +39,8 @@ from schemas import (
     UserResponseSchema,
     UserUpdateSchema,
     UserPartialUpdateSchema,
-    UserForgotPasswordSchema
+    UserForgotPasswordSchema,
+    PatientDataResponseSchema,
 )
 
 blp = Blueprint('user', __name__, description="Operacions relacionades amb els usuaris")
@@ -502,9 +503,13 @@ class PatientData(MethodView):
     @blp.arguments(PatientEmailPathSchema, location="path")
     @blp.doc(
         summary="Obtenir un pacient pel correu",
-        description="Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; els pacients poden obtenir el seu propi registre.",
+        description=(
+            "Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; "
+            "els pacients poden obtenir el seu propi registre. La resposta inclou les dades del pacient, "
+            "les puntuacions, les preguntes contestades i els gràfics generats com a fitxers HTML codificats en base64."
+        ),
     )
-    @blp.response(200, schema=UserResponseSchema, description="Informació del pacient recuperada correctament.")
+    @blp.response(200, schema=PatientDataResponseSchema, description="Dades del pacient i gràfics generats correctament.")
     @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="L'usuari autenticat no pot veure aquest pacient.")
     @blp.response(404, description="Pacient no trobat.")
@@ -515,7 +520,13 @@ class PatientData(MethodView):
         Recupera informació d'un pacient pel correu amb autorització per rol.
 
         Cal un JWT vàlid. Els administradors poden veure qualsevol pacient. Els metges poden veure
-        pacients als quals estan assignats. Els pacients poden veure el seu propi registre.
+        pacients als quals estan assignats. Els pacients poden veure el seu propi registre. La
+        resposta inclou:
+        - `patient`: dades bàsiques i de rol del pacient.
+        - `scores`: llista de puntuacions d'activitats.
+        - `questions`: preguntes contestades amb mètriques d'anàlisi.
+        - `graph_files`: fitxers HTML dels gràfics codificats en base64. Els fitxers es creen a la
+          carpeta `tmp/` per a la resposta i s'esborren tot seguit.
 
         Codis d'estat:
         - 200: Informació del pacient retornada.
