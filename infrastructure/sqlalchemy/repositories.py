@@ -8,6 +8,7 @@ from db import db
 from sqlalchemy.orm import Session
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
+from domain.entities.score import Score as ScoreDomain
 from domain.entities.user import Admin as AdminDomain
 from domain.entities.user import Doctor as DoctorDomain
 from domain.entities.user import Patient as PatientDomain
@@ -19,6 +20,7 @@ from domain.repositories import (
     IPatientRepository,
     IQuestionRepository,
     IResetCodeRepository,
+    IScoreRepository,
     IUserRepository,
 )
 from helpers.enums.user_role import UserRole
@@ -35,6 +37,7 @@ from models.associations import UserCodeAssociation
 from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
+from models.score import Score
 from models.user import User
 
 
@@ -473,3 +476,51 @@ class SQLAlchemyResetCodeRepository(IResetCodeRepository):
         )
         if association:
             self.session.delete(association)
+
+
+class SQLAlchemyScoreRepository(IScoreRepository):
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
+        self.user_repo = SQLAlchemyUserRepository(self.session)
+        self.activity_repo = SQLAlchemyActivityRepository(self.session)
+
+    def add(self, score: ScoreDomain) -> None:
+        model = Score(
+            patient_email=score.patient.email,
+            activity_id=score.activity.id,
+            completed_at=score.completed_at,
+            score=score.score,
+            seconds_to_finish=score.seconds_to_finish,
+        )
+        self.session.add(model)
+
+    def list_by_patient(self, patient_email: str) -> List[ScoreDomain]:
+        score_rows: List[Score] = (
+            self.session.query(Score)
+            .filter(Score.patient_email == patient_email)
+            .all()
+        )
+        patient_model: Patient | None = self.session.get(Patient, patient_email)
+        patient_domain = (
+            self.user_repo._to_domain(patient_model) if patient_model else None  # type: ignore[arg-type]
+        )
+        results: List[ScoreDomain] = []
+        for row in score_rows:
+            activity_domain = (
+                self.activity_repo._to_domain(row.activity)
+                if row.activity is not None
+                else None
+            )
+            if patient_domain is None or activity_domain is None:
+                # Skip malformed rows; upstream validation should avoid this.
+                continue
+            results.append(
+                ScoreDomain(
+                    patient=patient_domain,
+                    activity=activity_domain,
+                    completed_at=row.completed_at,
+                    score=row.score,
+                    seconds_to_finish=row.seconds_to_finish,
+                )
+            )
+        return results
