@@ -41,6 +41,14 @@ class ActivityService:
                 f"No s'han pogut crear les activitats: {str(exc)}"
             ) from exc
 
+    def get_activity(self, activity_id: uuid.UUID) -> Activity:
+        activity = self.activity_repo.get(activity_id)
+        if not activity:
+            raise ActivityNotFoundException(
+                f"No s'ha trobat cap activitat amb l'ID {activity_id}."
+            )
+        return activity
+    
     def list_activities(self, filters: dict) -> List[Activity]:
         activities = self.activity_repo.list(filters)
         if filters.get("id") and not activities:

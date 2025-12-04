@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Dict
 import uuid
 
 from db import db
 from sqlalchemy.orm import Session
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
+from domain.entities.question_answer import QuestionAnswer
+from domain.entities.score import Score as ScoreDomain
 from domain.entities.user import Admin as AdminDomain
 from domain.entities.user import Doctor as DoctorDomain
 from domain.entities.user import Patient as PatientDomain
@@ -18,7 +20,9 @@ from domain.repositories import (
     IDoctorRepository,
     IPatientRepository,
     IQuestionRepository,
+    IQuestionAnswerRepository,
     IResetCodeRepository,
+    IScoreRepository,
     IUserRepository,
 )
 from helpers.enums.user_role import UserRole
@@ -35,6 +39,7 @@ from models.associations import UserCodeAssociation
 from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
+from models.score import Score
 from models.user import User
 
 
@@ -68,27 +73,9 @@ class SQLAlchemyUserRepository(IUserRepository):
             raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.")
         role = model.role
         if role == UserRole.PATIENT and isinstance(model, Patient):
-            return PatientDomain(
-                email=model.email,
-                password_hash=model.password,
-                name=model.name,
-                surname=model.surname,
-                ailments=model.ailments,
-                gender=model.gender,
-                age=model.age,
-                treatments=model.treatments,
-                height_cm=model.height_cm,
-                weight_kg=model.weight_kg,
-                doctor_emails=[doctor.email for doctor in model.doctors],
-            )
+            return self._patient_to_domain(model, include_doctors=True)
         if role == UserRole.DOCTOR and isinstance(model, Doctor):
-            return DoctorDomain(
-                email=model.email,
-                password_hash=model.password,
-                name=model.name,
-                surname=model.surname,
-                patient_emails=[patient.email for patient in model.patients],
-            )
+            return self._doctor_to_domain(model, include_patients=True)
         if role == UserRole.ADMIN and isinstance(model, Admin):
             return AdminDomain(
                 email=model.email,
@@ -205,6 +192,42 @@ class SQLAlchemyUserRepository(IUserRepository):
                 f"No s'ha trobat cap pacient amb el correu: {', '.join(missing)}"
             )
         return patients
+
+    def _patient_to_domain(self, model: Patient, include_doctors: bool = False) -> PatientDomain:
+        doctors = []
+        if include_doctors:
+            doctors = [
+                self._doctor_to_domain(doctor, include_patients=False)
+                for doctor in model.doctors
+            ]
+        return PatientDomain(
+            email=model.email,
+            password_hash=model.password,
+            name=model.name,
+            surname=model.surname,
+            ailments=model.ailments,
+            gender=model.gender,
+            age=model.age,
+            treatments=model.treatments,
+            height_cm=model.height_cm,
+            weight_kg=model.weight_kg,
+            doctors=doctors,  # type: ignore[arg-type]
+        )
+
+    def _doctor_to_domain(self, model: Doctor, include_patients: bool = False) -> DoctorDomain:
+        patients = []
+        if include_patients:
+            patients = [
+                self._patient_to_domain(patient, include_doctors=False)
+                for patient in model.patients
+            ]
+        return DoctorDomain(
+            email=model.email,
+            password_hash=model.password,
+            name=model.name,
+            surname=model.surname,
+            patients=patients,  # type: ignore[arg-type]
+        )
 
 
 class SQLAlchemyPatientRepository(IPatientRepository):
@@ -473,3 +496,111 @@ class SQLAlchemyResetCodeRepository(IResetCodeRepository):
         )
         if association:
             self.session.delete(association)
+
+
+class SQLAlchemyScoreRepository(IScoreRepository):
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
+        self.user_repo = SQLAlchemyUserRepository(self.session)
+        self.activity_repo = SQLAlchemyActivityRepository(self.session)
+
+    def add(self, score: ScoreDomain) -> None:
+        model = Score(
+            patient_email=score.patient.email,
+            activity_id=score.activity.id,
+            completed_at=score.completed_at,
+            score=score.score,
+            seconds_to_finish=score.seconds_to_finish,
+        )
+        self.session.add(model)
+
+    def list_by_patient(self, patient_email: str) -> List[ScoreDomain]:
+        score_rows: List[Score] = (
+            self.session.query(Score)
+            .filter(Score.patient_email == patient_email)
+            .all()
+        )
+        patient_model: Patient | None = self.session.get(Patient, patient_email)
+        patient_domain = (
+            self.user_repo._to_domain(patient_model) if patient_model else None  # type: ignore[arg-type]
+        )
+        results: List[ScoreDomain] = []
+        for row in score_rows:
+            activity_domain = (
+                self.activity_repo._to_domain(row.activity)
+                if row.activity is not None
+                else None
+            )
+            if patient_domain is None or activity_domain is None:
+                # Skip malformed rows; upstream validation should avoid this.
+                continue
+            results.append(
+                ScoreDomain(
+                    patient=patient_domain,
+                    activity=activity_domain,
+                    completed_at=row.completed_at,
+                    score=row.score,
+                    seconds_to_finish=row.seconds_to_finish,
+                )
+            )
+        return results
+
+
+class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
+    """
+    SQLAlchemy implementation of the ``IQuestionAnswerRepository``.  This
+    repository reads answered questions from the association table joining
+    patients and questions.  It also derives simple analysis metrics on the
+    question text using the built-in analysis engine to provide cognitive
+    proxies when no voice transcription is available.
+
+    The returned domain objects expose the question entity, the timestamp when
+    it was answered and a dictionary of analysis metrics computed from the
+    question text.  Note that these metrics are approximations based solely
+    on the question content, as the actual spoken answer isn't stored in the
+    database.  Should a linkage to voice transcriptions be added in the
+    future, this repository can be updated to pull analysis directly from
+    the transcription records.
+    """
+
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
+        # Reuse the existing question repository for domain conversion
+        self.question_repo = SQLAlchemyQuestionRepository(self.session)
+
+    def list_by_patient(self, patient_email: str) -> List[QuestionAnswer]:
+        # Fetch all answered question associations for the patient
+        from models.associations import QuestionAnsweredAssociation  # late import to avoid circular
+        associations: List[QuestionAnsweredAssociation] = (
+            self.session.query(QuestionAnsweredAssociation)
+            .filter(QuestionAnsweredAssociation.patient_email == patient_email)
+            .all()
+        )
+        answered: List[QuestionAnswer] = []
+        for assoc in associations:
+            # Convert the underlying question model to domain entity
+            question_model = assoc.question
+            if question_model is None:
+                continue
+            question_domain = self.question_repo._to_domain(question_model)
+            answered_at = assoc.answered_at
+            # Derive basic analysis metrics from the question text using the
+            # analysis engine.  These metrics serve as placeholders until
+            # actual answer transcriptions are persisted and linked.
+            try:
+                from helpers.analysis_engine import analyze_linguistics, analyze_executive_functions
+                linguistics = analyze_linguistics(question_domain.text)
+                exec_metrics = analyze_executive_functions(question_domain.text)
+                # Flatten metrics; if there are overlapping keys, later values override
+                analysis: Dict[str, float] = {**linguistics, **exec_metrics}
+            except Exception:
+                # In case of any failure computing metrics (e.g. missing models), fall back to empty
+                analysis = {}
+            answered.append(
+                QuestionAnswer(
+                    question=question_domain,
+                    answered_at=answered_at,
+                    analysis=analysis,
+                )
+            )
+        return answered

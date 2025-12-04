@@ -8,7 +8,6 @@ from helpers.enums.gender import Gender
 from helpers.enums.user_role import UserRole
 from domain.services.security import PasswordHasher
 
-
 @dataclass
 class User(ABC):
     """
@@ -137,49 +136,13 @@ class Patient(User):
     treatments: Optional[str]
     height_cm: float
     weight_kg: float
-    doctor_emails: List[str] = field(default_factory=list)
+    doctors: List["Doctor"] = field(default_factory=list)
 
     @property
     def role(self) -> UserRole:
         return UserRole.PATIENT
 
-    def add_doctors(self, doctors: List[str]) -> None:
-        """
-        Add doctor emails to the association list, avoiding duplicates and blanks.
-
-        Args:
-            doctors (List[str]): Doctor emails to add.
-        """
-        for doctor_email in doctors:
-            if doctor_email and doctor_email not in self.doctor_emails:
-                self.doctor_emails.append(doctor_email)
-
-    def replace_doctors(self, doctors: List[str]) -> None:
-        """
-        Replace doctor associations with the provided list.
-
-        Args:
-            doctors (List[str]): Doctor emails to set.
-        """
-        self.doctor_emails = [email for email in doctors if email]
-        
-    def remove_doctor(self, doctor_email: str) -> None:
-        """
-        Remove a doctor association.
-        
-        Args:
-            doctor_email (str): Doctor email to remove.
-        """
-        if doctor_email in self.doctor_emails:
-            self.doctor_emails.remove(doctor_email)
-
     def role_payload(self) -> dict:
-        """
-        Payload with patient-specific fields for serialization.
-
-        Returns:
-            dict: Patient data including demographics and linked doctors.
-        """
         return {
             "ailments": self.ailments,
             "gender": self.gender.value if self.gender else None,
@@ -187,53 +150,43 @@ class Patient(User):
             "treatments": self.treatments,
             "height_cm": self.height_cm,
             "weight_kg": self.weight_kg,
-            "doctors": list(self.doctor_emails),
+            "doctors": [doctor.email for doctor in self.doctors],
         }
 
     def doctor_of_this_patient(self, patient: "Patient") -> bool:
-        """
-        Patients cannot access other patients.
-
-        Args:
-            patient (Patient): Patient being accessed.
-
-        Returns:
-            bool: Always False for Patient role.
-        """
         return False
 
     def remove_role_associations(self) -> None:
-        """
-        Clear doctor associations for the patient.
-        """
-        self.doctor_emails.clear()
+        self.doctors.clear()
 
     def get_daily_question_filters(self) -> dict:
-        """
-        Compute filters to select a daily question for this patient.
-
-        Returns:
-            dict: Filter arguments for the question repository.
-        """
         return {}
 
     def get_recommended_activity_filters(self) -> dict:
-        """
-        Compute filters to select a recommended activity for this patient.
-
-        Returns:
-            dict: Filter arguments for the activity repository.
-        """
         return {}
 
-    def set_properties(self, data: dict, hasher: PasswordHasher) -> None:
-        """
-        Update patient-specific and base fields from a payload.
+    @property
+    def doctor_emails(self) -> List[str]:
+        return [doctor.email for doctor in self.doctors]
 
-        Args:
-            data (dict): Fields to update.
-            hasher (PasswordHasher): Hashing service for password changes.
-        """
+    def add_doctors(self, doctors: List["Doctor"]) -> None:
+        existing = {doctor.email for doctor in self.doctors}
+        for doctor in doctors:
+            if doctor and doctor.email not in existing:
+                self.doctors.append(doctor)
+                existing.add(doctor.email)
+
+    def replace_doctors(self, doctors: List["Doctor"]) -> None:
+        unique = {}
+        for doctor in doctors:
+            if doctor and doctor.email not in unique:
+                unique[doctor.email] = doctor
+        self.doctors = list(unique.values())
+
+    def remove_doctor(self, doctor_email: str) -> None:
+        self.doctors = [doctor for doctor in self.doctors if doctor.email != doctor_email]
+
+    def set_properties(self, data: dict, hasher: PasswordHasher) -> None:
         super().set_properties(data, hasher)
         if "ailments" in data:
             self.ailments = data["ailments"]
@@ -247,78 +200,50 @@ class Patient(User):
             self.height_cm = data["height_cm"]
         if "weight_kg" in data and data["weight_kg"] is not None:
             self.weight_kg = data["weight_kg"]
-        if "doctors" in data and data["doctors"] is not None:
-            self.replace_doctors(data["doctors"])
 
 
 @dataclass
 class Doctor(User):
-    patient_emails: List[str] = field(default_factory=list)
+    patients: List[Patient] = field(default_factory=list)
 
     @property
     def role(self) -> UserRole:
         return UserRole.DOCTOR
 
-    def add_patients(self, patients: List[str]) -> None:
-        """
-        Add patient associations, skipping blanks and duplicates.
-
-        Args:
-            patients (List[str]): Patient emails to add.
-        """
-        for patient_email in patients:
-            if patient_email and patient_email not in self.patient_emails:
-                self.patient_emails.append(patient_email)
-
-    def replace_patients(self, patients: List[str]) -> None:
-        """
-        Replace the current patient associations.
-
-        Args:
-            patients (List[str]): Patient emails to set.
-        """
-        self.patient_emails = [email for email in patients if email]
-
     def role_payload(self) -> dict:
-        """
-        Payload with doctor-specific fields for serialization.
-
-        Returns:
-            dict: Patients linked to this doctor.
-        """
         return {
-            "patients": list(self.patient_emails),
+            "patients": [patient.email for patient in self.patients],
         }
 
     def doctor_of_this_patient(self, patient: Patient) -> bool:
-        """
-        Determine if this doctor is linked to the given patient.
-
-        Args:
-            patient (Patient): Patient being accessed.
-
-        Returns:
-            bool: True if patient email is in doctor's list.
-        """
-        return patient.email in self.patient_emails
+        return any(patient.email == p.email for p in self.patients)
 
     def remove_role_associations(self) -> None:
-        """
-        Clear patient associations for the doctor.
-        """
-        self.patient_emails.clear()
+        self.patients.clear()
 
     def set_properties(self, data: dict, hasher: PasswordHasher) -> None:
-        """
-        Update doctor-specific and base fields from a payload.
-
-        Args:
-            data (dict): Fields to update.
-            hasher (PasswordHasher): Hashing service for password changes.
-        """
         super().set_properties(data, hasher)
-        if "patients" in data and data["patients"] is not None:
-            self.replace_patients(data["patients"])
+
+    @property
+    def patient_emails(self) -> List[str]:
+        return [patient.email for patient in self.patients]
+
+    def add_patients(self, patients: List[Patient]) -> None:
+        existing = {patient.email for patient in self.patients}
+        for patient in patients:
+            if patient and patient.email not in existing:
+                self.patients.append(patient)
+                existing.add(patient.email)
+
+    def replace_patients(self, patients: List[Patient]) -> None:
+        unique = {}
+        for patient in patients:
+            if patient and patient.email not in unique:
+                unique[patient.email] = patient
+        self.patients = list(unique.values())
+
+    def remove_patient(self, patient_email: str) -> None:
+        self.patients = [patient for patient in self.patients if patient.email != patient_email]
 
 
 @dataclass
