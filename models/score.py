@@ -17,10 +17,6 @@ class Score(db.Model):
             'seconds_to_finish >= 0',
             name='non_negative_seconds_to_finish',
         ),
-        db.CheckConstraint(
-            'completed_at <= CURRENT_TIMESTAMP',
-            name='check_completed_at_not_future',
-        ),
     )
 
     patient_email = db.Column(db.String(120), db.ForeignKey('patients.email', onupdate='CASCADE'), primary_key=True)
