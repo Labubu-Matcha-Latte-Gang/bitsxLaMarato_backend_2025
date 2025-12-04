@@ -84,14 +84,7 @@ class UserService:
             self.user_repo.remove(user)
             self.uow.commit()
 
-    def get_patient_data(self, requester_email: str, patient_email: str) -> Patient:
-        requester = self.user_repo.get_by_email(requester_email)
-        if requester is None:
-            raise UserNotFoundException("Usuari no trobat.")
-        patient = self.patient_service.get_patient(patient_email)
-        if patient is None:
-            raise UserNotFoundException("Pacient no trobat.")
-
+    def get_patient_data(self, requester: User, patient: Patient) -> Patient:
         if isinstance(requester, Admin):
             return patient
         if isinstance(requester, Doctor) and patient.email in requester.patient_emails:

@@ -536,7 +536,8 @@ class PatientData(MethodView):
                 metadata={"patient_email": patient_email}
             )
 
-            user_service = ServiceFactory.get_instance().build_user_service()
+            factory = ServiceFactory.get_instance()
+            user_service = factory.build_user_service()
 
             current_email = get_jwt_identity()
             try:
@@ -544,10 +545,13 @@ class PatientData(MethodView):
             except UserNotFoundException:
                 abort(401, message="Token d'autenticació no vàlid.")
 
-            patient_domain = user_service.get_patient_data(current_user.email, patient_email)
-            patient_payload = patient_domain.to_dict()
-            return jsonify(patient_payload), 200
+            patient_service = factory.build_patient_service()
+            patient = patient_service.get_patient(patient_email)
 
+            patient_domain = user_service.get_patient_data(current_user, patient)
+            patient_payload = patient_domain.to_dict()
+            
+            return jsonify(patient_payload), 200
         except UserRoleConflictException as e:
             self.logger.error("User role conflict", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
