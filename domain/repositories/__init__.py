@@ -6,6 +6,7 @@ from .interfaces import (
     IQuestionRepository,
     IActivityRepository,
     IResetCodeRepository,
+    IScoreRepository,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "IQuestionRepository",
     "IActivityRepository",
     "IResetCodeRepository",
+    "IScoreRepository",
 ]
