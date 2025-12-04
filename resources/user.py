@@ -229,7 +229,7 @@ class UserLogin(MethodView):
             return {"access_token": access_token}, 200
         except UserNotFoundException as e:
             self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
-            abort(401, message="Correu o contrasenya no vàlids.")
+            abort(401, message="Correu o contrassenya no vàlids.")
         except UserRoleConflictException as e:
             self.logger.error("User login failed: Role conflict", module="UserLogin", metadata={"email": data.get('email')}, error=e)
             abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")

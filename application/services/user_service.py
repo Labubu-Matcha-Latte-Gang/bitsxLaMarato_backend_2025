@@ -70,9 +70,9 @@ class UserService:
     def login(self, email: str, password: str) -> str:
         user = self.user_repo.get_by_email(email)
         if user is None:
-            raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
+            raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
         if not user.check_password(password, self.hasher):
-            raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
+            raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
         return self.token_service.generate(user.email)
 
     def get_user(self, email: str) -> User:
