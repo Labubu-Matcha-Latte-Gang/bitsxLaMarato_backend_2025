@@ -120,7 +120,7 @@ class UserService:
                   ``Patient.to_dict()``.
                 - ``scores``: list of score objects with activity metadata.
                 - ``questions``: list of answered questions with analysis metrics.
-                - ``graph_files``: graph files encoded in base64 (HTML content).
+                - ``graph_files``: graph files encoded en base64 (fragments HTML amb un div i script Plotly).
 
         Raises:
             PermissionError: If the requester is not authorized to view the
@@ -187,9 +187,9 @@ class UserService:
 
     def _build_graph_files(self, graphs: Dict[str, dict]) -> list[dict]:
         """
-        Persist graph figures as HTML files in the tmp directory and return them
-        as base64-encoded payloads. All files in the tmp directory are removed
-        once the payload is built.
+        Persist graph figures as HTML fragments in the tmp directory and return
+        them as base64-encoded payloads. All files in the tmp directory are
+        removed once the payload is built.
         """
         self.GRAPH_TMP_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -212,29 +212,32 @@ class UserService:
 
     def _figure_to_html(self, title: str, figure: dict) -> str:
         """
-        Render a minimal Plotly HTML wrapper using the provided figure data.
+        Render an embeddable HTML fragment (div + script) for Plotly.
+
+        The fragment loads Plotly from CDN only if it is not already present in
+        the embedding document. It is intended to be consumed as `srcdoc` of an
+        <iframe> or injected into a wrapper element that allows script
+        execution.
         """
         figure_id = f"plot_{title}".replace(" ", "_").replace("-", "_")
         data_json = json.dumps(figure.get("data", []))
         layout = figure.get("layout", {}) or {}
         layout.setdefault("title", title)
         layout_json = json.dumps(layout)
-        return f"""<!DOCTYPE html>
-<html lang="ca">
-<head>
-  <meta charset="UTF-8" />
-  <title>{title}</title>
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-</head>
-<body>
-  <div id="{figure_id}" style="width:100%;height:100%;min-height:400px;"></div>
-  <script>
-    const data = {data_json};
-    const layout = {layout_json};
-    Plotly.newPlot("{figure_id}", data, layout, {{responsive: true}});
-  </script>
-</body>
-</html>"""
+        return f"""<div id="{figure_id}" style="width:100%;min-height:360px;"></div>
+<script>
+(function() {{
+  const render = () => Plotly.newPlot("{figure_id}", {data_json}, {layout_json}, {{responsive: true}});
+  if (window.Plotly) {{
+    render();
+    return;
+  }}
+  const script = document.createElement("script");
+  script.src = "https://cdn.plot.ly/plotly-latest.min.js";
+  script.onload = render;
+  document.head.appendChild(script);
+}})();
+</script>"""
 
     def _cleanup_tmp_graph_dir(self) -> None:
         """
