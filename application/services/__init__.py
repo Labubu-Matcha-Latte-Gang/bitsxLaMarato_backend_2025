@@ -6,6 +6,7 @@ from .password_reset_service import PasswordResetService
 from .patient_service import PatientService
 from .doctor_service import DoctorService
 from .admin_service import AdminService
+from .score_service import ScoreService
 
 __all__ = [
     "TokenService",
@@ -16,4 +17,5 @@ __all__ = [
     "PatientService",
     "DoctorService",
     "AdminService",
+    "ScoreService",
 ]
