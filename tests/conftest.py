@@ -11,11 +11,6 @@ from db import db
 def app():
     app = create_app("testing_settings")
     with app.app_context():
-        # Clean legacy tables that may not be in metadata to avoid FK issues on drop_all
-        with db.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-            conn.execute(sa.text("DROP TABLE IF EXISTS activities_completed CASCADE"))
-        # Ensure schema matches current models (drops existing tables in test DB)
-        db.drop_all()
         db.create_all()
     return app
 
