@@ -525,8 +525,7 @@ class PatientData(MethodView):
         - `patient`: dades bàsiques i de rol del pacient.
         - `scores`: llista de puntuacions d'activitats.
         - `questions`: preguntes contestades amb mètriques d'anàlisi.
-        - `graph_files`: fitxers HTML dels gràfics codificats en base64. Els fitxers es creen a la
-          carpeta `tmp/` per a la resposta i s'esborren tot seguit.
+        - `graph_files`: fitxers dels gràfics codificats en base64. Cal decodificar el contingut en base64 per tal d'obtenir l'HTML original.
 
         Codis d'estat:
         - 200: Informació del pacient retornada.
