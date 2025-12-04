@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from helpers.enums.question_types import QuestionType
 from models.associations import DoctorPatientAssociation, QuestionAnsweredAssociation
 from models.doctor import Doctor
 from models.patient import Patient
@@ -16,7 +17,7 @@ class TestUserRelationsCascade(BaseTest):
             "questions": [
                 {
                     "text": f"Pregunta cascada {uuid.uuid4().hex[:8]}",
-                    "question_type": "CONCENTRATION",
+                    "question_type": QuestionType.CONCENTRATION.value,
                     "difficulty": 1.0,
                 }
             ]
