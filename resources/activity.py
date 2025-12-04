@@ -408,6 +408,15 @@ class ActivityCompleteResource(MethodView):
                 error=e,
             )
             abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error(
+                "Violació d'integritat en completar activitat",
+                module="ActivityCompleteResource",
+                metadata={"patient_email": email, "activity_id": str(activity_id), "score": score, "seconds_to_finish": seconds_to_finish},
+                error=e,
+            )
+            abort(422, message=str(e))
         except Exception as e:
             self.logger.error("Error inesperat en completar activitat", module="ActivityCompleteResource", metadata={"patient_email": email, "activity_id": str(activity_id), "score": score, "seconds_to_finish": seconds_to_finish}, error=e)
             abort(500, message=f"S'ha produït un error inesperat en completar l'activitat: {str(e)}")
