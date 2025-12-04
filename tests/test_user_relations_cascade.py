@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+from uuid import uuid4, UUID
 from datetime import datetime, timezone
 
 from helpers.enums.question_types import QuestionType
@@ -17,7 +17,7 @@ class TestUserRelationsCascade(BaseTest):
         payload = {
             "questions": [
                 {
-                    "text": f"Pregunta cascada {uuid.uuid4().hex[:8]}",
+                    "text": f"Pregunta cascada {uuid4().hex[:8]}",
                     "question_type": QuestionType.CONCENTRATION.value,
                     "difficulty": 1.0,
                 }
@@ -69,7 +69,7 @@ class TestUserRelationsCascade(BaseTest):
         activity_id = self._create_activity(admin_token)
 
         patient_model = self.db.get(Patient, patient_payload["email"])
-        question_model = self.db.get(Question, uuid.UUID(question_id))
+        question_model = self.db.get(Question, UUID(question_id))
         assert patient_model and question_model
         patient_model.add_answered_questions({question_model}, answered_at=datetime.now(timezone.utc))
         self.db.flush()
@@ -176,7 +176,7 @@ class TestUserRelationsCascade(BaseTest):
         assert patient_resp.status_code == 201
 
         patient_model = self.db.get(Patient, patient_payload["email"])
-        question_model = self.db.get(Question, uuid.UUID(question_id))
+        question_model = self.db.get(Question, UUID(question_id))
         assert patient_model and question_model
         patient_model.add_answered_questions({question_model}, answered_at=datetime.now(timezone.utc))
         self.db.flush()
@@ -190,10 +190,10 @@ class TestUserRelationsCascade(BaseTest):
 
         # Assert
         assert delete_resp.status_code == 204
-        assert self.db.get(Question, uuid.UUID(question_id)) is None
+        assert self.db.get(Question, UUID(question_id)) is None
         assert (
             self.db.query(QuestionAnsweredAssociation)
-            .filter(QuestionAnsweredAssociation.question_id == uuid.UUID(question_id))
+            .filter(QuestionAnsweredAssociation.question_id == UUID(question_id))
             .count()
             == 0
         )
