@@ -219,22 +219,22 @@ class GraphFileSchema(Schema):
     filename = fields.String(
         required=True,
         metadata={
-            "description": "Nom del fitxer generat.",
+            "description": "Nom del fitxer generat (per exemple, un id de gràfic).",
             "example": "scores_memory.html",
         },
     )
     content_type = fields.String(
         required=True,
         metadata={
-            "description": "Tipus MIME del fitxer.",
+            "description": "Tipus MIME del fitxer (sempre text/html).",
             "example": "text/html",
         },
     )
     content = fields.String(
         required=True,
         metadata={
-            "description": "Contingut del fitxer en base64.",
-            "example": "PGh0bWw+PC9odG1sPg==",
+            "description": "Fragment HTML (div + script Plotly) codificat en base64, pensat per injectar-se en un iframe via `srcdoc` o en un contenidor que executi scripts.",
+            "example": "PGRpdiBpZD0icGxvdF9leGFtcGxlIj48L2Rpdj48c2NyaXB0Pi8qIHBsb3QgKi88L3NjcmlwdD4=",
         },
     )
 
@@ -278,7 +278,7 @@ class PatientDataResponseSchema(Schema):
         fields.Nested(GraphFileSchema),
         required=True,
         metadata={
-            "description": "Fitxers HTML dels gràfics en base64 (pot ser buit).",
+            "description": "Fragments HTML (div + script) dels gràfics codificats en base64 (pot ser buit).",
         },
     )
 
