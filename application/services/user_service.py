@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import base64
+import json
+from pathlib import Path
+
 from domain.entities.user import Admin, Doctor, Patient, User
 from domain.repositories import (
     IUserRepository,
@@ -27,6 +31,8 @@ class UserService:
     Application service for user-level concerns (auth, user dispatch).
     Delegates role-specific operations to dedicated services.
     """
+
+    GRAPH_TMP_DIR = Path(__file__).resolve().parent.parent.parent / "tmp"
 
     def __init__(
         self,
@@ -99,9 +105,9 @@ class UserService:
     def get_patient_data(self, requester: User, patient: Patient) -> dict:
         """
         Assemble a comprehensive payload for the given patient including basic
-        demographics, activity scores, answered questions and graph
-        definitions.  The caller must supply a user (requester)
-        authorized to view the patient.
+        demographics, activity scores, answered questions and generated graph
+        files. The caller must supply a user (requester) authorized to view the
+        patient.
 
         Args:
             requester (User): The user requesting the data.  Must be an admin,
@@ -114,7 +120,7 @@ class UserService:
                   ``Patient.to_dict()``.
                 - ``scores``: list of score objects with activity metadata.
                 - ``questions``: list of answered questions with analysis metrics.
-                - ``graphs``: a mapping of chart definitions.
+                - ``graph_files``: graph files encoded in base64 (HTML content).
 
         Raises:
             PermissionError: If the requester is not authorized to view the
@@ -165,9 +171,77 @@ class UserService:
             # Graph generation is optional; if it fails, leave graphs empty
             graphs = {}
 
+        graph_files: list[dict] = []
+        if graphs:
+            try:
+                graph_files = self._build_graph_files(graphs)
+            except Exception:
+                graph_files = []
+
         return {
             "patient": patient_payload,
             "scores": scores_list,
             "questions": questions_list,
-            "graphs": graphs,
+            "graph_files": graph_files,
         }
+
+    def _build_graph_files(self, graphs: Dict[str, dict]) -> list[dict]:
+        """
+        Persist graph figures as HTML files in the tmp directory and return them
+        as base64-encoded payloads. All files in the tmp directory are removed
+        once the payload is built.
+        """
+        self.GRAPH_TMP_DIR.mkdir(parents=True, exist_ok=True)
+
+        created_files: list[dict] = []
+        try:
+            for name, figure in graphs.items():
+                sanitized_name = name.replace(" ", "_")
+                file_path = self.GRAPH_TMP_DIR / f"{sanitized_name}.html"
+                html_content = self._figure_to_html(name, figure)
+                file_path.write_text(html_content, encoding="utf-8")
+                encoded_content = base64.b64encode(file_path.read_bytes()).decode("ascii")
+                created_files.append({
+                    "filename": file_path.name,
+                    "content_type": "text/html",
+                    "content": encoded_content,
+                })
+            return created_files
+        finally:
+            self._cleanup_tmp_graph_dir()
+
+    def _figure_to_html(self, title: str, figure: dict) -> str:
+        """
+        Render a minimal Plotly HTML wrapper using the provided figure data.
+        """
+        figure_id = f"plot_{title}".replace(" ", "_").replace("-", "_")
+        data_json = json.dumps(figure.get("data", []))
+        layout = figure.get("layout", {}) or {}
+        layout.setdefault("title", title)
+        layout_json = json.dumps(layout)
+        return f"""<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <title>{title}</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <div id="{figure_id}" style="width:100%;height:100%;min-height:400px;"></div>
+  <script>
+    const data = {data_json};
+    const layout = {layout_json};
+    Plotly.newPlot("{figure_id}", data, layout, {{responsive: true}});
+  </script>
+</body>
+</html>"""
+
+    def _cleanup_tmp_graph_dir(self) -> None:
+        """
+        Remove all files inside the graph tmp directory.
+        """
+        if not self.GRAPH_TMP_DIR.exists():
+            return
+        for file in self.GRAPH_TMP_DIR.iterdir():
+            if file.is_file():
+                file.unlink(missing_ok=True)
