@@ -5,7 +5,10 @@ from typing import Optional
 from db import db
 from application.services import (
     ActivityService,
+    AdminService,
+    DoctorService,
     PasswordResetService,
+    PatientService,
     QuestionService,
     TokenService,
     UserService,
@@ -59,15 +62,32 @@ class ServiceFactory:
         token_service = TokenService()
 
         user_repo = SQLAlchemyUserRepository(self.session)
-        patient_repo = SQLAlchemyPatientRepository(self.session)
-        doctor_repo = SQLAlchemyDoctorRepository(self.session)
-        admin_repo = SQLAlchemyAdminRepository(self.session)
+        patient_service = PatientService(
+            user_repo=user_repo,
+            patient_repo=SQLAlchemyPatientRepository(self.session),
+            doctor_repo=SQLAlchemyDoctorRepository(self.session),
+            uow=SQLAlchemyUnitOfWork(self.session),
+            hasher=hasher,
+        )
+        doctor_service = DoctorService(
+            user_repo=user_repo,
+            doctor_repo=SQLAlchemyDoctorRepository(self.session),
+            patient_repo=SQLAlchemyPatientRepository(self.session),
+            uow=SQLAlchemyUnitOfWork(self.session),
+            hasher=hasher,
+        )
+        admin_service = AdminService(
+            user_repo=user_repo,
+            admin_repo=SQLAlchemyAdminRepository(self.session),
+            uow=SQLAlchemyUnitOfWork(self.session),
+            hasher=hasher,
+        )
 
         return UserService(
             user_repo=user_repo,
-            patient_repo=patient_repo,
-            doctor_repo=doctor_repo,
-            admin_repo=admin_repo,
+            patient_service=patient_service,
+            doctor_service=doctor_service,
+            admin_service=admin_service,
             uow=uow,
             hasher=hasher,
             token_service=token_service,
@@ -92,6 +112,61 @@ class ServiceFactory:
         uow = SQLAlchemyUnitOfWork(self.session)
         activity_repo = SQLAlchemyActivityRepository(self.session)
         return ActivityService(activity_repo=activity_repo, uow=uow)
+
+    def build_patient_service(self) -> PatientService:
+        """
+        Build a PatientService with its dependencies.
+        Returns:
+            PatientService: The constructed PatientService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        hasher = PasswordHasher()
+        user_repo = SQLAlchemyUserRepository(self.session)
+        patient_repo = SQLAlchemyPatientRepository(self.session)
+        doctor_repo = SQLAlchemyDoctorRepository(self.session)
+        return PatientService(
+            user_repo=user_repo,
+            patient_repo=patient_repo,
+            doctor_repo=doctor_repo,
+            uow=uow,
+            hasher=hasher,
+        )
+
+    def build_doctor_service(self) -> DoctorService:
+        """
+        Build a DoctorService with its dependencies.
+        Returns:
+            DoctorService: The constructed DoctorService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        hasher = PasswordHasher()
+        user_repo = SQLAlchemyUserRepository(self.session)
+        doctor_repo = SQLAlchemyDoctorRepository(self.session)
+        patient_repo = SQLAlchemyPatientRepository(self.session)
+        return DoctorService(
+            user_repo=user_repo,
+            doctor_repo=doctor_repo,
+            patient_repo=patient_repo,
+            uow=uow,
+            hasher=hasher,
+        )
+
+    def build_admin_service(self) -> AdminService:
+        """
+        Build an AdminService with its dependencies.
+        Returns:
+            AdminService: The constructed AdminService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        hasher = PasswordHasher()
+        user_repo = SQLAlchemyUserRepository(self.session)
+        admin_repo = SQLAlchemyAdminRepository(self.session)
+        return AdminService(
+            user_repo=user_repo,
+            admin_repo=admin_repo,
+            uow=uow,
+            hasher=hasher,
+        )
 
     def build_password_reset_service(self, validity_minutes: int) -> PasswordResetService:
         """
