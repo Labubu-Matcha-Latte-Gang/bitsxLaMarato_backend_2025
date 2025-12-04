@@ -1,4 +1,5 @@
 import base64
+import uuid
 
 from application.container import ServiceFactory
 from helpers.enums.question_types import QuestionType
@@ -16,7 +17,7 @@ class TestUserPatientData(BaseTest):
         activity = activity_service.create_activities(
             [
                 {
-                    "title": "Speed test",
+                    "title": f"Speed test {uuid.uuid4().hex[:8]}",
                     "description": "Quick check",
                     "activity_type": QuestionType.SPEED,
                     "difficulty": 1.0,
