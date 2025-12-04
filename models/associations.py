@@ -52,6 +52,13 @@ class UserCodeAssociation(db.Model):
 class QuestionAnsweredAssociation(db.Model):
     __tablename__ = 'questions_answered'
 
+    __table_args__ = (
+        db.CheckConstraint(
+            'answered_at <= CURRENT_TIMESTAMP',
+            name='check_answered_at_not_future',
+        )
+    )
+
     patient_email = db.Column(db.String(120), db.ForeignKey('patients.email', onupdate='CASCADE'), primary_key=True)
     question_id = db.Column(UUID(as_uuid=True), db.ForeignKey('questions.id', onupdate='CASCADE'), primary_key=True)
     answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
