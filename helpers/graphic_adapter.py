@@ -1,15 +1,3 @@
-"""
-Helper module to convert domain objects into Plotly-compatible chart
-definitions without coupling the application layer to the Plotly
-library.  This adapter encapsulates the details of constructing the
-`data` and `layout` structures expected by Plotly for common chart
-types.
-
-The ``AbstractPlotlyAdapter`` defines the contract that the
-application layer relies on.  Concrete implementations can vary the
-graph formatting as needed without changing the service logic.
-"""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -19,44 +7,41 @@ from domain.entities.score import Score
 from domain.entities.question_answer import QuestionAnswer
 
 
-class AbstractPlotlyAdapter(ABC):
-    """Abstract base class for Plotly adapters.
+class AbstractGraphicAdapter(ABC):
+    """Abstract base class for graphic adapters.
 
     Implementations must provide methods that take domain objects and
-    return dictionaries suitable for consumption by Plotly on the
-    frontend.  By keeping Plotly references out of the core domain and
-    application code, we preserve the hexagonal architecture and make
-    the data visualisation layer swappable.
+    return dictionaries suitable for consumption by graphic libraries.
     """
 
     @abstractmethod
     def create_score_graphs(self, scores: List[Score]) -> Dict[str, dict]:
-        """Generate Plotly graph definitions for activity scores.
+        """Generate graph definitions for activity scores.
 
         Args:
             scores (List[Score]): A list of score domain objects.
 
         Returns:
-            Dict[str, dict]: A mapping keyed by a descriptive name to a Plotly
+            Dict[str, dict]: A mapping keyed by a descriptive name to a
                 figure dictionary (with ``data`` and ``layout`` keys).
         """
         raise NotImplementedError
 
     @abstractmethod
     def create_question_graphs(self, answers: List[QuestionAnswer]) -> Dict[str, dict]:
-        """Generate Plotly graph definitions for answered question metrics.
+        """Generate graph definitions for answered question metrics.
 
         Args:
             answers (List[QuestionAnswer]): Answered questions with analysis.
 
         Returns:
-            Dict[str, dict]: A mapping keyed by a descriptive name to a Plotly
+            Dict[str, dict]: A mapping keyed by a descriptive name to a
                 figure dictionary.
         """
         raise NotImplementedError
 
 
-class SimplePlotlyAdapter(AbstractPlotlyAdapter):
+class SimplePlotlyAdapter(AbstractGraphicAdapter):
     """Concrete adapter providing basic visualisations for scores and answers.
 
     This implementation generates line charts for activity scores and
