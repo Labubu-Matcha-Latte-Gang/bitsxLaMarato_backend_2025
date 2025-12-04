@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Dict
 import uuid
 
 from db import db
 from sqlalchemy.orm import Session
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
+from domain.entities.question_answer import QuestionAnswer
 from domain.entities.score import Score as ScoreDomain
 from domain.entities.user import Admin as AdminDomain
 from domain.entities.user import Doctor as DoctorDomain
@@ -19,6 +20,7 @@ from domain.repositories import (
     IDoctorRepository,
     IPatientRepository,
     IQuestionRepository,
+    IQuestionAnswerRepository,
     IResetCodeRepository,
     IScoreRepository,
     IUserRepository,
@@ -542,3 +544,63 @@ class SQLAlchemyScoreRepository(IScoreRepository):
                 )
             )
         return results
+
+
+class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
+    """
+    SQLAlchemy implementation of the ``IQuestionAnswerRepository``.  This
+    repository reads answered questions from the association table joining
+    patients and questions.  It also derives simple analysis metrics on the
+    question text using the built-in analysis engine to provide cognitive
+    proxies when no voice transcription is available.
+
+    The returned domain objects expose the question entity, the timestamp when
+    it was answered and a dictionary of analysis metrics computed from the
+    question text.  Note that these metrics are approximations based solely
+    on the question content, as the actual spoken answer isn't stored in the
+    database.  Should a linkage to voice transcriptions be added in the
+    future, this repository can be updated to pull analysis directly from
+    the transcription records.
+    """
+
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.session: Session = session or db.session
+        # Reuse the existing question repository for domain conversion
+        self.question_repo = SQLAlchemyQuestionRepository(self.session)
+
+    def list_by_patient(self, patient_email: str) -> List[QuestionAnswer]:
+        # Fetch all answered question associations for the patient
+        from models.associations import QuestionAnsweredAssociation  # late import to avoid circular
+        associations: List[QuestionAnsweredAssociation] = (
+            self.session.query(QuestionAnsweredAssociation)
+            .filter(QuestionAnsweredAssociation.patient_email == patient_email)
+            .all()
+        )
+        answered: List[QuestionAnswer] = []
+        for assoc in associations:
+            # Convert the underlying question model to domain entity
+            question_model = assoc.question
+            if question_model is None:
+                continue
+            question_domain = self.question_repo._to_domain(question_model)
+            answered_at = assoc.answered_at
+            # Derive basic analysis metrics from the question text using the
+            # analysis engine.  These metrics serve as placeholders until
+            # actual answer transcriptions are persisted and linked.
+            try:
+                from helpers.analysis_engine import analyze_linguistics, analyze_executive_functions
+                linguistics = analyze_linguistics(question_domain.text)
+                exec_metrics = analyze_executive_functions(question_domain.text)
+                # Flatten metrics; if there are overlapping keys, later values override
+                analysis: Dict[str, float] = {**linguistics, **exec_metrics}
+            except Exception:
+                # In case of any failure computing metrics (e.g. missing models), fall back to empty
+                analysis = {}
+            answered.append(
+                QuestionAnswer(
+                    question=question_domain,
+                    answered_at=answered_at,
+                    analysis=analysis,
+                )
+            )
+        return answered
