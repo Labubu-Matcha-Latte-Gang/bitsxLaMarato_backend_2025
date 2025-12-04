@@ -5,8 +5,10 @@ from datetime import datetime
 from typing import Iterable, List, Optional
 import uuid
 
+from domain.entities.score import Score
 from domain.entities.user import User, Patient, Doctor, Admin
 from domain.entities.question import Question
+from domain.entities.question_answer import QuestionAnswer
 from domain.entities.activity import Activity
 
 
@@ -345,5 +347,56 @@ class IResetCodeRepository(ABC):
 
         Args:
             email (str): Target user email.
+        """
+        raise NotImplementedError()
+
+class IScoreRepository(ABC):
+    @abstractmethod
+    def add(self, score: Score) -> None:
+        """
+        Persist a new score.
+
+        Args:
+            score (Score): Score entity to add.
+        """
+        raise NotImplementedError()
+    
+    @abstractmethod
+    def list_by_patient(self, patient_email: str) -> List[Score]:
+        """
+        List scores for a given patient.
+
+        Args:
+            patient_email (str): Email of the patient.
+        Returns:
+            List[Score]: List of scores for the patient.
+        """
+        raise NotImplementedError()
+
+
+class IQuestionAnswerRepository(ABC):
+    """
+    Repository abstraction for retrieving answered questions.  The
+    application layer uses this interface to fetch the relationship between
+    a patient and the questions they have answered, along with any
+    associated analysis metrics.
+    """
+
+    @abstractmethod
+    def list_by_patient(self, patient_email: str) -> List["QuestionAnswer"]:
+        """
+        List all questions answered by a given patient.
+
+        Implementations should return domain-level ``QuestionAnswer`` objects,
+        containing the question, the timestamp of the answer and any analysis
+        metrics captured at answer time.
+
+        Args:
+            patient_email (str): The unique email of the patient whose
+                answered questions are requested.
+
+        Returns:
+            List[QuestionAnswer]: A list of domain objects representing each
+                answered question.
         """
         raise NotImplementedError()

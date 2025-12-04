@@ -1,4 +1,5 @@
 import pytest
+import sqlalchemy as sa
 from sqlalchemy import event
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -10,8 +11,6 @@ from db import db
 def app():
     app = create_app("testing_settings")
     with app.app_context():
-        # Ensure schema matches current models (drops existing tables in test DB)
-        db.drop_all()
         db.create_all()
     return app
 

@@ -2,9 +2,10 @@ from models.user import User
 from models.patient import Patient
 from models.doctor import Doctor
 from models.admin import Admin
-from models.associations import DoctorPatientAssociation, UserCodeAssociation, QuestionAnsweredAssociation, ActivityCompletedAssociation
+from models.associations import DoctorPatientAssociation, UserCodeAssociation, QuestionAnsweredAssociation
 from models.question import Question
 from models.activity import Activity
+from models.score import Score
 from .transcription import TranscriptionChunk
 
 __all__ = [
@@ -17,5 +18,5 @@ __all__ = [
     'DoctorPatientAssociation',
     'UserCodeAssociation',
     'QuestionAnsweredAssociation',
-    'ActivityCompletedAssociation',
+    'Score',
 ]

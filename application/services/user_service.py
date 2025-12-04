@@ -1,158 +1,79 @@
 from __future__ import annotations
 
-import uuid
-from abc import ABC, abstractmethod
-from typing import Dict
+import base64
+import json
+from pathlib import Path
 
 from domain.entities.user import Admin, Doctor, Patient, User
 from domain.repositories import (
-    IAdminRepository,
-    IDoctorRepository,
-    IPatientRepository,
     IUserRepository,
+    IScoreRepository,
+    IQuestionAnswerRepository,
 )
 from domain.services.security import PasswordHasher
 from domain.unit_of_work import IUnitOfWork
-from helpers.enums.gender import Gender
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     InvalidCredentialsException,
-    UserAlreadyExistsException,
     UserNotFoundException,
     UserRoleConflictException,
 )
+from application.services.admin_service import AdminService
+from application.services.doctor_service import DoctorService
+from application.services.patient_service import PatientService
 from application.services.token_service import TokenService
+from typing import Dict
+from helpers.factories.adapter_factories import AbstractAdapterFactory
 
 
 class UserService:
+    """
+    Application service for user-level concerns (auth, user dispatch).
+    Delegates role-specific operations to dedicated services.
+    """
+
+    GRAPH_TMP_DIR = Path(__file__).resolve().parent.parent.parent / "tmp"
+
     def __init__(
         self,
         user_repo: IUserRepository,
-        patient_repo: IPatientRepository,
-        doctor_repo: IDoctorRepository,
-        admin_repo: IAdminRepository,
+        patient_service: PatientService,
+        doctor_service: DoctorService,
+        admin_service: AdminService,
         uow: IUnitOfWork,
         hasher: PasswordHasher,
         token_service: TokenService,
+        score_repo: IScoreRepository,
+        question_answer_repo: IQuestionAnswerRepository,
+        adapter_factory: AbstractAdapterFactory,
     ):
         self.user_repo = user_repo
-        self.patient_repo = patient_repo
-        self.doctor_repo = doctor_repo
-        self.admin_repo = admin_repo
+        self.patient_service = patient_service
+        self.doctor_service = doctor_service
+        self.admin_service = admin_service
         self.uow = uow
         self.hasher = hasher
         self.token_service = token_service
-        
-        # Initialize role updaters once for reuse
-        self._role_updaters: Dict[UserRole, "_BaseRoleUpdater"] = {
-            UserRole.PATIENT: _PatientUpdater(
-                self.patient_repo,
-                self.doctor_repo,
-                self.uow,
-                self.hasher,
-            ),
-            UserRole.DOCTOR: _DoctorUpdater(
-                self.doctor_repo,
-                self.patient_repo,
-                self.uow,
-                self.hasher,
-            ),
-            UserRole.ADMIN: _AdminUpdater(
-                self.admin_repo,
-                self.uow,
-                self.hasher,
-            ),
-        }
+        self.score_repo = score_repo
+        self.question_answer_repo = question_answer_repo
+        self.adapter_factory = adapter_factory
 
     def register_patient(self, data: dict) -> Patient:
-        email = data["email"]
-        if self.user_repo.get_by_email(email):
-            raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
-
-        doctor_emails = data.get("doctors", []) or []
-        if doctor_emails:
-            # Validate related doctors exist
-            doctors = self.doctor_repo.fetch_by_emails(doctor_emails)
-            
-        patient = Patient(
-            email=email,
-            password_hash=self.hasher.hash(data["password"]),
-            name=data["name"],
-            surname=data["surname"],
-            ailments=data.get("ailments"),
-            gender=data["gender"],
-            age=data["age"],
-            treatments=data.get("treatments"),
-            height_cm=data["height_cm"],
-            weight_kg=data["weight_kg"],
-            doctor_emails=list(doctor_emails),
-        )
-
-        with self.uow:
-            self.patient_repo.add(patient)
-            
-            # Create bidirectional associations
-            if doctor_emails:
-                for doctor in doctors:
-                    if patient.email not in doctor.patient_emails:
-                        doctor.patient_emails.append(patient.email)
-                        self.doctor_repo.update(doctor)
-            
-            self.uow.commit()
-        return patient
+        return self.patient_service.register_patient(data)
 
     def register_doctor(self, data: dict) -> Doctor:
-        email = data["email"]
-        if self.user_repo.get_by_email(email):
-            raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
-
-        patient_emails = data.get("patients", []) or []
-        if patient_emails:
-            patients = self.patient_repo.fetch_by_emails(patient_emails)
-
-        doctor = Doctor(
-            email=email,
-            password_hash=self.hasher.hash(data["password"]),
-            name=data["name"],
-            surname=data["surname"],
-            patient_emails=list(patient_emails),
-        )
-        
-        with self.uow:
-            self.doctor_repo.add(doctor)
-            
-            # Create bidirectional associations
-            if patient_emails:
-                for patient in patients:
-                    if doctor.email not in patient.doctor_emails:
-                        patient.doctor_emails.append(doctor.email)
-                        self.patient_repo.update(patient)
-            
-            self.uow.commit()
-        return doctor
+        return self.doctor_service.register_doctor(data)
 
     def register_admin(self, email: str, password: str, name: str, surname: str) -> Admin:
-        if self.user_repo.get_by_email(email):
-            raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
-        admin = Admin(
-            email=email,
-            password_hash=self.hasher.hash(password),
-            name=name,
-            surname=surname,
-        )
-        with self.uow:
-            self.admin_repo.add(admin)
-            self.uow.commit()
-        return admin
+        return self.admin_service.register_admin(email, password, name, surname)
 
     def login(self, email: str, password: str) -> str:
         user = self.user_repo.get_by_email(email)
         if user is None:
-            raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
+            raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
         if not user.check_password(password, self.hasher):
-            raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
-        token = self.token_service.generate(user.email)
-        return token
+            raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
+        return self.token_service.generate(user.email)
 
     def get_user(self, email: str) -> User:
         user = self.user_repo.get_by_email(email)
@@ -165,8 +86,13 @@ class UserService:
         if user is None:
             raise UserNotFoundException("Usuari no trobat.")
 
-        updater = self._build_role_updater(user.role)
-        return updater.update(user, update_data)
+        if user.role == UserRole.PATIENT:
+            return self.patient_service.update_patient(email, update_data)
+        if user.role == UserRole.DOCTOR:
+            return self.doctor_service.update_doctor(email, update_data)
+        if user.role == UserRole.ADMIN:
+            return self.admin_service.update_admin(email, update_data)
+        raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.")
 
     def delete_user(self, email: str) -> None:
         user = self.user_repo.get_by_email(email)
@@ -176,151 +102,149 @@ class UserService:
             self.user_repo.remove(user)
             self.uow.commit()
 
-    def get_patient_data(self, requester_email: str, patient_email: str) -> Patient:
-        requester = self.user_repo.get_by_email(requester_email)
-        if requester is None:
-            raise UserNotFoundException("Usuari no trobat.")
-        patient = self.patient_repo.get_by_email(patient_email)
-        if patient is None:
-            raise UserNotFoundException("Pacient no trobat.")
-
-        if isinstance(requester, Admin):
-            return patient
-        if isinstance(requester, Doctor) and patient.email in requester.patient_emails:
-            return patient
-        if isinstance(requester, Patient) and requester.email == patient.email:
-            return patient
-        raise PermissionError("No tens permís per accedir a les dades d'aquest pacient.")
-
-    def _build_role_updater(self, role: UserRole) -> "_BaseRoleUpdater":
+    def get_patient_data(self, requester: User, patient: Patient) -> dict:
         """
-        Retrieves the role-specific update handler.
+        Assemble a comprehensive payload for the given patient including basic
+        demographics, activity scores, answered questions and generated graph
+        files. The caller must supply a user (requester) authorized to view the
+        patient.
 
         Args:
-            role (UserRole): Role of the user being updated.
+            requester (User): The user requesting the data.  Must be an admin,
+                assigned doctor or the patient themselves.
+            patient (Patient): The patient whose data is being requested.
 
         Returns:
-            _BaseRoleUpdater: Handler that knows how to mutate and persist the role.
+            dict: A dictionary ready to be serialized as JSON containing:
+                - ``patient``: basic patient information as returned by
+                  ``Patient.to_dict()``.
+                - ``scores``: list of score objects with activity metadata.
+                - ``questions``: list of answered questions with analysis metrics.
+                - ``graph_files``: fragments HTML (div + script Plotly) codificats en base64; es poden injectar des de frontend (p. ex. WebView de Flutter via ``loadHtmlString``).
 
         Raises:
-            UserRoleConflictException: If the role is unsupported.
+            PermissionError: If the requester is not authorized to view the
+                patient's data.
         """
+        if isinstance(requester, Admin):
+            authorized = True
+        elif isinstance(requester, Doctor) and patient.email in requester.patient_emails:
+            authorized = True
+        elif isinstance(requester, Patient) and requester.email == patient.email:
+            authorized = True
+        else:
+            authorized = False
+        if not authorized:
+            raise PermissionError("No tens permís per accedir a les dades d'aquest pacient.")
+
+        patient_payload = patient.to_dict()
+
         try:
-            return self._role_updaters[role]
-        except KeyError as exc:
-            raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.") from exc
+            score_objects = self.score_repo.list_by_patient(patient.email)
+        except Exception:
+            score_objects = []
+        scores_list = []
+        for score in score_objects:
+            scores_list.append({
+                "activity_id": str(score.activity.id),
+                "activity_title": score.activity.title,
+                "activity_type": score.activity.activity_type.value if score.activity.activity_type else None,
+                "completed_at": score.completed_at.isoformat(),
+                "score": score.score,
+                "seconds_to_finish": score.seconds_to_finish,
+            })
 
+        # Retrieve answered questions with metrics
+        try:
+            answered = self.question_answer_repo.list_by_patient(patient.email)
+        except Exception:
+            answered = []
+        questions_list = [qa.to_dict() for qa in answered]
 
-class _BaseRoleUpdater(ABC):
-    """
-    Abstract base class for role-specific user update strategies.
-    
-    Implements the Strategy pattern to handle updates for different user roles (Patient, Doctor, Admin).
-    Each concrete updater must implement the abstract `update` method for role-specific logic.
-    This design enables clean separation of concerns and makes the update logic extensible.
-    """
-    
-    def __init__(self, uow: IUnitOfWork, hasher: PasswordHasher) -> None:
-        self.uow = uow
-        self.hasher = hasher
+        # Build graph definitions using the adapter
+        graphs: Dict[str, dict] = {}
+        graphic_adapter = self.adapter_factory.get_graphic_adapter()
+        try:
+            graphs.update(graphic_adapter.create_score_graphs(score_objects))
+            graphs.update(graphic_adapter.create_question_graphs(answered))
+        except Exception:
+            # Graph generation is optional; if it fails, leave graphs empty
+            graphs = {}
 
-    @abstractmethod
-    def update(self, user: User, update_data: dict) -> User:
-        ...
+        graph_files: list[dict] = []
+        if graphs:
+            try:
+                graph_files = self._build_graph_files(graphs)
+            except Exception:
+                graph_files = []
 
+        return {
+            "patient": patient_payload,
+            "scores": scores_list,
+            "questions": questions_list,
+            "graph_files": graph_files,
+        }
 
-class _PatientUpdater(_BaseRoleUpdater):
-    """
-    Concrete strategy for updating Patient users.
-    
-    Handles patient-specific update logic including validation and synchronization of assigned doctors.
-    Validates that referenced doctors exist before updating the patient's doctor associations.
-    """
-    
-    def __init__(
-        self,
-        patient_repo: IPatientRepository,
-        doctor_repo: IDoctorRepository,
-        uow: IUnitOfWork,
-        hasher: PasswordHasher,
-    ) -> None:
-        super().__init__(uow, hasher)
-        self.patient_repo = patient_repo
-        self.doctor_repo = doctor_repo
+    def _build_graph_files(self, graphs: Dict[str, dict]) -> list[dict]:
+        """
+        Persist graph figures as HTML fragments in the tmp directory and return
+        them as base64-encoded payloads. All files in the tmp directory are
+        removed once the payload is built.
+        """
+        self.GRAPH_TMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    def update(self, user: User, update_data: dict) -> Patient:
-        patient: Patient = user
-        doctors_list = update_data.get("doctors")
-        if doctors_list is not None:
-            normalized = doctors_list or []
-            self.doctor_repo.fetch_by_emails(normalized)
-            update_data = {**update_data, "doctors": normalized}
+        created_files: list[dict] = []
+        try:
+            for name, figure in graphs.items():
+                sanitized_name = name.replace(" ", "_")
+                file_path = self.GRAPH_TMP_DIR / f"{sanitized_name}.html"
+                html_content = self._figure_to_html(name, figure)
+                file_path.write_text(html_content, encoding="utf-8")
+                encoded_content = base64.b64encode(file_path.read_bytes()).decode("ascii")
+                created_files.append({
+                    "filename": file_path.name,
+                    "content_type": "text/html",
+                    "content": encoded_content,
+                })
+            return created_files
+        finally:
+            self._cleanup_tmp_graph_dir()
 
-        patient.set_properties(update_data, self.hasher)
+    def _figure_to_html(self, title: str, figure: dict) -> str:
+        """
+        Render an embeddable HTML fragment (div + script) for Plotly.
 
-        with self.uow:
-            self.patient_repo.update(patient)
-            self.uow.commit()
-        return patient
+        The fragment loads Plotly from CDN only if it is not already present in
+        the embedding document. It is intended to be consumed as `srcdoc` of an
+        <iframe> or injected into a wrapper element that allows script
+        execution.
+        """
+        figure_id = f"plot_{title}".replace(" ", "_").replace("-", "_")
+        data_json = json.dumps(figure.get("data", []))
+        layout = figure.get("layout", {}) or {}
+        layout.setdefault("title", title)
+        layout_json = json.dumps(layout)
+        return f"""<div id="{figure_id}" style="width:100%;min-height:360px;"></div>
+<script>
+(function() {{
+  const render = () => Plotly.newPlot("{figure_id}", {data_json}, {layout_json}, {{responsive: true}});
+  if (window.Plotly) {{
+    render();
+    return;
+  }}
+  const script = document.createElement("script");
+  script.src = "https://cdn.plot.ly/plotly-latest.min.js";
+  script.onload = render;
+  document.head.appendChild(script);
+}})();
+</script>"""
 
-
-class _DoctorUpdater(_BaseRoleUpdater):
-    """
-    Concrete strategy for updating Doctor users.
-    
-    Handles doctor-specific update logic including validation and synchronization of assigned patients.
-    Validates that referenced patients exist before updating the doctor's patient associations.
-    """
-    
-    def __init__(
-        self,
-        doctor_repo: IDoctorRepository,
-        patient_repo: IPatientRepository,
-        uow: IUnitOfWork,
-        hasher: PasswordHasher,
-    ) -> None:
-        super().__init__(uow, hasher)
-        self.doctor_repo = doctor_repo
-        self.patient_repo = patient_repo
-
-    def update(self, user: User, update_data: dict) -> Doctor:
-        doctor: Doctor = user
-        patients_list = update_data.get("patients")
-        if patients_list is not None:
-            normalized = patients_list or []
-            self.patient_repo.fetch_by_emails(normalized)
-            update_data = {**update_data, "patients": normalized}
-
-        doctor.set_properties(update_data, self.hasher)
-
-        with self.uow:
-            self.doctor_repo.update(doctor)
-            self.uow.commit()
-        return doctor
-
-
-class _AdminUpdater(_BaseRoleUpdater):
-    """
-    Concrete strategy for updating Admin users.
-    
-    Handles admin-specific update logic. Admins have no role-specific associations,
-    so this strategy primarily updates common fields (name, surname, password).
-    """
-    
-    def __init__(
-        self,
-        admin_repo: IAdminRepository,
-        uow: IUnitOfWork,
-        hasher: PasswordHasher,
-    ) -> None:
-        super().__init__(uow, hasher)
-        self.admin_repo = admin_repo
-
-    def update(self, user: User, update_data: dict) -> Admin:
-        admin: Admin = user
-        admin.set_properties(update_data, self.hasher)
-
-        with self.uow:
-            self.admin_repo.update(admin)
-            self.uow.commit()
-        return admin
+    def _cleanup_tmp_graph_dir(self) -> None:
+        """
+        Remove all files inside the graph tmp directory.
+        """
+        if not self.GRAPH_TMP_DIR.exists():
+            return
+        for file in self.GRAPH_TMP_DIR.iterdir():
+            if file.is_file():
+                file.unlink(missing_ok=True)

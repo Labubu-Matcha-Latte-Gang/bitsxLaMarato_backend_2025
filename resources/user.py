@@ -4,7 +4,7 @@ from pathlib import Path
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import Response, jsonify, g, request, current_app
+from flask import Response, jsonify
 from werkzeug.exceptions import HTTPException
 
 from db import db
@@ -39,7 +39,8 @@ from schemas import (
     UserResponseSchema,
     UserUpdateSchema,
     UserPartialUpdateSchema,
-    UserForgotPasswordSchema
+    UserForgotPasswordSchema,
+    PatientDataResponseSchema,
 )
 
 blp = Blueprint('user', __name__, description="Operacions relacionades amb els usuaris")
@@ -82,8 +83,8 @@ class PatientRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            user_service = ServiceFactory.get_instance().build_user_service()
-            patient = user_service.register_patient(data)
+            patient_service = ServiceFactory.get_instance().build_patient_service()
+            patient = patient_service.register_patient(data)
 
             return jsonify(patient.to_dict()), 201
         except KeyError as e:
@@ -152,8 +153,8 @@ class DoctorRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            user_service = ServiceFactory.get_instance().build_user_service()
-            doctor = user_service.register_doctor(data)
+            doctor_service = ServiceFactory.get_instance().build_doctor_service()
+            doctor = doctor_service.register_doctor(data)
 
             return jsonify(doctor.to_dict()), 201
         except KeyError as e:
@@ -228,7 +229,7 @@ class UserLogin(MethodView):
             return {"access_token": access_token}, 200
         except UserNotFoundException as e:
             self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
-            abort(401, message="Correu o contrasenya no vàlids.")
+            abort(401, message="Correu o contrassenya no vàlids.")
         except UserRoleConflictException as e:
             self.logger.error("User login failed: Role conflict", module="UserLogin", metadata={"email": data.get('email')}, error=e)
             abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
@@ -502,9 +503,15 @@ class PatientData(MethodView):
     @blp.arguments(PatientEmailPathSchema, location="path")
     @blp.doc(
         summary="Obtenir un pacient pel correu",
-        description="Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; els pacients poden obtenir el seu propi registre.",
+        description=(
+            "Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; "
+            "els pacients poden obtenir el seu propi registre. La resposta inclou les dades del pacient, "
+            "les puntuacions, les preguntes contestades i els gràfics generats com a fragments HTML (div + script) "
+            "codificats en base64, pensats per ser injectats a una WebView (p. ex. Flutter amb `loadHtmlString`) "
+            "o a un contenidor que executi scripts."
+        ),
     )
-    @blp.response(200, schema=UserResponseSchema, description="Informació del pacient recuperada correctament.")
+    @blp.response(200, schema=PatientDataResponseSchema, description="Dades del pacient i gràfics generats correctament.")
     @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="L'usuari autenticat no pot veure aquest pacient.")
     @blp.response(404, description="Pacient no trobat.")
@@ -515,7 +522,12 @@ class PatientData(MethodView):
         Recupera informació d'un pacient pel correu amb autorització per rol.
 
         Cal un JWT vàlid. Els administradors poden veure qualsevol pacient. Els metges poden veure
-        pacients als quals estan assignats. Els pacients poden veure el seu propi registre.
+        pacients als quals estan assignats. Els pacients poden veure el seu propi registre. La
+        resposta inclou:
+        - `patient`: dades bàsiques i de rol del pacient.
+        - `scores`: llista de puntuacions d'activitats.
+        - `questions`: preguntes contestades amb mètriques d'anàlisi.
+        - `graph_files`: fragments HTML (div + script) dels gràfics codificats en base64. Cal decodificar el contingut en base64 i injectar-lo a una WebView (p. ex. Flutter: `controller.loadHtmlString(fragment)`) o a un contenidor que executi scripts. Cada fragment carrega Plotly des del CDN si no és present.
 
         Codis d'estat:
         - 200: Informació del pacient retornada.
@@ -526,6 +538,7 @@ class PatientData(MethodView):
         - 500: Error inesperat en recuperar el pacient.
         """
         patient_email = None
+        current_email: str | None = None
         try:
             patient_email = path_args.get('email')
 
@@ -535,20 +548,20 @@ class PatientData(MethodView):
                 metadata={"patient_email": patient_email}
             )
 
-            user_service = ServiceFactory.get_instance().build_user_service()
+            factory = ServiceFactory.get_instance()
+            user_service = factory.build_user_service()
 
-            current_user = getattr(g, "current_user", None)
-            if current_user is None:
-                current_email: str = get_jwt_identity()
-                try:
-                    current_user = user_service.get_user(current_email)
-                except UserNotFoundException:
-                    abort(401, message="Token d'autenticació no vàlid.")
+            current_email = get_jwt_identity()
+            try:
+                current_user = user_service.get_user(current_email)
+            except UserNotFoundException:
+                abort(401, message="Token d'autenticació no vàlid.")
 
-            patient_domain = user_service.get_patient_data(current_user.email, patient_email)
-            patient_payload = patient_domain.to_dict()
+            patient_service = factory.build_patient_service()
+            patient = patient_service.get_patient(patient_email)
+
+            patient_payload = user_service.get_patient_data(current_user, patient)
             return jsonify(patient_payload), 200
-
         except UserRoleConflictException as e:
             self.logger.error("User role conflict", module="PatientData", metadata={"patient_email": patient_email}, error=e)
             abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")

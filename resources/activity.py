@@ -17,11 +17,13 @@ from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
 from schemas import (
     ActivityBulkCreateSchema,
+    ActivityCompleteResponseSchema,
     ActivityIdSchema,
     ActivityPartialUpdateSchema,
     ActivityQuerySchema,
     ActivityResponseSchema,
     ActivityUpdateSchema,
+    ActivityCompleteSchema
 )
 
 blp = Blueprint('activity', __name__, description="Operacions CRUD per a les activitats de l'aplicació.")
@@ -349,3 +351,73 @@ class RecommendedActivityResource(MethodView):
         except Exception as e:
             self.logger.error("Error inesperat en recuperar activitats", module="RecommendedActivityResource", error=e)
             abort(500, message=f"S'ha produït un error inesperat en recuperar les activitats recomanades: {str(e)}")
+
+
+@blp.route('/complete')
+class ActivityCompleteResource(MethodView):
+    """
+    Endpoint per marcar que un pacient ha completat una activitat.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.PATIENT])
+    @blp.arguments(ActivityCompleteSchema, location='json')
+    @blp.doc(
+        summary="Completar una activitat",
+        description="Marca una activitat com a completada pel pacient."
+    )
+    @blp.response(200, schema=ActivityCompleteResponseSchema, description="Activitat marcada com a completada correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
+    @blp.response(404, description="No s'ha trobat l'activitat indicada.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en marcar l'activitat com a completada.")
+    def post(self, data: dict):
+        """
+        Marca una activitat com a completada pel pacient.
+        """
+        email: str | None = None
+        try:
+            email = get_jwt_identity()
+            activity_id = data['id']
+            score = data['score']
+            seconds_to_finish = data['seconds_to_finish']
+
+            self.logger.info(
+                "Marcant activitat com a completada",
+                module="ActivityCompleteResource",
+                metadata={"patient_email": email, "activity_id": str(activity_id), "score": score, "seconds_to_finish": seconds_to_finish},
+            )
+
+            factory = ServiceFactory.get_instance()
+            patient_service = factory.build_patient_service()
+            patient = patient_service.get_patient(email)
+
+            activity_service = factory.build_activity_service()
+            activity = activity_service.get_activity(activity_id)
+
+            score_service = factory.build_score_service()
+            score = score_service.complete_activity(patient, activity, score, seconds_to_finish)
+
+            return jsonify(score.to_dict()), 200
+        except ActivityNotFoundException as e:
+            self.logger.error(
+                "Activitat no trobada en completar",
+                module="ActivityCompleteResource",
+                metadata={"patient_email": email, "activity_id": str(activity_id), "score": score, "seconds_to_finish": seconds_to_finish},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except DataIntegrityException as e:
+            db.session.rollback()
+            self.logger.error(
+                "Violació d'integritat en completar activitat",
+                module="ActivityCompleteResource",
+                metadata={"patient_email": email, "activity_id": str(activity_id), "score": score, "seconds_to_finish": seconds_to_finish},
+                error=e,
+            )
+            abort(422, message=str(e))
+        except Exception as e:
+            self.logger.error("Error inesperat en completar activitat", module="ActivityCompleteResource", metadata={"patient_email": email, "activity_id": str(activity_id), "score": score, "seconds_to_finish": seconds_to_finish}, error=e)
+            abort(500, message=f"S'ha produït un error inesperat en completar l'activitat: {str(e)}")
