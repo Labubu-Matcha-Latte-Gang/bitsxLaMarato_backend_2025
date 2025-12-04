@@ -1,4 +1,3 @@
-# Usa una imagen base un poco más completa para el build (evita compilar desde cero)
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -6,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 1. Instalar dependencias de sistema (ffmpeg, etc.)
+# Instalar dependencias del sistema (ffmpeg para audio, compiladores)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
@@ -14,20 +13,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Copiar SOLO requirements.txt primero
+# Copiar el archivo de requerimientos
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
-# 3. Instalar librerías usando CACHÉ DE DOCKER
+# Instalar PyTorch CPU primero
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# 4. Descargar modelos de IA (Capa pesada pero estática)
+# Instalar el resto de librerías
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
+
+# Descargar modelos de IA 
 RUN python -m spacy download ca_core_news_md && \
     python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
 
-# 5. FINALMENTE copiamos tu código
+# Copiar el código de la aplicación
 COPY . .
 
 EXPOSE 5000
