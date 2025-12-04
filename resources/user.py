@@ -4,7 +4,7 @@ from pathlib import Path
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import Response, jsonify, g, request, current_app
+from flask import Response, jsonify
 from werkzeug.exceptions import HTTPException
 
 from db import db
@@ -526,6 +526,7 @@ class PatientData(MethodView):
         - 500: Error inesperat en recuperar el pacient.
         """
         patient_email = None
+        current_email: str | None = None
         try:
             patient_email = path_args.get('email')
 
@@ -537,13 +538,11 @@ class PatientData(MethodView):
 
             user_service = ServiceFactory.get_instance().build_user_service()
 
-            current_user = getattr(g, "current_user", None)
-            if current_user is None:
-                current_email: str = get_jwt_identity()
-                try:
-                    current_user = user_service.get_user(current_email)
-                except UserNotFoundException:
-                    abort(401, message="Token d'autenticació no vàlid.")
+            current_email = get_jwt_identity()
+            try:
+                current_user = user_service.get_user(current_email)
+            except UserNotFoundException:
+                abort(401, message="Token d'autenticació no vàlid.")
 
             patient_domain = user_service.get_patient_data(current_user.email, patient_email)
             patient_payload = patient_domain.to_dict()
