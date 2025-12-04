@@ -71,27 +71,9 @@ class SQLAlchemyUserRepository(IUserRepository):
             raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.")
         role = model.role
         if role == UserRole.PATIENT and isinstance(model, Patient):
-            return PatientDomain(
-                email=model.email,
-                password_hash=model.password,
-                name=model.name,
-                surname=model.surname,
-                ailments=model.ailments,
-                gender=model.gender,
-                age=model.age,
-                treatments=model.treatments,
-                height_cm=model.height_cm,
-                weight_kg=model.weight_kg,
-                doctor_emails=[doctor.email for doctor in model.doctors],
-            )
+            return self._patient_to_domain(model, include_doctors=True)
         if role == UserRole.DOCTOR and isinstance(model, Doctor):
-            return DoctorDomain(
-                email=model.email,
-                password_hash=model.password,
-                name=model.name,
-                surname=model.surname,
-                patient_emails=[patient.email for patient in model.patients],
-            )
+            return self._doctor_to_domain(model, include_patients=True)
         if role == UserRole.ADMIN and isinstance(model, Admin):
             return AdminDomain(
                 email=model.email,
@@ -208,6 +190,42 @@ class SQLAlchemyUserRepository(IUserRepository):
                 f"No s'ha trobat cap pacient amb el correu: {', '.join(missing)}"
             )
         return patients
+
+    def _patient_to_domain(self, model: Patient, include_doctors: bool = False) -> PatientDomain:
+        doctors = []
+        if include_doctors:
+            doctors = [
+                self._doctor_to_domain(doctor, include_patients=False)
+                for doctor in model.doctors
+            ]
+        return PatientDomain(
+            email=model.email,
+            password_hash=model.password,
+            name=model.name,
+            surname=model.surname,
+            ailments=model.ailments,
+            gender=model.gender,
+            age=model.age,
+            treatments=model.treatments,
+            height_cm=model.height_cm,
+            weight_kg=model.weight_kg,
+            doctors=doctors,  # type: ignore[arg-type]
+        )
+
+    def _doctor_to_domain(self, model: Doctor, include_patients: bool = False) -> DoctorDomain:
+        patients = []
+        if include_patients:
+            patients = [
+                self._patient_to_domain(patient, include_doctors=False)
+                for patient in model.patients
+            ]
+        return DoctorDomain(
+            email=model.email,
+            password_hash=model.password,
+            name=model.name,
+            surname=model.surname,
+            patients=patients,  # type: ignore[arg-type]
+        )
 
 
 class SQLAlchemyPatientRepository(IPatientRepository):

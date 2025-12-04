@@ -56,7 +56,7 @@ class PatientService:
             treatments=data.get("treatments"),
             height_cm=data["height_cm"],
             weight_kg=data["weight_kg"],
-            doctor_emails=list(doctor_emails),
+            doctors=doctors,
         )
 
         with self.uow:
@@ -65,7 +65,7 @@ class PatientService:
                 # Keep bidirectional domain associations in sync
                 for doctor in doctors:
                     if patient.email not in doctor.patient_emails:
-                        doctor.patient_emails.append(patient.email)
+                        doctor.add_patients([patient])
                         self.doctor_repo.update(doctor)
             self.uow.commit()
 
@@ -90,12 +90,31 @@ class PatientService:
         if doctors_list is not None:
             normalized = doctors_list or []
             # Validate referenced doctors before mutating the aggregate.
-            self.doctor_repo.fetch_by_emails(normalized)
-            update_data = {**update_data, "doctors": normalized}
+            doctors = self.doctor_repo.fetch_by_emails(normalized)
+            previous_doctors = {doc.email: doc for doc in patient.doctors}
+            patient.replace_doctors(doctors)
+            update_data = {k: v for k, v in update_data.items() if k != "doctors"}
+        else:
+            doctors = None
 
         patient.set_properties(update_data, self.hasher)
 
         with self.uow:
+            if doctors is not None:
+                # Remove patient from doctors no longer associated
+                removed_doctors = [
+                    doc for email, doc in previous_doctors.items() if email not in {d.email for d in doctors}
+                ]
+                for doctor in removed_doctors:
+                    doctor.remove_patient(patient.email)
+                    self.doctor_repo.update(doctor)
+
+                # Add patient to newly associated doctors
+                for doctor in doctors:
+                    if patient.email not in doctor.patient_emails:
+                        doctor.add_patients([patient])
+                    self.doctor_repo.update(doctor)
+
             self.patient_repo.update(patient)
             self.uow.commit()
 
