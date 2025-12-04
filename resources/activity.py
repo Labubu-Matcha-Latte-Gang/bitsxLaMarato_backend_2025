@@ -397,9 +397,9 @@ class ActivityCompleteResource(MethodView):
             activity = activity_service.get_activity(activity_id)
 
             score_service = factory.build_score_service()
-            score_service.complete_activity(patient, activity, score, seconds_to_finish)
+            score = score_service.complete_activity(patient, activity, score, seconds_to_finish)
 
-            return jsonify({"message": "Activitat marcada com a completada correctament."}), 200
+            return jsonify(score.to_dict()), 200
         except ActivityNotFoundException as e:
             self.logger.error(
                 "Activitat no trobada en completar",
