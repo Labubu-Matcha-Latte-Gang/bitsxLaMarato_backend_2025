@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 2. Copiar SOLO requirements.txt primero
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir torch --index-url https://download.pytorc h.org/whl/cpu
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 # 3. Instalar librerías usando CACHÉ DE DOCKER
 RUN --mount=type=cache,target=/root/.cache/pip \
