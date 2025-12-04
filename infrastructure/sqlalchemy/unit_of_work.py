@@ -69,6 +69,8 @@ def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
         "doctor_patient_pkey": "Ja existeix una associació entre aquest metge i aquest pacient.",
         "questions_answered_pkey": "Ja s'ha registrat aquesta pregunta com a contestada pel pacient.",
         "activities_completed_pkey": "Ja s'ha registrat aquesta activitat com a completada pel pacient.",
+        "scores_pkey": "Ja s'ha registrat aquesta activitat com a completada pel pacient.",
+        "check_score_range": "La puntuació ha d'estar entre 0 i 10.",
     }
 
     raw_message = str(getattr(exc, "orig", exc))
@@ -89,6 +91,8 @@ def map_integrity_error(exc: IntegrityError) -> DataIntegrityException:
             return DataIntegrityException("Ja existeix una pregunta amb aquestes dades.")
         if table in {"users", "patients", "doctors", "admins"}:
             return DataIntegrityException("Ja existeix un usuari amb aquest correu.")
+        if table in {"activities_completed", "scores"}:
+            return DataIntegrityException("Ja s'ha registrat aquesta activitat com a completada pel pacient.")
         return DataIntegrityException("Ja existeix un registre amb aquest identificador.")
 
     # Fallback per a motors sense diag
