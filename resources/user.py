@@ -507,7 +507,8 @@ class PatientData(MethodView):
             "Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; "
             "els pacients poden obtenir el seu propi registre. La resposta inclou les dades del pacient, "
             "les puntuacions, les preguntes contestades i els gràfics generats com a fragments HTML (div + script) "
-            "codificats en base64, pensats per ser injectats a un iframe via `srcdoc` o en un contenidor que executi scripts."
+            "codificats en base64, pensats per ser injectats a una WebView (p. ex. Flutter amb `loadHtmlString`) "
+            "o a un contenidor que executi scripts."
         ),
     )
     @blp.response(200, schema=PatientDataResponseSchema, description="Dades del pacient i gràfics generats correctament.")
@@ -526,7 +527,7 @@ class PatientData(MethodView):
         - `patient`: dades bàsiques i de rol del pacient.
         - `scores`: llista de puntuacions d'activitats.
         - `questions`: preguntes contestades amb mètriques d'anàlisi.
-        - `graph_files`: fragments HTML (div + script) dels gràfics codificats en base64. Cal decodificar el contingut en base64 i injectar-lo a un iframe via `srcdoc` (o en un contenidor que executi scripts). Cada fragment carrega Plotly des del CDN si no és present.
+        - `graph_files`: fragments HTML (div + script) dels gràfics codificats en base64. Cal decodificar el contingut en base64 i injectar-lo a una WebView (p. ex. Flutter: `controller.loadHtmlString(fragment)`) o a un contenidor que executi scripts. Cada fragment carrega Plotly des del CDN si no és present.
 
         Codis d'estat:
         - 200: Informació del pacient retornada.
