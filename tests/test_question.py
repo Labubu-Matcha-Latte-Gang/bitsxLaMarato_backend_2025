@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from helpers.enums.question_types import QuestionType
 from tests.base_test import BaseTest
 
@@ -7,7 +9,7 @@ from tests.base_test import BaseTest
 class TestQuestionResource(BaseTest):
     def _make_question_payload(self, **overrides) -> dict:
         return {
-            "text": overrides.get("text", "Pregunta de prova"),
+            "text": overrides.get("text", f"Pregunta de prova {uuid.uuid4().hex[:8]}"),
             "question_type": overrides.get("question_type", QuestionType.CONCENTRATION.value),
             "difficulty": overrides.get("difficulty", 2.5),
         }
@@ -18,7 +20,11 @@ class TestQuestionResource(BaseTest):
 
     def _create_questions(self, count: int = 1, token: str | None = None):
         token = token or self.get_admin_token()
-        payload = {"questions": [self._make_question_payload(text=f"Pregunta {i}") for i in range(count)]}
+        payload = {
+            "questions": [
+                self._make_question_payload(text=f"Pregunta {i} {uuid.uuid4().hex[:8]}") for i in range(count)
+            ]
+        }
         return self.client.post(
             f"{self.api_prefix}/question",
             headers=self.auth_headers(token),
@@ -27,19 +33,26 @@ class TestQuestionResource(BaseTest):
 
     def test_create_and_get_questions(self):
         token = self.get_admin_token()
+        baseline_resp = self.client.get(
+            f"{self.api_prefix}/question",
+            headers=self.auth_headers(token),
+        )
+        baseline = baseline_resp.get_json() or []
         create_resp = self._create_questions(count=2, token=token)
         assert create_resp.status_code == 201
         created = create_resp.get_json()
         assert len(created) == 2
+        created_ids = {q["id"] for q in created}
 
         list_resp = self.client.get(
             f"{self.api_prefix}/question",
             headers=self.auth_headers(token),
         )
         assert list_resp.status_code == 200
-        listed = list_resp.get_json()
-        assert len(listed) == 2
-        assert {q["text"] for q in listed} == {q["text"] for q in created}
+        listed = list_resp.get_json() or []
+        listed_ids = {q["id"] for q in listed}
+        assert created_ids.issubset(listed_ids)
+        assert len(listed) >= len(baseline)
 
     def test_filters_by_id_and_ranges(self):
         token = self.get_admin_token()
@@ -74,7 +87,10 @@ class TestQuestionResource(BaseTest):
         create_resp = self._create_questions(count=1, token=token)
         question = create_resp.get_json()[0]
 
-        update_payload = self._make_question_payload(text="Pregunta actualitzada", difficulty=3.0)
+        update_payload = self._make_question_payload(
+            text=f"Pregunta actualitzada {uuid.uuid4().hex[:8]}",
+            difficulty=3.0,
+        )
         put_resp = self.client.put(
             f"{self.api_prefix}/question",
             headers=self.auth_headers(token),
@@ -83,7 +99,7 @@ class TestQuestionResource(BaseTest):
         )
         assert put_resp.status_code == 200
         updated = put_resp.get_json()
-        assert updated["text"] == "Pregunta actualitzada"
+        assert updated["text"] == update_payload["text"]
         assert updated["difficulty"] == 3.0
 
     def test_patch_updates_subset(self):
@@ -91,15 +107,16 @@ class TestQuestionResource(BaseTest):
         create_resp = self._create_questions(count=1, token=token)
         question = create_resp.get_json()[0]
 
+        new_text = f"Nou text {uuid.uuid4().hex[:8]}"
         patch_resp = self.client.patch(
             f"{self.api_prefix}/question",
             headers=self.auth_headers(token),
             query_string={"id": question["id"]},
-            json={"text": "Nou text"},
+            json={"text": new_text},
         )
         assert patch_resp.status_code == 200
         patched = patch_resp.get_json()
-        assert patched["text"] == "Nou text"
+        assert patched["text"] == new_text
 
     def test_delete_question(self):
         token = self.get_admin_token()
@@ -147,7 +164,8 @@ class TestQuestionResource(BaseTest):
 
     def test_create_duplicate_text_returns_422_with_message(self):
         token = self.get_admin_token()
-        payload = {"questions": [self._make_question_payload(text="Enunciat únic")]}
+        unique_text = f"Enunciat únic {uuid.uuid4().hex[:8]}"
+        payload = {"questions": [self._make_question_payload(text=unique_text)]}
         first = self.client.post(
             f"{self.api_prefix}/question",
             headers=self.auth_headers(token),
