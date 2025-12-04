@@ -158,7 +158,7 @@ class TranscriptionCompleteResource(MethodView):
     @blp.arguments(TranscriptionCompleteSchema, location='json')
     @blp.doc(
         summary="Finalitzar transcripció",
-        description="Recupera tots els fragments de la DB, els ordena i retorna el text final.",
+        description="Recupera tots els fragments de la DB, els ordena i retorna el text final amb anàlisi complet.",
     )
     @blp.response(200, schema=TranscriptionResponseSchema, description="Text complet retornat.")
     @blp.response(404, description="No s'han trobat fragments per a aquesta sessió.")
@@ -166,7 +166,7 @@ class TranscriptionCompleteResource(MethodView):
         session_id = data['session_id']
 
         try:
-            # 1. Recuperar chunks de la DB
+            # 1. Recuperar fragments
             chunks = TranscriptionChunk.query.filter_by(session_id=session_id)\
                         .order_by(TranscriptionChunk.chunk_index.asc())\
                         .all()
@@ -174,25 +174,38 @@ class TranscriptionCompleteResource(MethodView):
             if not chunks:
                 abort(404, message="No s'ha trobat cap sessió activa amb aquest ID.")
 
-            # 2. Unir el texto completo
-            # Añadimos espacio entre chunks para evitar palabras pegadas
-            full_text = " ".join([chunk.text.strip() for chunk in chunks])
+            # 2. Unir text
+            full_text = " ".join([chunk.text for chunk in chunks])
             
-            # 3. ANÁLISIS DE FUNCIONES EJECUTIVAS (Planificación)
-            # Analizamos el texto completo para ver la coherencia global
+            # ---------------------------------------------------------
+            # 3. ANÀLISI INTEGRAL (Text Complet)
+            # ---------------------------------------------------------
+            # A. Funcions Executives (Planificació, Coherència)
             executive_metrics = analyze_executive_functions(full_text)
+            
+            # B. Lingüística (Anomia, Densitat) -
+            linguistic_metrics = analyze_linguistics(full_text)
 
-            # 4. Limpieza DB
+            # C. Recuperar mètriques físiques mitjanes (Opcional, si volem mantenir dades de veu)
+            # Com que no tenim l'àudio, podríem fer la mitjana dels chunks si ho guardéssim a la DB.
+            # Per ara, retornem la combinació de Exec + Ling.
+            
+            final_metrics = {
+                **executive_metrics,
+                **linguistic_metrics
+            }
+
+            # 4. Netejar la DB
             for chunk in chunks:
                 db.session.delete(chunk)
             db.session.commit()
             
-            self.logger.info(f"Session {session_id} completed. Coherence: {executive_metrics['global_coherence']}", module="Transcription")
+            self.logger.info(f"Session {session_id} completed. Metrics: {final_metrics}", module="Transcription")
 
             return {
                 "status": "completed",
                 "transcription": full_text,
-                "analysis": executive_metrics
+                "analysis": final_metrics 
             }, 200
 
         except IntegrityError as e:
