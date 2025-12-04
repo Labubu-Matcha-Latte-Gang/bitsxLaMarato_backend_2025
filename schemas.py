@@ -1228,13 +1228,63 @@ class ActivityCompleteResponseSchema(Schema):
     """
 
     class Meta:
-        description = "Resposta que confirma que l'activitat s'ha marcat com a completada."
-        example = {"message": "Activitat marcada com a completada correctament."}
+        description = "Resposta amb les dades de puntuació en completar una activitat."
+        example = {
+            "patient": {
+                "email": "pacient@example.com",
+                "name": "John",
+                "surname": "Doe",
+                "role": {"gender": "male", "age": 30, "height_cm": 180.0, "weight_kg": 75.0, "doctors": []},
+            },
+            "activity": {
+                "id": "8f0d1a2b-5678-4cde-9abc-444455556666",
+                "title": "Suma ràpida",
+                "description": "Respon sumes senzilles en menys de 5 segons.",
+                "activity_type": "speed",
+                "difficulty": 1.5,
+            },
+            "completed_at": "2024-05-01T12:34:56.789Z",
+            "score": 8.5,
+            "seconds_to_finish": 120.3,
+        }
 
-    message = fields.String(
+    patient = fields.Nested(
+        UserResponseSchema,
         required=True,
+        dump_only=True,
         metadata={
-            "description": "Missatge de resultat de l'operació de marcar l'activitat com a completada.",
-            "example": "Activitat marcada com a completada correctament.",
+            "description": "Dades del pacient que ha completat l'activitat.",
+        },
+    )
+    activity = fields.Nested(
+        ActivityResponseSchema,
+        required=True,
+        dump_only=True,
+        metadata={
+            "description": "Activitat que s'ha completat.",
+        },
+    )
+    completed_at = fields.DateTime(
+        required=True,
+        dump_only=True,
+        metadata={
+            "description": "Moment en què s'ha registrat la finalització.",
+            "example": "2024-05-01T12:34:56.789Z",
+        },
+    )
+    score = fields.Float(
+        required=True,
+        dump_only=True,
+        metadata={
+            "description": "Puntuació obtinguda en completar l'activitat.",
+            "example": 8.5,
+        },
+    )
+    seconds_to_finish = fields.Float(
+        required=True,
+        dump_only=True,
+        metadata={
+            "description": "Temps en segons que ha trigat el pacient a completar l'activitat.",
+            "example": 120.3,
         },
     )
