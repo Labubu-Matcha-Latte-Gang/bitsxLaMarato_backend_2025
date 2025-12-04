@@ -1,147 +1,53 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Dict
-
 from domain.entities.user import Admin, Doctor, Patient, User
-from domain.repositories import (
-    IAdminRepository,
-    IDoctorRepository,
-    IPatientRepository,
-    IUserRepository,
-)
+from domain.repositories import IUserRepository
 from domain.services.security import PasswordHasher
 from domain.unit_of_work import IUnitOfWork
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     InvalidCredentialsException,
-    UserAlreadyExistsException,
     UserNotFoundException,
     UserRoleConflictException,
 )
+from application.services.admin_service import AdminService
+from application.services.doctor_service import DoctorService
+from application.services.patient_service import PatientService
 from application.services.token_service import TokenService
 
 
 class UserService:
+    """
+    Application service for user-level concerns (auth, user dispatch).
+    Delegates role-specific operations to dedicated services.
+    """
+
     def __init__(
         self,
         user_repo: IUserRepository,
-        patient_repo: IPatientRepository,
-        doctor_repo: IDoctorRepository,
-        admin_repo: IAdminRepository,
+        patient_service: PatientService,
+        doctor_service: DoctorService,
+        admin_service: AdminService,
         uow: IUnitOfWork,
         hasher: PasswordHasher,
         token_service: TokenService,
     ):
         self.user_repo = user_repo
-        self.patient_repo = patient_repo
-        self.doctor_repo = doctor_repo
-        self.admin_repo = admin_repo
+        self.patient_service = patient_service
+        self.doctor_service = doctor_service
+        self.admin_service = admin_service
         self.uow = uow
         self.hasher = hasher
         self.token_service = token_service
-        
-        # Initialize role updaters once for reuse
-        self._role_updaters: Dict[UserRole, "_BaseRoleUpdater"] = {
-            UserRole.PATIENT: _PatientUpdater(
-                self.patient_repo,
-                self.doctor_repo,
-                self.uow,
-                self.hasher,
-            ),
-            UserRole.DOCTOR: _DoctorUpdater(
-                self.doctor_repo,
-                self.patient_repo,
-                self.uow,
-                self.hasher,
-            ),
-            UserRole.ADMIN: _AdminUpdater(
-                self.admin_repo,
-                self.uow,
-                self.hasher,
-            ),
-        }
 
     def register_patient(self, data: dict) -> Patient:
-        email = data["email"]
-        if self.user_repo.get_by_email(email):
-            raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
-
-        doctor_emails = data.get("doctors", []) or []
-        if doctor_emails:
-            # Validate related doctors exist
-            doctors = self.doctor_repo.fetch_by_emails(doctor_emails)
-            
-        patient = Patient(
-            email=email,
-            password_hash=self.hasher.hash(data["password"]),
-            name=data["name"],
-            surname=data["surname"],
-            ailments=data.get("ailments"),
-            gender=data["gender"],
-            age=data["age"],
-            treatments=data.get("treatments"),
-            height_cm=data["height_cm"],
-            weight_kg=data["weight_kg"],
-            doctor_emails=list(doctor_emails),
-        )
-
-        with self.uow:
-            self.patient_repo.add(patient)
-            
-            # Create bidirectional associations
-            if doctor_emails:
-                for doctor in doctors:
-                    if patient.email not in doctor.patient_emails:
-                        doctor.patient_emails.append(patient.email)
-                        self.doctor_repo.update(doctor)
-            
-            self.uow.commit()
-        return patient
+        return self.patient_service.register_patient(data)
 
     def register_doctor(self, data: dict) -> Doctor:
-        email = data["email"]
-        if self.user_repo.get_by_email(email):
-            raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
-
-        patient_emails = data.get("patients", []) or []
-        if patient_emails:
-            patients = self.patient_repo.fetch_by_emails(patient_emails)
-
-        doctor = Doctor(
-            email=email,
-            password_hash=self.hasher.hash(data["password"]),
-            name=data["name"],
-            surname=data["surname"],
-            patient_emails=list(patient_emails),
-        )
-        
-        with self.uow:
-            self.doctor_repo.add(doctor)
-            
-            # Create bidirectional associations
-            if patient_emails:
-                for patient in patients:
-                    if doctor.email not in patient.doctor_emails:
-                        patient.doctor_emails.append(doctor.email)
-                        self.patient_repo.update(patient)
-            
-            self.uow.commit()
-        return doctor
+        return self.doctor_service.register_doctor(data)
 
     def register_admin(self, email: str, password: str, name: str, surname: str) -> Admin:
-        if self.user_repo.get_by_email(email):
-            raise UserAlreadyExistsException("Ja existeix un usuari amb aquest correu.")
-        admin = Admin(
-            email=email,
-            password_hash=self.hasher.hash(password),
-            name=name,
-            surname=surname,
-        )
-        with self.uow:
-            self.admin_repo.add(admin)
-            self.uow.commit()
-        return admin
+        return self.admin_service.register_admin(email, password, name, surname)
 
     def login(self, email: str, password: str) -> str:
         user = self.user_repo.get_by_email(email)
@@ -149,8 +55,7 @@ class UserService:
             raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
         if not user.check_password(password, self.hasher):
             raise InvalidCredentialsException("Correu o contrasenya no vàlids.")
-        token = self.token_service.generate(user.email)
-        return token
+        return self.token_service.generate(user.email)
 
     def get_user(self, email: str) -> User:
         user = self.user_repo.get_by_email(email)
@@ -163,8 +68,13 @@ class UserService:
         if user is None:
             raise UserNotFoundException("Usuari no trobat.")
 
-        updater = self._build_role_updater(user.role)
-        return updater.update(user, update_data)
+        if user.role == UserRole.PATIENT:
+            return self.patient_service.update_patient(email, update_data)
+        if user.role == UserRole.DOCTOR:
+            return self.doctor_service.update_doctor(email, update_data)
+        if user.role == UserRole.ADMIN:
+            return self.admin_service.update_admin(email, update_data)
+        raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.")
 
     def delete_user(self, email: str) -> None:
         user = self.user_repo.get_by_email(email)
@@ -178,7 +88,7 @@ class UserService:
         requester = self.user_repo.get_by_email(requester_email)
         if requester is None:
             raise UserNotFoundException("Usuari no trobat.")
-        patient = self.patient_repo.get_by_email(patient_email)
+        patient = self.patient_service.get_patient(patient_email)
         if patient is None:
             raise UserNotFoundException("Pacient no trobat.")
 
@@ -189,136 +99,3 @@ class UserService:
         if isinstance(requester, Patient) and requester.email == patient.email:
             return patient
         raise PermissionError("No tens permís per accedir a les dades d'aquest pacient.")
-
-    def _build_role_updater(self, role: UserRole) -> "_BaseRoleUpdater":
-        """
-        Retrieves the role-specific update handler.
-
-        Args:
-            role (UserRole): Role of the user being updated.
-
-        Returns:
-            _BaseRoleUpdater: Handler that knows how to mutate and persist the role.
-
-        Raises:
-            UserRoleConflictException: If the role is unsupported.
-        """
-        try:
-            return self._role_updaters[role]
-        except KeyError as exc:
-            raise UserRoleConflictException("L'usuari ha de tenir assignat exactament un únic rol.") from exc
-
-
-class _BaseRoleUpdater(ABC):
-    """
-    Abstract base class for role-specific user update strategies.
-    
-    Implements the Strategy pattern to handle updates for different user roles (Patient, Doctor, Admin).
-    Each concrete updater must implement the abstract `update` method for role-specific logic.
-    This design enables clean separation of concerns and makes the update logic extensible.
-    """
-    
-    def __init__(self, uow: IUnitOfWork, hasher: PasswordHasher) -> None:
-        self.uow = uow
-        self.hasher = hasher
-
-    @abstractmethod
-    def update(self, user: User, update_data: dict) -> User:
-        ...
-
-
-class _PatientUpdater(_BaseRoleUpdater):
-    """
-    Concrete strategy for updating Patient users.
-    
-    Handles patient-specific update logic including validation and synchronization of assigned doctors.
-    Validates that referenced doctors exist before updating the patient's doctor associations.
-    """
-    
-    def __init__(
-        self,
-        patient_repo: IPatientRepository,
-        doctor_repo: IDoctorRepository,
-        uow: IUnitOfWork,
-        hasher: PasswordHasher,
-    ) -> None:
-        super().__init__(uow, hasher)
-        self.patient_repo = patient_repo
-        self.doctor_repo = doctor_repo
-
-    def update(self, user: User, update_data: dict) -> Patient:
-        patient: Patient = user
-        doctors_list = update_data.get("doctors")
-        if doctors_list is not None:
-            normalized = doctors_list or []
-            self.doctor_repo.fetch_by_emails(normalized)
-            update_data = {**update_data, "doctors": normalized}
-
-        patient.set_properties(update_data, self.hasher)
-
-        with self.uow:
-            self.patient_repo.update(patient)
-            self.uow.commit()
-        return patient
-
-
-class _DoctorUpdater(_BaseRoleUpdater):
-    """
-    Concrete strategy for updating Doctor users.
-    
-    Handles doctor-specific update logic including validation and synchronization of assigned patients.
-    Validates that referenced patients exist before updating the doctor's patient associations.
-    """
-    
-    def __init__(
-        self,
-        doctor_repo: IDoctorRepository,
-        patient_repo: IPatientRepository,
-        uow: IUnitOfWork,
-        hasher: PasswordHasher,
-    ) -> None:
-        super().__init__(uow, hasher)
-        self.doctor_repo = doctor_repo
-        self.patient_repo = patient_repo
-
-    def update(self, user: User, update_data: dict) -> Doctor:
-        doctor: Doctor = user
-        patients_list = update_data.get("patients")
-        if patients_list is not None:
-            normalized = patients_list or []
-            self.patient_repo.fetch_by_emails(normalized)
-            update_data = {**update_data, "patients": normalized}
-
-        doctor.set_properties(update_data, self.hasher)
-
-        with self.uow:
-            self.doctor_repo.update(doctor)
-            self.uow.commit()
-        return doctor
-
-
-class _AdminUpdater(_BaseRoleUpdater):
-    """
-    Concrete strategy for updating Admin users.
-    
-    Handles admin-specific update logic. Admins have no role-specific associations,
-    so this strategy primarily updates common fields (name, surname, password).
-    """
-    
-    def __init__(
-        self,
-        admin_repo: IAdminRepository,
-        uow: IUnitOfWork,
-        hasher: PasswordHasher,
-    ) -> None:
-        super().__init__(uow, hasher)
-        self.admin_repo = admin_repo
-
-    def update(self, user: User, update_data: dict) -> Admin:
-        admin: Admin = user
-        admin.set_properties(update_data, self.hasher)
-
-        with self.uow:
-            self.admin_repo.update(admin)
-            self.uow.commit()
-        return admin
