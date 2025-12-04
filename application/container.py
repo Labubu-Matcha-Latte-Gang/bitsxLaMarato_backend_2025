@@ -7,6 +7,7 @@ from application.services import (
     ActivityService,
     AdminService,
     DoctorService,
+    ScoreService,
     PasswordResetService,
     PatientService,
     QuestionService,
@@ -20,6 +21,7 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyDoctorRepository,
     SQLAlchemyPatientRepository,
     SQLAlchemyQuestionRepository,
+    SQLAlchemyScoreRepository,
     SQLAlchemyResetCodeRepository,
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
@@ -186,4 +188,19 @@ class ServiceFactory:
             hasher=hasher,
             uow=uow,
             validity_minutes=validity_minutes,
+        )
+
+    def build_score_service(self) -> ScoreService:
+        """
+        Build a ScoreService with its dependencies.
+        Returns:
+            ScoreService: The constructed ScoreService instance.
+        """
+        uow = SQLAlchemyUnitOfWork(self.session)
+        score_repo = SQLAlchemyScoreRepository(self.session)
+        activity_repo = SQLAlchemyActivityRepository(self.session)
+        return ScoreService(
+            score_repo=score_repo,
+            activity_repo=activity_repo,
+            uow=uow,
         )
