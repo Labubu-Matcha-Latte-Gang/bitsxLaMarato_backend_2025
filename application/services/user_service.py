@@ -120,7 +120,7 @@ class UserService:
                   ``Patient.to_dict()``.
                 - ``scores``: list of score objects with activity metadata.
                 - ``questions``: list of answered questions with analysis metrics.
-                - ``graph_files``: graph files encoded en base64 (fragments HTML amb un div i script Plotly).
+                - ``graph_files``: fragments HTML (div + script Plotly) codificats en base64; es poden injectar des de frontend (p. ex. WebView de Flutter via ``loadHtmlString``).
 
         Raises:
             PermissionError: If the requester is not authorized to view the
