@@ -21,11 +21,13 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyDoctorRepository,
     SQLAlchemyPatientRepository,
     SQLAlchemyQuestionRepository,
+    SQLAlchemyQuestionAnswerRepository,
     SQLAlchemyScoreRepository,
     SQLAlchemyResetCodeRepository,
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
 )
+from helpers.plotly_adapter import SimplePlotlyAdapter
 from sqlalchemy.orm import Session
 
 
@@ -64,6 +66,7 @@ class ServiceFactory:
         token_service = TokenService()
 
         user_repo = SQLAlchemyUserRepository(self.session)
+        # Build subordinate services
         patient_service = PatientService(
             user_repo=user_repo,
             patient_repo=SQLAlchemyPatientRepository(self.session),
@@ -85,6 +88,11 @@ class ServiceFactory:
             hasher=hasher,
         )
 
+        # Additional repositories used directly by UserService
+        score_repo = SQLAlchemyScoreRepository(self.session)
+        question_answer_repo = SQLAlchemyQuestionAnswerRepository(self.session)
+        plotly_adapter = SimplePlotlyAdapter()
+
         return UserService(
             user_repo=user_repo,
             patient_service=patient_service,
@@ -93,6 +101,9 @@ class ServiceFactory:
             uow=uow,
             hasher=hasher,
             token_service=token_service,
+            score_repo=score_repo,
+            question_answer_repo=question_answer_repo,
+            plotly_adapter=plotly_adapter,
         )
 
     def build_question_service(self) -> QuestionService:
