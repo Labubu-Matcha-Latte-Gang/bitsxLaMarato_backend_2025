@@ -393,8 +393,11 @@ class ActivityCompleteResource(MethodView):
             patient_service = factory.build_patient_service()
             patient = patient_service.get_patient(email)
 
+            activity_service = factory.build_activity_service()
+            activity = activity_service.get_activity(activity_id)
+
             score_service = factory.build_score_service()
-            score_service.complete_activity(patient, activity_id, score, seconds_to_finish)
+            score_service.complete_activity(patient, activity, score, seconds_to_finish)
 
             return jsonify({"message": "Activitat marcada com a completada correctament."}), 200
         except ActivityNotFoundException as e:

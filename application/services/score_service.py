@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 
+from domain.entities.activity import Activity
 from domain.entities.score import Score
 from domain.entities.user import Patient
 from domain.repositories import IActivityRepository, IScoreRepository
@@ -28,19 +28,13 @@ class ScoreService:
     def complete_activity(
         self,
         patient: Patient,
-        activity_id: uuid.UUID,
+        activity: Activity,
         score_value: float,
         seconds_to_finish: float,
     ) -> Score:
         """
         Register a completed activity for the given patient.
         """
-        activity = self.activity_repo.get(activity_id)
-        if activity is None:
-            raise ActivityNotFoundException(
-                f"No s'ha trobat cap activitat amb l'ID {activity_id}."
-            )
-
         score = Score(
             patient=patient,
             activity=activity,
