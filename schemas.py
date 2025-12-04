@@ -1221,3 +1221,20 @@ class ActivityCompleteSchema(Schema):
             "example": 120.3,
         },
     )
+
+class ActivityCompleteResponseSchema(Schema):
+    """
+    Esquema per a la resposta de l'activitat completada.
+    """
+
+    class Meta:
+        description = "Resposta que confirma que l'activitat s'ha marcat com a completada."
+        example = {"message": "Activitat marcada com a completada correctament."}
+
+    message = fields.String(
+        required=True,
+        metadata={
+            "description": "Missatge de resultat de l'operació de marcar l'activitat com a completada.",
+            "example": "Activitat marcada com a completada correctament.",
+        },
+    )
