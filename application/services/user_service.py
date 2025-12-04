@@ -120,7 +120,6 @@ class UserService:
             PermissionError: If the requester is not authorized to view the
                 patient's data.
         """
-        # Authorization as in the original implementation
         if isinstance(requester, Admin):
             authorized = True
         elif isinstance(requester, Doctor) and patient.email in requester.patient_emails:
@@ -132,17 +131,14 @@ class UserService:
         if not authorized:
             raise PermissionError("No tens permís per accedir a les dades d'aquest pacient.")
 
-        # Core patient information
         patient_payload = patient.to_dict()
 
-        # Retrieve scores for this patient via the injected repository
         try:
             score_objects = self.score_repo.list_by_patient(patient.email)
         except Exception:
             score_objects = []
         scores_list = []
         for score in score_objects:
-            # Flatten the score for API serialization
             scores_list.append({
                 "activity_id": str(score.activity.id),
                 "activity_title": score.activity.title,
