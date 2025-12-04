@@ -121,4 +121,20 @@ class TestActivityComplete(BaseTest):
             },
         )
 
-        assert response.status_code == 500
+        assert response.status_code == 422
+
+    def test_negative_seconds_returns_422(self):
+        _, token = self._register_and_login_patient()
+        activity = self._create_activity()
+
+        response = self.client.post(
+            f"{self.api_prefix}/activity/complete",
+            headers=self.auth_headers(token),
+            json={
+                "id": str(activity.id),
+                "score": 5.0,
+                "seconds_to_finish": -3.0,
+            },
+        )
+
+        assert response.status_code == 422
