@@ -15,5 +15,4 @@ __pycache__/
 *.pyd
 .pytest_cache/
 migrations/
-tests/
 data/
