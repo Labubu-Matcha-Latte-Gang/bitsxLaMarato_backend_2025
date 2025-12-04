@@ -14,7 +14,9 @@ class TestUserPatientData(BaseTest):
         )
 
         assert response.status_code == 200
-        assert response.get_json()["email"] == patient_payload["email"]
+        body = response.get_json()
+        assert body["patient"]["email"] == patient_payload["email"]
+        assert "graph_files" in body
 
     def test_assigned_doctor_can_get_patient_data(self):
         doctor_user = self.create_doctor_model()
@@ -28,7 +30,9 @@ class TestUserPatientData(BaseTest):
         )
 
         assert response.status_code == 200
-        assert response.get_json()["email"] == patient_payload["email"]
+        body = response.get_json()
+        assert body["patient"]["email"] == patient_payload["email"]
+        assert "graph_files" in body
 
     def test_unassigned_doctor_gets_403(self):
         doctor_user = self.create_doctor_model()
@@ -54,7 +58,9 @@ class TestUserPatientData(BaseTest):
         )
 
         assert response.status_code == 200
-        assert response.get_json()["email"] == patient_payload["email"]
+        body = response.get_json()
+        assert body["patient"]["email"] == patient_payload["email"]
+        assert "graph_files" in body
 
     def test_other_patient_gets_403(self):
         patient_one = self.make_patient_payload()
