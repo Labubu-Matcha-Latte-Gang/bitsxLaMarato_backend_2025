@@ -198,9 +198,7 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         score_repo = SQLAlchemyScoreRepository(self.session)
-        activity_repo = SQLAlchemyActivityRepository(self.session)
         return ScoreService(
             score_repo=score_repo,
-            activity_repo=activity_repo,
             uow=uow,
         )
