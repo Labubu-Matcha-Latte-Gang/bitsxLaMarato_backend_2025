@@ -82,8 +82,8 @@ class PatientRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            user_service = ServiceFactory.get_instance().build_user_service()
-            patient = user_service.register_patient(data)
+            patient_service = ServiceFactory.get_instance().build_patient_service()
+            patient = patient_service.register_patient(data)
 
             return jsonify(patient.to_dict()), 201
         except KeyError as e:
@@ -152,8 +152,8 @@ class DoctorRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            user_service = ServiceFactory.get_instance().build_user_service()
-            doctor = user_service.register_doctor(data)
+            doctor_service = ServiceFactory.get_instance().build_doctor_service()
+            doctor = doctor_service.register_doctor(data)
 
             return jsonify(doctor.to_dict()), 201
         except KeyError as e:
