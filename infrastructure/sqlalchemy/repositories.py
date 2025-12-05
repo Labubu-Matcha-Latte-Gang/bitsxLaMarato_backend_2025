@@ -5,6 +5,7 @@ from typing import Iterable, List, Optional, Dict
 import uuid
 
 from db import db
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
@@ -413,6 +414,7 @@ class SQLAlchemyActivityRepository(IActivityRepository):
         query = self.session.query(Activity)
         activity_id = filters.get("id")
         activity_title = filters.get("title")
+        search_query = filters.get("search")
         difficulty = filters.get("difficulty")
         difficulty_min = filters.get("difficulty_min")
         difficulty_max = filters.get("difficulty_max")
@@ -422,6 +424,10 @@ class SQLAlchemyActivityRepository(IActivityRepository):
             query = query.filter(Activity.id == activity_id)
         if activity_title is not None:
             query = query.filter(Activity.title == activity_title)
+        if search_query:
+            normalized_search = search_query.strip().lower()
+            if normalized_search:
+                query = query.filter(func.lower(Activity.title).contains(normalized_search))
         if difficulty is not None:
             query = query.filter(Activity.difficulty == difficulty)
         if difficulty_min is not None:

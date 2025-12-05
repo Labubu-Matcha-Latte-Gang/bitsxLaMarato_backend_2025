@@ -93,6 +93,34 @@ class TestActivityResource(BaseTest):
         assert len(ranged) >= 1
         assert all(a["difficulty"] <= 2.6 for a in ranged)
 
+    def test_search_filters_by_partial_title_case_insensitive(self):
+        token = self.get_admin_token()
+        target_title = "Vamos a contar palabras"
+        other_title = "Lista de compra semanal"
+
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json={
+                "activities": [
+                    self._make_activity_payload(title=target_title),
+                    self._make_activity_payload(title=other_title),
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+        search_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": "CONTAR"},
+        )
+        assert search_resp.status_code == 200
+        results = search_resp.get_json() or []
+        titles = {a["title"] for a in results}
+        assert target_title in titles
+        assert other_title not in titles
+
     def test_put_updates_activity(self):
         token = self.get_admin_token()
         create_resp = self._create_activities(count=1, token=token)

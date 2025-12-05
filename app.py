@@ -14,6 +14,7 @@ from resources.user import blp as UserBlueprint
 from resources.transcription import blp as TranscriptionBlueprint
 from resources.question import blp as QuestionBlueprint
 from resources.activity import blp as ActivityBlueprint
+from resources.documentation import blp as DocumentationBlueprint
 
 def create_app(settings_module: str = 'globals') -> Flask:
     """
@@ -94,6 +95,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
     jwt = JWTManager(app)
 
     api = Api(app)
+    app.extensions.setdefault("labubu", {})["api"] = api
 
     api.spec.components.security_scheme(
         'jwt', {'type': 'http', 'scheme': 'bearer', 'bearerFormat': 'JWT', 'x-bearerInfoFunc': 'app.decode_token'}
@@ -108,6 +110,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
     api.register_blueprint(TranscriptionBlueprint, url_prefix=getApiPrefix('transcription'))
     api.register_blueprint(QuestionBlueprint, url_prefix=getApiPrefix('question'))
     api.register_blueprint(ActivityBlueprint, url_prefix=getApiPrefix('activity'))
+    api.register_blueprint(DocumentationBlueprint, url_prefix=getApiPrefix('swagger-doc'))
 
     with app.app_context():
         db = create_db(app)
