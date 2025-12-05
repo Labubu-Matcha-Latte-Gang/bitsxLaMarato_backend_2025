@@ -26,8 +26,8 @@ from domain.repositories import (
     IResetCodeRepository,
     IScoreRepository,
     IUserRepository,
+    ITranscriptionAnalysisRepository,
 )
-from domain.repositories.interfaces import ITranscriptionAnalysisRepository
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
@@ -43,8 +43,8 @@ from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
 from models.score import Score
-from models.transcription_session import TranscriptionSession
 from models.user import User
+from models.transcription_session import TranscriptionSession
 
 
 class SQLAlchemyUserRepository(IUserRepository):
@@ -623,17 +623,20 @@ class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
             )
         return answered
 
+
 class SQLAlchemyTranscriptionAnalysisRepository(ITranscriptionAnalysisRepository):
     """
-    SQLAlchemy implementation of ``ITranscriptionAnalysisRepository``.
-    Retrieves aggregated transcription sessions from the
-    ``transcription_sessions`` table and converts them into
+    SQLAlchemy implementation of ``ITranscriptionAnalysisRepository``.  This
+    repository retrieves aggregated transcription sessions from the
+    ``transcription_sessions`` table and converts them into domain-level
     ``TranscriptionAnalysis`` objects.
     """
+
     def __init__(self, session: Optional[Session] = None) -> None:
         self.session: Session = session or db.session
 
     def list_by_patient(self, patient_email: str) -> List[TranscriptionAnalysis]:
+        # Query all sessions for the patient, oldest first
         rows: List[TranscriptionSession] = (
             self.session.query(TranscriptionSession)
             .filter(TranscriptionSession.patient_email == patient_email)
@@ -642,12 +645,14 @@ class SQLAlchemyTranscriptionAnalysisRepository(ITranscriptionAnalysisRepository
         )
         analyses: List[TranscriptionAnalysis] = []
         for row in rows:
+            # Ensure metrics is a dictionary of numeric values
             metrics_dict: Dict[str, float] = {}
             if isinstance(row.metrics, dict):
                 for k, v in row.metrics.items():
                     try:
                         metrics_dict[k] = float(v)
                     except (TypeError, ValueError):
+                        # Skip non-numeric metric values
                         continue
             analyses.append(
                 TranscriptionAnalysis(
