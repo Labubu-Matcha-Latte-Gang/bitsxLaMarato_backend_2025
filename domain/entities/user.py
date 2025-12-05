@@ -160,10 +160,10 @@ class Patient(User):
         self.doctors.clear()
 
     def get_daily_question_filters(self) -> dict:
-        return {}
+        return {} #TODO: Implement based on patient attributes
 
     def get_recommended_activity_filters(self) -> dict:
-        return {}
+        return {} #TODO: Implement based on patient attributes
 
     @property
     def doctor_emails(self) -> List[str]:
