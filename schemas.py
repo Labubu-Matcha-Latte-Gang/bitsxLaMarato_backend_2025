@@ -14,6 +14,25 @@ password_complexity = validate.Regexp(
 )
 
 
+class SwaggerDocQuerySchema(Schema):
+    """
+    Paràmetres per descarregar la documentació de l'API.
+    """
+
+    class Meta:
+        description = "Selecciona el format de descàrrega de la documentació."
+        example = {"format": "pdf"}
+
+    format = fields.String(
+        load_default="html",
+        validate=validate.OneOf(["html", "pdf"]),
+        metadata={
+            "description": "Format del document a descarregar (html o pdf).",
+            "example": "html",
+        },
+    )
+
+
 class PatientEmailPathSchema(Schema):
     """
     Esquema per recuperar dades d'un pacient a partir del correu a la ruta.
