@@ -14,6 +14,25 @@ password_complexity = validate.Regexp(
 )
 
 
+class SwaggerDocQuerySchema(Schema):
+    """
+    Paràmetres per descarregar la documentació de l'API.
+    """
+
+    class Meta:
+        description = "Selecciona el format de descàrrega de la documentació."
+        example = {"format": "pdf"}
+
+    format = fields.String(
+        load_default="html",
+        validate=validate.OneOf(["html", "pdf"]),
+        metadata={
+            "description": "Format del document a descarregar (html o pdf).",
+            "example": "html",
+        },
+    )
+
+
 class PatientEmailPathSchema(Schema):
     """
     Esquema per recuperar dades d'un pacient a partir del correu a la ruta.
@@ -1331,6 +1350,7 @@ class ActivityQuerySchema(Schema):
     class Meta:
         description = "Filtres disponibles per consultar les activitats."
         example = {
+            "search": "memoritzar",
             "title": "Memoritzar seqüències",
             "activity_type": "concentration",
             "difficulty_min": 1.0,
@@ -1348,8 +1368,16 @@ class ActivityQuerySchema(Schema):
         required=False,
         validate=validate.Length(min=1),
         metadata={
-            "description": "Filtra per títol exacte de l'activitat.",
+            "description": "Filtra per títol exacte de l'activitat (per cerques parcials, utilitza `search`).",
             "example": "Memoritzar seqüències",
+        },
+    )
+    search = fields.String(
+        required=False,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Text parcial per cercar coincidències en el títol, sense diferenciar majúscules/minúscules.",
+            "example": "contar",
         },
     )
     activity_type = fields.Enum(
