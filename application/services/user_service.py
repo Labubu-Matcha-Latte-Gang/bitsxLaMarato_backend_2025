@@ -4,6 +4,8 @@ import base64
 import json
 from pathlib import Path
 
+from typing import Dict
+
 from domain.entities.user import Admin, Doctor, Patient, User
 from domain.repositories import (
     IUserRepository,
@@ -22,8 +24,12 @@ from application.services.admin_service import AdminService
 from application.services.doctor_service import DoctorService
 from application.services.patient_service import PatientService
 from application.services.token_service import TokenService
-from typing import Dict
 from helpers.factories.adapter_factories import AbstractAdapterFactory
+from models.associations import DoctorPatientAssociation, QuestionAnsweredAssociation, UserCodeAssociation
+from models.doctor import Doctor as DoctorModel
+from models.patient import Patient as PatientModel
+from models.score import Score
+from models.user import User as UserModel
 
 
 class UserService:
@@ -98,8 +104,43 @@ class UserService:
         user = self.user_repo.get_by_email(email)
         if user is None:
             raise UserNotFoundException("Usuari no trobat.")
+
+        # Perform explicit clean-up to avoid relying on DB ON DELETE cascades.
+        session = getattr(self.uow, "session", None)
         with self.uow:
-            self.user_repo.remove(user)
+            if session is not None:
+                # Remove reset codes linked to this user.
+                session.query(UserCodeAssociation).filter(UserCodeAssociation.user_email == email).delete(
+                    synchronize_session=False
+                )
+
+                if isinstance(user, Patient):
+                    session.query(DoctorPatientAssociation).filter(
+                        DoctorPatientAssociation.patient_email == email
+                    ).delete(synchronize_session=False)
+                    session.query(QuestionAnsweredAssociation).filter(
+                        QuestionAnsweredAssociation.patient_email == email
+                    ).delete(synchronize_session=False)
+                    session.query(Score).filter(Score.patient_email == email).delete(
+                        synchronize_session=False
+                    )
+                    patient_model = session.get(PatientModel, email)
+                    if patient_model:
+                        session.delete(patient_model)
+                elif isinstance(user, Doctor):
+                    session.query(DoctorPatientAssociation).filter(
+                        DoctorPatientAssociation.doctor_email == email
+                    ).delete(synchronize_session=False)
+                    doctor_model = session.get(DoctorModel, email)
+                    if doctor_model:
+                        session.delete(doctor_model)
+                else:
+                    user_model = session.get(UserModel, email)
+                    if user_model:
+                        session.delete(user_model)
+            else:
+                # Fallback for unit of work implementations without direct session access.
+                self.user_repo.remove(user)
             self.uow.commit()
 
     def get_patient_data(self, requester: User, patient: Patient) -> dict:
