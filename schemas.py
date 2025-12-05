@@ -1331,6 +1331,7 @@ class ActivityQuerySchema(Schema):
     class Meta:
         description = "Filtres disponibles per consultar les activitats."
         example = {
+            "search": "memoritzar",
             "title": "Memoritzar seqüències",
             "activity_type": "concentration",
             "difficulty_min": 1.0,
@@ -1348,8 +1349,16 @@ class ActivityQuerySchema(Schema):
         required=False,
         validate=validate.Length(min=1),
         metadata={
-            "description": "Filtra per títol exacte de l'activitat.",
+            "description": "Filtra per títol exacte de l'activitat (per cerques parcials, utilitza `search`).",
             "example": "Memoritzar seqüències",
+        },
+    )
+    search = fields.String(
+        required=False,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Text parcial per cercar coincidències en el títol, sense diferenciar majúscules/minúscules.",
+            "example": "contar",
         },
     )
     activity_type = fields.Enum(
