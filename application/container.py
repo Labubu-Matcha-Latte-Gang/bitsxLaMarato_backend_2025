@@ -51,8 +51,10 @@ class ServiceFactory:
         Returns:
             ServiceFactory: The singleton instance.
         """
-        if refresh or cls.__instance is None or (session is not None and cls.__instance.session is not session):
-            cls.__instance = cls(session)
+        current_session = session or db.session
+        # Refresh the factory when explicitly requested or when the underlying session changes
+        if refresh or cls.__instance is None or cls.__instance.session is not current_session:
+            cls.__instance = cls(current_session)
         return cls.__instance
 
     def build_user_service(self) -> UserService:
