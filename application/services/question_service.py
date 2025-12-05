@@ -6,7 +6,7 @@ from typing import List
 
 from domain.entities.question import Question
 from domain.entities.user import Patient
-from domain.repositories import IQuestionRepository
+from domain.repositories import IQuestionRepository, IScoreRepository, ITranscriptionAnalysisRepository
 from domain.unit_of_work import IUnitOfWork
 from helpers.exceptions.question_exceptions import (
     QuestionCreationException,
@@ -16,9 +16,17 @@ from helpers.exceptions.question_exceptions import (
 
 
 class QuestionService:
-    def __init__(self, question_repo: IQuestionRepository, uow: IUnitOfWork):
+    def __init__(
+        self,
+        question_repo: IQuestionRepository,
+        uow: IUnitOfWork,
+        score_repo: IScoreRepository,
+        transcription_repo: ITranscriptionAnalysisRepository,
+    ) -> None:
         self.question_repo = question_repo
         self.uow = uow
+        self.score_repo = score_repo
+        self.transcription_repo = transcription_repo
 
     def create_questions(self, payloads: List[dict]) -> List[Question]:
         try:
