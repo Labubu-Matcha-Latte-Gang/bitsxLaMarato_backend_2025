@@ -10,6 +10,7 @@ from .repositories import (
     SQLAlchemyResetCodeRepository,
     SQLAlchemyScoreRepository,
     SQLAlchemyQuestionAnswerRepository,
+    SQLAlchemyTranscriptionAnalysisRepository,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "SQLAlchemyResetCodeRepository",
     "SQLAlchemyScoreRepository",
     "SQLAlchemyQuestionAnswerRepository",
+    "SQLAlchemyTranscriptionAnalysisRepository",
 ]
