@@ -1,3 +1,4 @@
+import hashlib
 import html
 import json
 import re
@@ -18,6 +19,22 @@ blp = Blueprint(
 )
 
 
+def _get_limiter():
+    """Obté la instància del limiter de l'aplicació."""
+    return current_app.extensions.get("labubu", {}).get("limiter")
+
+
+def _check_pdf_rate_limit():
+    """Comprova el rate limit per generació de PDF."""
+    limiter = _get_limiter()
+    if limiter:
+        # Crea una funció dummy per aplicar el decorador
+        @limiter.limit("10 per hour")
+        def dummy():
+            pass
+        dummy()
+
+
 @blp.route("")
 class SwaggerDocResource(MethodView):
     """
@@ -25,6 +42,7 @@ class SwaggerDocResource(MethodView):
     """
 
     logger = AbstractLogger.get_instance()
+    _pdf_cache: dict[str, bytes] = {}
 
     @staticmethod
     def _slugify_filename(name: str) -> str:
@@ -458,29 +476,78 @@ class SwaggerDocResource(MethodView):
             raise RuntimeError("WeasyPrint no està disponible per generar PDF.") from exc
         return HTML(string=html_content, base_url=request.url_root).write_pdf()
 
+    @classmethod
+    def _get_cached_pdf(cls, spec_hash: str, html_content: str) -> bytes:
+        """
+        Obté el PDF de la cache si existeix, sinó el genera i el desa.
+        
+        Args:
+            spec_hash: Hash únic de l'especificació OpenAPI.
+            html_content: Contingut HTML per generar el PDF.
+            
+        Returns:
+            bytes: Contingut del PDF.
+        """
+        if spec_hash in cls._pdf_cache:
+            cls.logger.debug("PDF trobat a la cache", module="SwaggerDocResource", hash=spec_hash)
+            return cls._pdf_cache[spec_hash]
+        
+        cls.logger.info("Generant nou PDF", module="SwaggerDocResource", hash=spec_hash)
+        pdf_bytes = cls._build_pdf(html_content)
+        cls._pdf_cache[spec_hash] = pdf_bytes
+        
+        # Limitar la mida de la cache a 10 PDFs
+        if len(cls._pdf_cache) > 10:
+            first_key = next(iter(cls._pdf_cache))
+            del cls._pdf_cache[first_key]
+            cls.logger.debug("PDF eliminat de la cache per límit de mida", module="SwaggerDocResource", removed_hash=first_key)
+        
+        return pdf_bytes
+
     @blp.arguments(SwaggerDocQuerySchema, location="query")
     @blp.doc(
         security=[],
         summary="Descarregar Swagger/OpenAPI",
-        description="Recupera la documentació vigent d'/api-docs com a fitxer HTML (per defecte) o PDF.",
+        description="Recupera la documentació vigent d'/api-docs com a fitxer HTML (per defecte) o PDF. "
+                    "La generació de PDF té límit de 10 peticions per hora per IP per prevenir abús de recursos.",
     )
     @blp.response(200, description="Documentació generada correctament.")
+    @blp.response(429, description="S'ha excedit el límit de peticions.")
     def get(self, query_args: dict[str, Any]):
         """
         Descarrega la documentació actual de la API.
 
         Paràmetres:
         - format: 'html' (per defecte) o 'pdf'.
+        
+        Nota: La generació de PDF està limitada a 10 peticions per hora per IP.
+        Els PDF generats es guarden en cache per millorar el rendiment.
         """
         doc_format = (query_args.get("format") or "html").lower()
+        
         try:
+            # Aplicar rate limiting només per PDF abans de processar
+            if doc_format == "pdf":
+                try:
+                    _check_pdf_rate_limit()
+                except Exception:
+                    self.logger.warning(
+                        "Rate limit excedit per generació de PDF",
+                        module="SwaggerDocResource"
+                    )
+                    abort(429, message="S'ha excedit el límit de peticions per generar PDF. Torna-ho a provar més tard.")
+            
             spec = self._get_openapi_spec()
             html_content = self._build_html(spec)
             filename_base = self._slugify_filename(
                 spec.get("info", {}).get("title") or current_app.config.get("API_TITLE", "api")
             )
             if doc_format == "pdf":
-                pdf_bytes = self._build_pdf(html_content)
+                # Calcular hash de l'especificació per caching
+                spec_str = json.dumps(spec, sort_keys=True)
+                spec_hash = hashlib.sha256(spec_str.encode()).hexdigest()[:16]
+                
+                pdf_bytes = self._get_cached_pdf(spec_hash, html_content)
                 self.logger.info("Documentació Swagger generada en PDF", module="SwaggerDocResource")
                 return Response(
                     pdf_bytes,

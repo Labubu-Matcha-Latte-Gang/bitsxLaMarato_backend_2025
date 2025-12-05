@@ -2,6 +2,8 @@ import os
 from flask import Flask, jsonify, redirect
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate, upgrade as alembic_upgrade
 from flask_smorest import Api
 from sqlalchemy.engine import URL
@@ -93,6 +95,14 @@ def create_app(settings_module: str = 'globals') -> Flask:
     def getApiPrefix(url:str) -> str: return f"{app.config['API_PREFIX']}/{url}"
 
     jwt = JWTManager(app)
+
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["1000 per day", "100 per hour"],
+        storage_uri=app.config.get('RATELIMIT_STORAGE_URI', 'memory://'),
+    )
+    app.extensions.setdefault("labubu", {})["limiter"] = limiter
 
     api = Api(app)
     app.extensions.setdefault("labubu", {})["api"] = api
