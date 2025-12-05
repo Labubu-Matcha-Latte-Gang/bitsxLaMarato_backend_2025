@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from uuid import uuid4, UUID
 from datetime import datetime, timezone, timedelta
-import bcrypt
 
 from helpers.enums.question_types import QuestionType
 from models.associations import DoctorPatientAssociation, QuestionAnsweredAssociation, UserCodeAssociation
@@ -10,6 +9,7 @@ from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
 from models.score import Score
+from models.user import User
 from tests.base_test import BaseTest
 
 
@@ -260,7 +260,7 @@ class TestUserRelationsCascade(BaseTest):
 
         # Create a UserCodeAssociation (password reset code) for the user
         reset_code = "TESTCODE123"
-        hashed_code = bcrypt.hashpw(reset_code.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        hashed_code = User.hash_password(reset_code)
         expiration = datetime.now(timezone.utc) + timedelta(minutes=30)
         
         code_association = UserCodeAssociation(
