@@ -6,11 +6,11 @@ from typing import Iterable, List, Optional
 import uuid
 
 from domain.entities.score import Score
-from domain.entities.transcription_analysis import TranscriptionAnalysis
 from domain.entities.user import User, Patient, Doctor, Admin
 from domain.entities.question import Question
 from domain.entities.question_answer import QuestionAnswer
 from domain.entities.activity import Activity
+from domain.entities.transcription_analysis import TranscriptionAnalysis
 
 
 class IUserRepository(ABC):
@@ -351,6 +351,34 @@ class IResetCodeRepository(ABC):
         """
         raise NotImplementedError()
 
+
+class ITranscriptionAnalysisRepository(ABC):
+    """
+    Repository abstraction for retrieving cognitive analysis sessions linked
+    to patients.  These sessions encapsulate metrics derived from voice
+    transcriptions (e.g., processing speed, lexical access) and are used
+    by recommendation strategies to adjust difficulty and content.
+
+    The application layer uses this interface to fetch all sessions of a
+    given patient.  Infrastructure implementations should persist and
+    return domain-level ``TranscriptionAnalysis`` objects.
+    """
+
+    @abstractmethod
+    def list_by_patient(self, patient_email: str) -> List[TranscriptionAnalysis]:
+        """
+        List all transcription analysis sessions for a given patient.
+
+        Args:
+            patient_email (str): The unique email of the patient whose
+                sessions are requested.
+
+        Returns:
+            List[TranscriptionAnalysis]: A list of domain objects representing
+                each cognitive analysis session, or an empty list if none exist.
+        """
+        raise NotImplementedError()
+
 class IScoreRepository(ABC):
     @abstractmethod
     def add(self, score: Score) -> None:
@@ -399,26 +427,5 @@ class IQuestionAnswerRepository(ABC):
         Returns:
             List[QuestionAnswer]: A list of domain objects representing each
                 answered question.
-        """
-        raise NotImplementedError()
-    
-class ITranscriptionAnalysisRepository(ABC):
-    """
-    Repository abstraction for retrieving cognitive analysis sessions linked
-    to patients. These sessions encapsulate metrics derived from voice
-    transcriptions and are used by recommendation strategies.
-    """
-    @abstractmethod
-    def list_by_patient(self, patient_email: str) -> List[TranscriptionAnalysis]:
-        """
-        List all transcription analysis sessions for a given patient.
-
-        Args:
-            patient_email (str): The unique email of the patient whose
-                sessions are requested.
-
-        Returns:
-            List[TranscriptionAnalysis]: A list of domain objects representing
-                each cognitive analysis session, or an empty list if none exist.
         """
         raise NotImplementedError()
