@@ -166,10 +166,9 @@ class Patient(User):
 
     def get_daily_question_filters(
         self,
-        strategy: Optional[DailyQuestionFilterStrategy] = None,
-        *,
-        score_repo: Optional[IScoreRepository] = None,
-        transcription_repo: Optional[ITranscriptionAnalysisRepository] = None,
+        score_repo: IScoreRepository,
+        transcription_repo: ITranscriptionAnalysisRepository,
+        strategy: DailyQuestionFilterStrategy | None = None,
     ) -> dict:
         """
         Generate filters for selecting the patient's daily question using an
@@ -178,14 +177,7 @@ class Patient(User):
 
         if strategy is None:
             strategy = ScoreBasedQuestionStrategy()
-        if score_repo is None or transcription_repo is None:
-            raise ValueError(
-                "score_repo and transcription_repo must be provided to compute question filters"
-            )
-        if not isinstance(strategy, DailyQuestionFilterStrategy):
-            raise TypeError(
-                "strategy must implement DailyQuestionFilterStrategy"
-            )
+
         return strategy.get_filters(self, score_repo, transcription_repo)
 
     def get_recommended_activity_filters(self) -> dict:
