@@ -109,10 +109,14 @@ class UserService:
         session = getattr(self.uow, "session", None)
         with self.uow:
             if session is not None:
-                # Remove reset codes linked to this user.
-                session.query(UserCodeAssociation).filter(UserCodeAssociation.user_email == email).delete(
-                    synchronize_session=False
-                )
+                # Remove reset codes linked to this user (avoid stale identity in session).
+                code_assoc = session.get(UserCodeAssociation, email)
+                if code_assoc:
+                    session.delete(code_assoc)
+                else:
+                    session.query(UserCodeAssociation).filter(UserCodeAssociation.user_email == email).delete(
+                        synchronize_session=False
+                    )
 
                 if isinstance(user, Patient):
                     patient_model = session.get(PatientModel, email)
