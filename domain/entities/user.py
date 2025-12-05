@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from helpers.enums.gender import Gender
 from helpers.enums.user_role import UserRole
 from domain.services.security import PasswordHasher
+
+if TYPE_CHECKING:
+    from domain.services.recommendation import DailyQuestionFilterStrategy
+    from domain.repositories.interfaces import IScoreRepository, ITranscriptionAnalysisRepository
+    from domain.services.recommendation import ScoreBasedQuestionStrategy
 
 @dataclass
 class User(ABC):
@@ -159,13 +164,29 @@ class Patient(User):
     def remove_role_associations(self) -> None:
         self.doctors.clear()
 
-    def get_daily_question_filters(self) -> dict:
+    def get_daily_question_filters(
+        self,
+        strategy: Optional[DailyQuestionFilterStrategy] = None,
+        *,
+        score_repo: Optional[IScoreRepository] = None,
+        transcription_repo: Optional[ITranscriptionAnalysisRepository] = None,
+    ) -> dict:
         """
-        Generate filters for daily question selection based on patient attributes.
-        Returns:
-            dict: Filters to apply when selecting daily questions.
+        Generate filters for selecting the patient's daily question using an
+        injectable strategy.
         """
-        return {} #TODO: Implement based on patient attributes
+
+        if strategy is None:
+            strategy = ScoreBasedQuestionStrategy()
+        if score_repo is None or transcription_repo is None:
+            raise ValueError(
+                "score_repo and transcription_repo must be provided to compute question filters"
+            )
+        if not isinstance(strategy, DailyQuestionFilterStrategy):
+            raise TypeError(
+                "strategy must implement DailyQuestionFilterStrategy"
+            )
+        return strategy.get_filters(self, score_repo, transcription_repo)
 
     def get_recommended_activity_filters(self) -> dict:
         """
