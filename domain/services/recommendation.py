@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, TYPE_CHECKING
-from collections import defaultdict
 
 if TYPE_CHECKING:
     from domain.entities.user import Patient
@@ -168,7 +167,8 @@ class ScoreBasedQuestionStrategy(DailyQuestionFilterStrategy):
         lexical_impairment = sum(lexical_vals) / len(lexical_vals) if lexical_vals else 0.0
         processing_impairment = sum(processing_vals) / len(processing_vals) if processing_vals else 0.0
 
-        from helpers.enums.question_types import QuestionType
+        selected_type: QuestionType
+        
         if lexical_impairment - processing_impairment > 0.1:
             selected_type = QuestionType.WORDS
         elif processing_impairment - lexical_impairment > 0.1:
