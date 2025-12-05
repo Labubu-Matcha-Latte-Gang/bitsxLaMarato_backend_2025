@@ -160,9 +160,19 @@ class Patient(User):
         self.doctors.clear()
 
     def get_daily_question_filters(self) -> dict:
+        """
+        Generate filters for daily question selection based on patient attributes.
+        Returns:
+            dict: Filters to apply when selecting daily questions.
+        """
         return {} #TODO: Implement based on patient attributes
 
     def get_recommended_activity_filters(self) -> dict:
+        """
+        Generate filters for recommended activity selection based on patient attributes.
+        Returns:
+            dict: Filters to apply when selecting recommended activities.
+        """
         return {} #TODO: Implement based on patient attributes
 
     @property
