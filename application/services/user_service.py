@@ -25,7 +25,7 @@ from application.services.doctor_service import DoctorService
 from application.services.patient_service import PatientService
 from application.services.token_service import TokenService
 from helpers.factories.adapter_factories import AbstractAdapterFactory
-from models.associations import DoctorPatientAssociation, QuestionAnsweredAssociation, UserCodeAssociation
+from models.associations import UserCodeAssociation
 from models.doctor import Doctor as DoctorModel
 from models.patient import Patient as PatientModel
 from models.score import Score
@@ -115,24 +115,21 @@ class UserService:
                 )
 
                 if isinstance(user, Patient):
-                    session.query(DoctorPatientAssociation).filter(
-                        DoctorPatientAssociation.patient_email == email
-                    ).delete(synchronize_session=False)
-                    session.query(QuestionAnsweredAssociation).filter(
-                        QuestionAnsweredAssociation.patient_email == email
-                    ).delete(synchronize_session=False)
-                    session.query(Score).filter(Score.patient_email == email).delete(
-                        synchronize_session=False
-                    )
                     patient_model = session.get(PatientModel, email)
                     if patient_model:
+                        # Clear associations explicitly
+                        patient_model.doctors.clear()
+                        patient_model.question_answers.clear()
+                        session.query(Score).filter(Score.patient_email == email).delete(
+                            synchronize_session=False
+                        )
+                        session.flush()
                         session.delete(patient_model)
                 elif isinstance(user, Doctor):
-                    session.query(DoctorPatientAssociation).filter(
-                        DoctorPatientAssociation.doctor_email == email
-                    ).delete(synchronize_session=False)
                     doctor_model = session.get(DoctorModel, email)
                     if doctor_model:
+                        doctor_model.patients.clear()
+                        session.flush()
                         session.delete(doctor_model)
                 else:
                     user_model = session.get(UserModel, email)
