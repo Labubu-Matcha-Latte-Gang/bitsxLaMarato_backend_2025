@@ -250,10 +250,11 @@ class TestActivityResource(BaseTest):
         )
         assert resp.status_code == 201
 
+        non_matching_search_term = "xyznonexistent123"
         search_resp = self.client.get(
             f"{self.api_prefix}/activity",
             headers=self.auth_headers(token),
-            query_string={"search": "xyznonexistent123"},
+            query_string={"search": non_matching_search_term},
         )
         assert search_resp.status_code == 200
         results = search_resp.get_json() or []
