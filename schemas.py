@@ -711,6 +711,38 @@ class UserLoginResponseSchema(Schema):
     )
 
 
+class UserRegisterResponseSchema(UserResponseSchema):
+    """
+    Esquema de resposta per al registre d'usuaris amb token d'accés.
+    """
+
+    class Meta:
+        description = "Usuari creat correctament amb el token JWT per iniciar sessió."
+        example = {
+            "email": "jane.doe@example.com",
+            "name": "Jane",
+            "surname": "Doe",
+            "role": {
+                "ailments": "Hipertensió lleu",
+                "gender": "female",
+                "age": 42,
+                "treatments": "Control dietètic",
+                "height_cm": 168.5,
+                "weight_kg": 64.3,
+                "doctors": ["dr.house@example.com"],
+            },
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        }
+
+    access_token = fields.String(
+        required=True,
+        metadata={
+            "description": "Token JWT que permet autenticar les peticions del nou usuari.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        },
+    )
+
+
 class UserForgotPasswordSchema(Schema):
     """
     Esquema per a la sol·licitud de recuperar contrasenya.

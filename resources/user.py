@@ -37,6 +37,7 @@ from schemas import (
     UserResetPasswordResponseSchema,
     UserResetPasswordSchema,
     UserResponseSchema,
+    UserRegisterResponseSchema,
     UserUpdateSchema,
     UserPartialUpdateSchema,
     UserForgotPasswordSchema,
@@ -57,9 +58,16 @@ class PatientRegister(MethodView):
     @blp.doc(
         security=[],
         summary="Registrar pacient",
-        description="Crea un usuari base amb perfil de pacient i enllaça els correus de metges indicats.",
+        description=(
+            "Crea un usuari base amb perfil de pacient, enllaça els correus de metges indicats "
+            "i retorna un token JWT per autenticar immediatament."
+        ),
     )
-    @blp.response(201, schema=UserResponseSchema, description="Usuari pacient creat amb les dades de rol de pacient.")
+    @blp.response(
+        201,
+        schema=UserRegisterResponseSchema,
+        description="Usuari pacient creat amb les dades de rol de pacient i token d'accés.",
+    )
     @blp.response(400, description="Falta un camp obligatori o el correu ja està registrat.")
     @blp.response(404, description="No s'ha trobat cap correu de metge indicat.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
@@ -83,10 +91,15 @@ class PatientRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a patient", module="PatientRegister", metadata=safe_metadata)
 
-            patient_service = ServiceFactory.get_instance().build_patient_service()
-            patient = patient_service.register_patient(data)
+            factory = ServiceFactory.get_instance()
+            user_service = factory.build_user_service()
+            patient = user_service.register_patient(data)
+            access_token = user_service.login(data["email"], data["password"])
 
-            return jsonify(patient.to_dict()), 201
+            patient_payload = patient.to_dict()
+            patient_payload["access_token"] = access_token
+
+            return jsonify(patient_payload), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Patient register failed due to missing field", module="PatientRegister", error=e)
@@ -128,9 +141,16 @@ class DoctorRegister(MethodView):
     @blp.doc(
         security=[],
         summary="Registrar metge",
-        description="Crea un usuari base amb perfil de metge i enllaça els pacients indicats.",
+        description=(
+            "Crea un usuari base amb perfil de metge, enllaça els pacients indicats "
+            "i retorna un token JWT per autenticar immediatament."
+        ),
     )
-    @blp.response(201, schema=UserResponseSchema, description="Usuari metge creat amb les dades de rol de metge.")
+    @blp.response(
+        201,
+        schema=UserRegisterResponseSchema,
+        description="Usuari metge creat amb les dades de rol de metge i token d'accés.",
+    )
     @blp.response(400, description="Falta un camp obligatori o el correu ja està registrat.")
     @blp.response(404, description="No s'ha trobat cap correu de pacient indicat.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
@@ -153,10 +173,15 @@ class DoctorRegister(MethodView):
             safe_metadata = {k: v for k, v in data.items() if k != 'password'}
             self.logger.info("Start registering a doctor", module="DoctorRegister", metadata=safe_metadata)
 
-            doctor_service = ServiceFactory.get_instance().build_doctor_service()
-            doctor = doctor_service.register_doctor(data)
+            factory = ServiceFactory.get_instance()
+            user_service = factory.build_user_service()
+            doctor = user_service.register_doctor(data)
+            access_token = user_service.login(data["email"], data["password"])
 
-            return jsonify(doctor.to_dict()), 201
+            doctor_payload = doctor.to_dict()
+            doctor_payload["access_token"] = access_token
+
+            return jsonify(doctor_payload), 201
         except KeyError as e:
             db.session.rollback()
             self.logger.error("Doctor register failed due to missing field", module="DoctorRegister", error=e)

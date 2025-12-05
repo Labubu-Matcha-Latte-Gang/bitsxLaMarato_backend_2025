@@ -374,6 +374,12 @@ class SQLAlchemyQuestionRepository(IQuestionRepository):
     def remove(self, question: QuestionDomain) -> None:
         model: Question | None = self.session.get(Question, question.id)
         if model is not None:
+            from models.associations import QuestionAnsweredAssociation  # local import to avoid circular deps
+            (
+                self.session.query(QuestionAnsweredAssociation)
+                .filter(QuestionAnsweredAssociation.question_id == question.id)
+                .delete(synchronize_session=False)
+            )
             self.session.delete(model)
 
     def _to_domain(self, model: Question) -> QuestionDomain:
@@ -443,6 +449,9 @@ class SQLAlchemyActivityRepository(IActivityRepository):
     def remove(self, activity: ActivityDomain) -> None:
         model: Activity | None = self.session.get(Activity, activity.id)
         if model is not None:
+            self.session.query(Score).filter(Score.activity_id == activity.id).delete(
+                synchronize_session=False
+            )
             self.session.delete(model)
 
     def _to_domain(self, model: Activity) -> ActivityDomain:

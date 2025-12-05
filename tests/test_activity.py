@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from helpers.enums.question_types import QuestionType
+from models.score import Score
 from tests.base_test import BaseTest
 
 
@@ -159,6 +160,46 @@ class TestActivityResource(BaseTest):
             query_string={"id": activity["id"]},
         )
         assert get_resp.status_code == 404
+
+    def test_delete_activity_cascades_scores(self):
+        admin_token = self.get_admin_token()
+        create_resp = self._create_activities(count=1, token=admin_token)
+        activity = create_resp.get_json()[0]
+
+        patient_payload = self.make_patient_payload()
+        self.register_patient(patient_payload)
+        patient_token = self.login_and_get_token(
+            patient_payload["email"], patient_payload["password"]
+        )
+
+        complete_resp = self.client.post(
+            f"{self.api_prefix}/activity/complete",
+            headers=self.auth_headers(patient_token),
+            json={
+                "id": activity["id"],
+                "score": 7.0,
+                "seconds_to_finish": 15.0,
+            },
+        )
+        assert complete_resp.status_code == 200
+
+        activity_uuid = uuid.UUID(activity["id"])
+        pre_delete_count = (
+            self.db.query(Score).filter(Score.activity_id == activity_uuid).count()
+        )
+        assert pre_delete_count == 1
+
+        del_resp = self.client.delete(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(admin_token),
+            query_string={"id": activity["id"]},
+        )
+        assert del_resp.status_code == 204
+
+        post_delete_count = (
+            self.db.query(Score).filter(Score.activity_id == activity_uuid).count()
+        )
+        assert post_delete_count == 0
 
     def test_patient_can_get_activities(self):
         admin_token = self.get_admin_token()
