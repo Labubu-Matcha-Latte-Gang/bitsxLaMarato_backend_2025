@@ -121,6 +121,183 @@ class TestActivityResource(BaseTest):
         assert target_title in titles
         assert other_title not in titles
 
+    def test_search_with_empty_string_returns_all_activities(self):
+        token = self.get_admin_token()
+        title_1 = "Primera activitat"
+        title_2 = "Segona activitat"
+
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json={
+                "activities": [
+                    self._make_activity_payload(title=title_1),
+                    self._make_activity_payload(title=title_2),
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+        search_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": ""},
+        )
+        assert search_resp.status_code == 200
+        results = search_resp.get_json() or []
+        titles = {a["title"] for a in results}
+        assert title_1 in titles
+        assert title_2 in titles
+
+    def test_search_with_whitespace_only_returns_all_activities(self):
+        token = self.get_admin_token()
+        title_1 = "Activitat amb espais"
+        title_2 = "Una altra activitat"
+
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json={
+                "activities": [
+                    self._make_activity_payload(title=title_1),
+                    self._make_activity_payload(title=title_2),
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+        search_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": "   "},
+        )
+        assert search_resp.status_code == 200
+        results = search_resp.get_json() or []
+        titles = {a["title"] for a in results}
+        assert title_1 in titles
+        assert title_2 in titles
+
+    def test_search_with_special_characters(self):
+        token = self.get_admin_token()
+        title_with_special = "Activitat #1: Números & símbols!"
+        title_normal = "Activitat sense simbols"
+
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json={
+                "activities": [
+                    self._make_activity_payload(title=title_with_special),
+                    self._make_activity_payload(title=title_normal),
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+        search_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": "#1"},
+        )
+        assert search_resp.status_code == 200
+        results = search_resp.get_json() or []
+        titles = {a["title"] for a in results}
+        assert title_with_special in titles
+        assert title_normal not in titles
+
+    def test_search_combined_with_difficulty_filter(self):
+        token = self.get_admin_token()
+        title_easy = "Buscar paraules fàcils"
+        title_hard = "Buscar paraules difícils"
+
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json={
+                "activities": [
+                    self._make_activity_payload(title=title_easy, difficulty=1.5),
+                    self._make_activity_payload(title=title_hard, difficulty=4.5),
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+        search_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": "paraules", "difficulty_min": 4.0},
+        )
+        assert search_resp.status_code == 200
+        results = search_resp.get_json() or []
+        titles = {a["title"] for a in results}
+        assert title_hard in titles
+        assert title_easy not in titles
+
+    def test_search_that_matches_no_results(self):
+        token = self.get_admin_token()
+        title_1 = "Activitat de concentració"
+        title_2 = "Exercici de memòria"
+
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json={
+                "activities": [
+                    self._make_activity_payload(title=title_1),
+                    self._make_activity_payload(title=title_2),
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+        search_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": "xyznonexistent123"},
+        )
+        assert search_resp.status_code == 200
+        results = search_resp.get_json() or []
+        assert len(results) == 0
+
+    def test_search_with_very_long_string(self):
+        token = self.get_admin_token()
+        title_short = "Activitat curta"
+        title_long = "Activitat amb un títol molt llarg que conté moltes paraules diferents i conceptes"
+
+        resp = self.client.post(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            json={
+                "activities": [
+                    self._make_activity_payload(title=title_short),
+                    self._make_activity_payload(title=title_long),
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+        very_long_search = "a" * 500
+        search_resp = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": very_long_search},
+        )
+        assert search_resp.status_code == 200
+        results = search_resp.get_json() or []
+        assert len(results) == 0
+
+        partial_long_search = "títol molt llarg"
+        search_resp_2 = self.client.get(
+            f"{self.api_prefix}/activity",
+            headers=self.auth_headers(token),
+            query_string={"search": partial_long_search},
+        )
+        assert search_resp_2.status_code == 200
+        results_2 = search_resp_2.get_json() or []
+        titles = {a["title"] for a in results_2}
+        assert title_long in titles
+        assert title_short not in titles
+
     def test_put_updates_activity(self):
         token = self.get_admin_token()
         create_resp = self._create_activities(count=1, token=token)
