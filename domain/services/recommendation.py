@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 """
 Recommendation strategies for tailoring activities and daily questions to
 individual patients based on their historical performance and cognitive
 metrics. These strategies can be injected into Patient methods.
 """
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, TYPE_CHECKING
