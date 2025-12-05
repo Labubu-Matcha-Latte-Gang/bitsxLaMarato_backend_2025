@@ -95,7 +95,8 @@ class ActivityResource(MethodView):
         summary="Consultar activitats",
         description=(
             "Filtra activitats per diversos criteris: "
-            "`id` (UUID exacte), `title` (text exacte), `activity_type` (enum), `difficulty` (valor exacte), "
+            "`id` (UUID exacte), `title` (text exacte), `search` (coincidència parcial en el títol, sense distingir majúscules/minúscules), "
+            "`activity_type` (enum), `difficulty` (valor exacte), "
             "`difficulty_min` (>=) i `difficulty_max` (<=). "
             "Es poden combinar; sense cap filtre es retornen totes."
         ),
@@ -112,12 +113,14 @@ class ActivityResource(MethodView):
         Paràmetres de consulta:
         - `id`: UUID exacte d'una activitat (retorna només aquesta o 404 si no existeix).
         - `title`: Títol exacte de l'activitat.
+        - `search`: Text parcial per buscar dins el títol (sense diferenciar majúscules/minúscules).
         - `activity_type`: Valor de l'enum QuestionType.
         - `difficulty`: Valor exacte de dificultat (0-5).
         - `difficulty_min`: Dificultat mínima (>=).
         - `difficulty_max`: Dificultat màxima (<=).
 
         Es poden combinar `difficulty`, `difficulty_min` i `difficulty_max`; tots els filtres aplicats alhora.
+        El filtre `search` és compatible amb la resta de filtres.
         Sense filtres retorna totes les activitats.
         """
         filters = {k: v for k, v in (query_args or {}).items() if v is not None}

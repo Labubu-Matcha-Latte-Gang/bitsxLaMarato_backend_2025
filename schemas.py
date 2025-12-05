@@ -14,6 +14,25 @@ password_complexity = validate.Regexp(
 )
 
 
+class SwaggerDocQuerySchema(Schema):
+    """
+    Paràmetres per descarregar la documentació de l'API.
+    """
+
+    class Meta:
+        description = "Selecciona el format de descàrrega de la documentació."
+        example = {"format": "pdf"}
+
+    format = fields.String(
+        load_default="html",
+        validate=validate.OneOf(["html", "pdf"]),
+        metadata={
+            "description": "Format del document a descarregar (html o pdf).",
+            "example": "html",
+        },
+    )
+
+
 class PatientEmailPathSchema(Schema):
     """
     Esquema per recuperar dades d'un pacient a partir del correu a la ruta.
@@ -711,6 +730,38 @@ class UserLoginResponseSchema(Schema):
     )
 
 
+class UserRegisterResponseSchema(UserResponseSchema):
+    """
+    Esquema de resposta per al registre d'usuaris amb token d'accés.
+    """
+
+    class Meta:
+        description = "Usuari creat correctament amb el token JWT per iniciar sessió."
+        example = {
+            "email": "jane.doe@example.com",
+            "name": "Jane",
+            "surname": "Doe",
+            "role": {
+                "ailments": "Hipertensió lleu",
+                "gender": "female",
+                "age": 42,
+                "treatments": "Control dietètic",
+                "height_cm": 168.5,
+                "weight_kg": 64.3,
+                "doctors": ["dr.house@example.com"],
+            },
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        }
+
+    access_token = fields.String(
+        required=True,
+        metadata={
+            "description": "Token JWT que permet autenticar les peticions del nou usuari.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        },
+    )
+
+
 class UserForgotPasswordSchema(Schema):
     """
     Esquema per a la sol·licitud de recuperar contrasenya.
@@ -1299,6 +1350,7 @@ class ActivityQuerySchema(Schema):
     class Meta:
         description = "Filtres disponibles per consultar les activitats."
         example = {
+            "search": "memoritzar",
             "title": "Memoritzar seqüències",
             "activity_type": "concentration",
             "difficulty_min": 1.0,
@@ -1316,8 +1368,16 @@ class ActivityQuerySchema(Schema):
         required=False,
         validate=validate.Length(min=1),
         metadata={
-            "description": "Filtra per títol exacte de l'activitat.",
+            "description": "Filtra per títol exacte de l'activitat (per cerques parcials, utilitza `search`).",
             "example": "Memoritzar seqüències",
+        },
+    )
+    search = fields.String(
+        required=False,
+        validate=validate.Length(min=1),
+        metadata={
+            "description": "Text parcial per cercar coincidències en el títol, sense diferenciar majúscules/minúscules.",
+            "example": "contar",
         },
     )
     activity_type = fields.Enum(

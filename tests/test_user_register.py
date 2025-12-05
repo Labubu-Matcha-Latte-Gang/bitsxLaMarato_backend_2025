@@ -10,6 +10,7 @@ class TestUserRegister(BaseTest):
 
         assert response.status_code == 201
         body = response.get_json()
+        assert body["access_token"]
         assert body["email"] == payload["email"]
         assert body["name"] == payload["name"]
         assert body["role"]["doctors"] == [doctor_user.email]
@@ -23,6 +24,7 @@ class TestUserRegister(BaseTest):
 
         assert response.status_code == 201
         body = response.get_json()
+        assert body["access_token"]
         assert body["email"] == payload["email"]
         assert body["role"]["patients"] == [patient_payload["email"]]
 
