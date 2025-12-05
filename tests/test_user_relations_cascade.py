@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from uuid import uuid4, UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import bcrypt
 
 from helpers.enums.question_types import QuestionType
-from models.associations import DoctorPatientAssociation, QuestionAnsweredAssociation
+from models.associations import DoctorPatientAssociation, QuestionAnsweredAssociation, UserCodeAssociation
 from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
@@ -247,3 +248,42 @@ class TestUserRelationsCascade(BaseTest):
             .count()
             == 1
         )
+
+    def test_delete_user_clears_password_reset_codes(self):
+        # Arrange: create a user and a password reset code association
+        patient_payload = self.make_patient_payload()
+        patient_resp = self.register_patient(patient_payload)
+        assert patient_resp.status_code == 201
+        patient_token = self.login_and_get_token(
+            patient_payload["email"], patient_payload["password"]
+        )
+
+        # Create a UserCodeAssociation (password reset code) for the user
+        reset_code = "TESTCODE123"
+        hashed_code = bcrypt.hashpw(reset_code.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        expiration = datetime.now(timezone.utc) + timedelta(minutes=30)
+        
+        code_association = UserCodeAssociation(
+            user_email=patient_payload["email"],
+            code=hashed_code,
+            expiration=expiration,
+        )
+        self.db.add(code_association)
+        self.db.flush()
+
+        # Verify the code association exists before deletion
+        pre_delete_association = self.db.get(UserCodeAssociation, patient_payload["email"])
+        assert pre_delete_association is not None
+        assert pre_delete_association.user_email == patient_payload["email"]
+
+        # Act: delete the user
+        delete_resp = self.client.delete(
+            f"{self.api_prefix}/user",
+            headers=self.auth_headers(patient_token),
+        )
+
+        # Assert: verify the user is deleted and the code association is also deleted via cascade
+        assert delete_resp.status_code == 204
+        assert self.db.get(Patient, patient_payload["email"]) is None
+        # Verify the code association was also deleted via cascade
+        assert self.db.get(UserCodeAssociation, patient_payload["email"]) is None
