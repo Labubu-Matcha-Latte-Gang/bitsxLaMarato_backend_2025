@@ -53,7 +53,7 @@ class ScoreBasedActivityStrategy(ActivityFilterStrategy):
     [0,5], and a ±1 window is returned.
     """
 
-    MAX_SCORE: float = 100.0
+    MAX_SCORE: float = 10.0
     SCORE_WEIGHT: float = 0.7
 
     def get_filters(
@@ -107,14 +107,31 @@ class ScoreBasedActivityStrategy(ActivityFilterStrategy):
 
 class ScoreBasedQuestionStrategy(DailyQuestionFilterStrategy):
     """
-    Default strategy for generating daily question filters leveraging past
-    scores and cognitive metrics. Computes a difficulty range as above and
-    selects a QuestionType where the patient performs worst, adjusting for
-    lexical or processing impairments.
+    Default strategy for generating daily question filters based primarily on
+    cognitive analysis metrics.
+
+    Unlike activities, daily questions are not scored by the patient.
+    Consequently, this strategy does **not** attempt to infer category
+    weights from past performance. Instead, it uses the patient’s
+    transcription-derived metrics to decide both the difficulty range and
+    the question type:
+      1. Difficulty range: reuse the activity recommendation logic to
+         compute a difficulty window. The patient’s scores on activities
+         still serve as a proxy for overall ability.
+      2. Impairment detection: aggregate two measures from the
+         transcription sessions: lexical impairment and processing
+         impairment. Each metric is normalised to [0,1] and averaged.
+      3. Question type selection: choose an appropriate `QuestionType`
+         based on these impairments. If lexical impairment dominates by
+         >0.1, `WORDS` is recommended; if processing impairment dominates,
+         `SPEED`; otherwise the average impairment is mapped to
+         `CONCENTRATION`, `SORTING` or `MULTITASKING`.
+    When no transcription data are available, the strategy returns only a
+    difficulty range without specifying `question_type`.
     """
 
-    MAX_SCORE: float = 100.0
-    SCORE_WEIGHT: float = 0.7
+    MAX_SCORE: float = 10.0
+    SCORE_WEIGHT: float = 0.0
 
     def get_filters(
         self,
@@ -122,70 +139,48 @@ class ScoreBasedQuestionStrategy(DailyQuestionFilterStrategy):
         score_repo: "IScoreRepository",
         transcription_repo: "ITranscriptionAnalysisRepository",
     ) -> Dict[str, float | "QuestionType"]:
-        # Difficulty range (reuses the activity strategy)
         activity_strategy = ScoreBasedActivityStrategy()
-        difficulty_filters = activity_strategy.get_filters(patient, score_repo, transcription_repo)
+        difficulty_filters = activity_strategy.get_filters(
+            patient, score_repo, transcription_repo
+        )
 
-        # Scores grouped by QuestionType
-        scores = score_repo.list_by_patient(patient.email)
-        from helpers.enums.question_types import QuestionType
-        score_sums: Dict[QuestionType, float] = {qt: 0.0 for qt in QuestionType}
-        score_counts: Dict[QuestionType, int] = {qt: 0 for qt in QuestionType}
-        for s in scores:
-            qt = getattr(s.activity, "activity_type", None)
-            if qt is None:
-                continue
-            score_sums[qt] += min(max(s.score / self.MAX_SCORE, 0.0), 1.0)
-            score_counts[qt] += 1
-        weights: Dict[QuestionType, float] = {}
-        for qt in QuestionType:
-            if score_counts[qt] > 0:
-                mean_score = score_sums[qt] / score_counts[qt]
-            else:
-                mean_score = 0.0  # unexplored area
-            weights[qt] = 1.0 - mean_score
-
-        # Deterioration adjustments
         sessions = transcription_repo.list_by_patient(patient.email)
-        lexical_impairment = 0.0
-        processing_impairment = 0.0
-        if sessions:
-            lex_vals: List[float] = []
-            proc_vals: List[float] = []
-            for sess in sessions:
-                metrics = sess.metrics
-                id_val = metrics.get("idea_density")
-                if id_val is not None:
-                    lex_vals.append(max(0.0, 1.0 - min(id_val / 5.0, 1.0)))
-                pn_val = metrics.get("p_n_ratio")
-                if pn_val is not None:
-                    lex_vals.append(max(0.0, 1.0 - min(pn_val / 5.0, 1.0)))
-                lat = metrics.get("raw_latency")
-                if lat is not None:
-                    proc_vals.append(min(max(lat / 10.0, 0.0), 1.0))
-                pause = metrics.get("pause_time")
-                if pause is not None:
-                    proc_vals.append(min(max(pause / 10.0, 0.0), 1.0))
-            if lex_vals:
-                lexical_impairment = sum(lex_vals) / len(lex_vals)
-            if proc_vals:
-                processing_impairment = sum(proc_vals) / len(proc_vals)
-
-        adjusted_weights: Dict[QuestionType, float] = defaultdict(float)
-        for qt in QuestionType:
-            adjusted_weights[qt] = weights.get(qt, 0.0)
-
-        if lexical_impairment >= processing_impairment:
-            from helpers.enums.question_types import QuestionType as QT
-            adjusted_weights[QT.WORDS] += lexical_impairment
-        else:
-            from helpers.enums.question_types import QuestionType as QT
-            adjusted_weights[QT.SPEED] += processing_impairment
-
-        if all(w <= 0.0 for w in adjusted_weights.values()):
-            # No preference if no data
+        if not sessions:
             return difficulty_filters
 
-        selected_type = max(adjusted_weights, key=adjusted_weights.get)
+        lexical_vals: List[float] = []
+        processing_vals: List[float] = []
+        for sess in sessions:
+            metrics = sess.metrics
+            id_val = metrics.get("idea_density")
+            if id_val is not None:
+                lexical_vals.append(max(0.0, 1.0 - min(id_val / 5.0, 1.0)))
+            pn_val = metrics.get("p_n_ratio")
+            if pn_val is not None:
+                lexical_vals.append(max(0.0, 1.0 - min(pn_val / 5.0, 1.0)))
+            lat = metrics.get("raw_latency")
+            if lat is not None:
+                processing_vals.append(min(max(lat / 10.0, 0.0), 1.0))
+            pause = metrics.get("pause_time")
+            if pause is not None:
+                processing_vals.append(min(max(pause / 10.0, 0.0), 1.0))
+
+        lexical_impairment = sum(lexical_vals) / len(lexical_vals) if lexical_vals else 0.0
+        processing_impairment = sum(processing_vals) / len(processing_vals) if processing_vals else 0.0
+
+        from helpers.enums.question_types import QuestionType
+        if lexical_impairment - processing_impairment > 0.1:
+            selected_type = QuestionType.WORDS
+        elif processing_impairment - lexical_impairment > 0.1:
+            selected_type = QuestionType.SPEED
+        else:
+            overall = (lexical_impairment + processing_impairment) / 2.0
+            if overall >= 0.66:
+                selected_type = QuestionType.CONCENTRATION
+            elif overall >= 0.33:
+                selected_type = QuestionType.SORTING
+            else:
+                selected_type = QuestionType.MULTITASKING
+
         difficulty_filters["question_type"] = selected_type
         return difficulty_filters
