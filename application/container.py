@@ -117,7 +117,14 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         question_repo = SQLAlchemyQuestionRepository(self.session)
-        return QuestionService(question_repo=question_repo, uow=uow)
+        score_repo = SQLAlchemyScoreRepository(self.session)
+        transcription_repo = SQLAlchemyTranscriptionAnalysisRepository(self.session)
+        return QuestionService(
+            question_repo=question_repo,
+            uow=uow,
+            score_repo=score_repo,
+            transcription_repo=transcription_repo,
+        )
 
     def build_activity_service(self) -> ActivityService:
         """
