@@ -36,7 +36,7 @@ class TestUserRelationsCascade(BaseTest):
         payload = {
             "activities": [
                 {
-                    "title": f"Activitat cascada {uuid.uuid4().hex[:8]}",
+                    "title": f"Activitat cascada {uuid4().hex[:8]}",
                     "description": "Descripcio de prova",
                     "activity_type": QuestionType.CONCENTRATION.value,
                     "difficulty": 2.0,
@@ -88,7 +88,7 @@ class TestUserRelationsCascade(BaseTest):
         assert complete_resp.status_code == 200
 
         # Verify Score exists before deletion
-        activity_uuid = uuid.UUID(activity_id)
+        activity_uuid = UUID(activity_id)
         pre_delete_score_count = (
             self.db.query(Score)
             .filter(Score.patient_email == patient_payload["email"])
