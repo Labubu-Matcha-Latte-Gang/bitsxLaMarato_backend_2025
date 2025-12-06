@@ -82,7 +82,20 @@ class TranscriptionChunkResource(MethodView):
             # 2. ANÀLISI DE SENYAL (Abans d'enviar a OpenAI)
             # ---------------------------------------------------------
             # Això ens dona mètriques de "Velocitat de Processament" reals (pauses, fonació)
-            acoustic_metrics = analyze_audio_signal(temp_path)
+            try:
+                acoustic_metrics = analyze_audio_signal(temp_path)
+            except Exception as e:
+                self.logger.error(
+                    "Error analitzant el senyal d'àudio, es posen mètriques per defecte",
+                    module="Transcription",
+                    error=e,
+                )
+                acoustic_metrics = {
+                    "duration_total": 0.0,
+                    "active_speech_time": 0.0,
+                    "pause_time": 0.0,
+                    "phonation_ratio": 0.0,
+                }
 
             # ---------------------------------------------------------
             # 3. TRANSCRIPCIÓ (Azure OpenAI)
