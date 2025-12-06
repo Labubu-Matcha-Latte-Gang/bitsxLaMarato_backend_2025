@@ -933,6 +933,12 @@ class TranscriptionResponseSchema(Schema):
             "example": "Bon dia, aquesta és la transcripció completa de la sessió.",
         },
     )
+    analysis = fields.Dict(
+        required=False,
+        metadata={
+            "description": "Mètriques d'anàlisi (lingüística, executiva, etc.)",
+        },
+    )
 
 
 class QuestionBaseSchema(Schema):
