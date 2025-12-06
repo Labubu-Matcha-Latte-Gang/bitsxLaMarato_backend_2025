@@ -6,57 +6,119 @@ while ($true) {
     Write-Host "`n----------------------------------------" -ForegroundColor Green
     Write-Host "CONTROL MENU" -ForegroundColor Green
     Write-Host "----------------------------------------"
-    Write-Host "1. Start/Update environment (docker-compose up)"
-    Write-Host "2. View live Output (Logs) [Ctrl+C to return]"
-    Write-Host "3. Enter container terminal (Bash)"
-    Write-Host "4. Run Unit Tests (pytest)"
-    Write-Host "5. Stop containers (Stop)"
-    Write-Host "6. Stop everything and Exit script"
+    Write-Host "1. Start/Update environment (Normal mode)"
+    Write-Host "2. Start/Update environment (Debug mode with debugpy)"
+    Write-Host "3. View live Output (Logs) [Ctrl+C to return]"
+    Write-Host "4. Enter container terminal (Bash)"
+    Write-Host "5. Run Unit Tests (pytest)"
+    Write-Host "6. Stop containers (Stop)"
+    Write-Host "7. Stop everything and Exit script"
     Write-Host "----------------------------------------"
     
-    $selection = Read-Host "Select an option (1-6)"
+    $selection = Read-Host "Select an option (1-7)"
 
     switch ($selection) {
         "1" {
-            Write-Host "Starting containers..." -ForegroundColor Yellow
+            Write-Host "Starting containers in NORMAL MODE..." -ForegroundColor Yellow
+            Write-Host "Container name: bitsXLaMarato_api_dev" -ForegroundColor Cyan
+            Write-Host "Port: 5000" -ForegroundColor Cyan
             # --build ensures that if requirements or Dockerfile change, it updates
-            docker-compose up -d --build
-            Write-Host "Done! Containers running." -ForegroundColor Green
+            docker-compose -f docker-compose.yml up -d --build
+            Write-Host "Done! Containers running in normal mode." -ForegroundColor Green
         }
         "2" {
-            Write-Host "Showing logs... (Press Ctrl+C to return to menu)" -ForegroundColor Yellow
-            try {
-                docker-compose logs -f api
-            } catch {
-                Write-Host "Error: Containers are likely not running." -ForegroundColor Red
-            }
+            Write-Host "Starting containers in DEBUG MODE..." -ForegroundColor Yellow
+            Write-Host "Container name: bitsXLaMarato_api_debug" -ForegroundColor Cyan
+            Write-Host "API Port: 5000 | Debug Port: 5678" -ForegroundColor Cyan
+            Write-Host "Use: Run & Debug (Ctrl+Shift+D) -> 'Python Debugger: Flask (Docker Remote)' -> F5" -ForegroundColor Magenta
+            # --build ensures that if requirements or Dockerfile change, it updates
+            docker-compose -f docker-compose.debug.yml up -d --build
+            Write-Host "Done! Containers running in debug mode. Waiting for debugger connection..." -ForegroundColor Green
+            Start-Sleep -Seconds 2
+            Write-Host "Opening logs to show debugger status..." -ForegroundColor Yellow
+            docker-compose -f docker-compose.debug.yml logs -f api
         }
         "3" {
-            Write-Host "Connecting to terminal... (Type 'exit' to quit)" -ForegroundColor Yellow
-            try {
-                docker-compose exec api /bin/bash
-            } catch {
-                Write-Host "Error: Cannot connect. Ensure you use Option 1 first." -ForegroundColor Red
+            Write-Host "Showing logs... (Press Ctrl+C to return to menu)" -ForegroundColor Yellow
+            Write-Host "Detecting active mode..." -ForegroundColor Cyan
+            $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
+            $debugRunning = docker ps -q -f "name=bitsXLaMarato_api_debug" 2>$null
+            
+            if ($debugRunning) {
+                Write-Host "Debug mode container detected" -ForegroundColor Magenta
+                docker-compose -f docker-compose.debug.yml logs -f api
+            } elseif ($normalRunning) {
+                Write-Host "Normal mode container detected" -ForegroundColor Green
+                docker-compose -f docker-compose.yml logs -f api
+            } else {
+                Write-Host "No containers running." -ForegroundColor Red
             }
         }
         "4" {
+            Write-Host "Connecting to terminal... (Type 'exit' to quit)" -ForegroundColor Yellow
+            Write-Host "Detecting active mode..." -ForegroundColor Cyan
+            $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
+            $debugRunning = docker ps -q -f "name=bitsXLaMarato_api_debug" 2>$null
+            
+            try {
+                if ($debugRunning) {
+                    Write-Host "Connecting to debug mode container..." -ForegroundColor Magenta
+                    docker-compose -f docker-compose.debug.yml exec api /bin/bash
+                } elseif ($normalRunning) {
+                    Write-Host "Connecting to normal mode container..." -ForegroundColor Green
+                    docker-compose -f docker-compose.yml exec api /bin/bash
+                } else {
+                    Write-Host "Error: No containers running. Start with option 1 or 2 first." -ForegroundColor Red
+                }
+            } catch {
+                Write-Host "Error: Cannot connect to container." -ForegroundColor Red
+            }
+        }
+        "5" {
             Write-Host "Running Tests..." -ForegroundColor Cyan
             try {
                 # Usamos 'run --rm' para crear un contenedor temporal solo para el test.
                 # Funciona aunque no hayas dado a la Opción 1.
-                docker-compose run --rm api pytest tests/
+                docker-compose -f docker-compose.yml run --rm api pytest tests/
             } catch {
                 Write-Host "Error running tests." -ForegroundColor Red
             }
         }
-        "5" {
-            Write-Host "Stopping containers..." -ForegroundColor Magenta
-            docker-compose stop
-            Write-Host "Containers stopped." -ForegroundColor Green
-        }
         "6" {
+            Write-Host "Stopping containers..." -ForegroundColor Magenta
+            Write-Host "Detecting running containers..." -ForegroundColor Cyan
+            $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
+            $debugRunning = docker ps -q -f "name=bitsXLaMarato_api_debug" 2>$null
+            
+            if ($debugRunning) {
+                Write-Host "Stopping debug mode container..." -ForegroundColor Magenta
+                docker-compose -f docker-compose.debug.yml stop
+            }
+            if ($normalRunning) {
+                Write-Host "Stopping normal mode container..." -ForegroundColor Green
+                docker-compose -f docker-compose.yml stop
+            }
+            if (-not $normalRunning -and -not $debugRunning) {
+                Write-Host "No containers running." -ForegroundColor Yellow
+            } else {
+                Write-Host "Containers stopped." -ForegroundColor Green
+            }
+        }
+        "7" {
             Write-Host "Shutting down and removing containers..." -ForegroundColor Red
-            docker-compose down
+            Write-Host "Detecting running containers..." -ForegroundColor Cyan
+            $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
+            $debugRunning = docker ps -q -f "name=bitsXLaMarato_api_debug" 2>$null
+            
+            if ($debugRunning) {
+                Write-Host "Removing debug mode container..." -ForegroundColor Magenta
+                docker-compose -f docker-compose.debug.yml down
+            }
+            if ($normalRunning) {
+                Write-Host "Removing normal mode container..." -ForegroundColor Green
+                docker-compose -f docker-compose.yml down
+            }
+            Write-Host "All containers removed. Exiting..." -ForegroundColor Red
             exit
         }
         Default {
