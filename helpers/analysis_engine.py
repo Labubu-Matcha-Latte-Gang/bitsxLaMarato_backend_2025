@@ -1,3 +1,6 @@
+import os
+import subprocess
+import tempfile
 import spacy
 import librosa
 import numpy as np
@@ -19,6 +22,51 @@ try:
 except Exception as e:
     print(f"⚠️ Error cargando SentenceTransformer: {e}")
     semantic_model = None
+
+def load_audio_with_fallback(file_path:str):
+    """
+    Intenta cargar el audio con librosa. Si falla (formato raro, webm, etc.),
+    intenta convertir a WAV con ffmpeg y volver a cargar.
+    """
+    try:
+        # Primer intento: directamente (soundfile + audioread)
+        y, sr = librosa.load(file_path, sr=None)
+        return y, sr
+    except Exception as e:
+        print(f"⚠️ librosa.load ha fallat amb {file_path}: {e}. Intentant ffmpeg -> WAV.")
+    
+    # Segundo intento: convertir a WAV con ffmpeg
+    tmp_wav = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_wav = tmp.name
+
+        # Conversió a mono i, per exemple, 16kHz per alleugerir càlculs
+        cmd = [
+            "ffmpeg",
+            "-y",               # sobreescriure si existeix
+            "-i", file_path,
+            "-ac", "1",         # 1 canal (mono)
+            "-ar", "16000",     # 16 kHz
+            tmp_wav,
+        ]
+        # Silenciar la sortida de ffmpeg
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        y, sr = librosa.load(tmp_wav, sr=None)
+        return y, sr
+    except Exception as e:
+        print(f"⚠️ No s'ha pogut convertir/cargar l'àudio amb ffmpeg: {e}")
+        # Últim recurs: llançar l'error perquè el capturi el nivell superior
+        raise
+    finally:
+        if tmp_wav and os.path.exists(tmp_wav):
+            os.remove(tmp_wav)
 
 # 2. Segmentación Optimizada (Evita romper subordinadas con 'que')
 def smart_segmentation(text, max_words=25):
@@ -47,7 +95,18 @@ def smart_segmentation(text, max_words=25):
 
 # 3. Análisis de Señal (DSP)
 def analyze_audio_signal(file_path):
-    y, sr = librosa.load(file_path, sr=None)
+    try:
+        y, sr = load_audio_with_fallback(file_path)
+    except Exception as e:
+        # Si no podem carregar l'àudio, tornem mètriques neutres però no petem
+        print(f"Error analitzant el senyal d'àudio ({file_path}): {e}")
+        return {
+            "duration_total": 0.0,
+            "active_speech_time": 0.0,
+            "pause_time": 0.0,
+            "phonation_ratio": 0.0,
+        }
+
     duration = librosa.get_duration(y=y, sr=sr)
     non_silent_intervals = librosa.effects.split(y, top_db=25)
     active_time = sum([end - start for start, end in non_silent_intervals]) / sr
