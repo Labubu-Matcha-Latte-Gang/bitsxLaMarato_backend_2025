@@ -17,4 +17,4 @@ services:
       - FLASK_DEBUG=1
       - DOCKER_BUILDKIT=1    
     # Usamos el servidor de desarrollo de Flask con debugger remoto
-    command: python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m flask run --host=0.0.0.0 --port=5000 --no-reload
+    command: python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m flask run --host=0.0.0.0 --port=5000 --no-reload
