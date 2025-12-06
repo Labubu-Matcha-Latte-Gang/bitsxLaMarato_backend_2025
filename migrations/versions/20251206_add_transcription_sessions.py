@@ -1,8 +1,8 @@
 """add transcription_sessions table
 
 Revision ID: add_transcription_sessions
+Create Date: 2025-12-06 00:00:00.000000
 Revises: cascade_delete_association_fks
-Create Date: 2025-01-01 00:00:00.000000
 """
 from __future__ import annotations
 
