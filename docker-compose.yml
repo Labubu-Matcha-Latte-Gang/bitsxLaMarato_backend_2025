@@ -4,6 +4,7 @@ services:
     container_name: bitsXLaMarato_api_dev
     ports:
       - "5000:5000"
+      - "5678:5678"
     
     volumes:
       - .:/app
@@ -15,5 +16,5 @@ services:
       - FLASK_APP=app.py
       - FLASK_DEBUG=1
       - DOCKER_BUILDKIT=1    
-    # Usamos el servidor de desarrollo de Flask
-    command: flask run --host=0.0.0.0 --port=5000 --reload
+    # Usamos el servidor de desarrollo de Flask con debugger remoto
+    command: python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m flask run --host=0.0.0.0 --port=5000 --no-reload

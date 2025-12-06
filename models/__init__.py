@@ -7,6 +7,7 @@ from models.question import Question
 from models.activity import Activity
 from models.score import Score
 from .transcription import TranscriptionChunk
+from .transcription_session import TranscriptionSession
 
 __all__ = [
     'User',
@@ -19,4 +20,6 @@ __all__ = [
     'UserCodeAssociation',
     'QuestionAnsweredAssociation',
     'Score',
+    'TranscriptionChunk',
+    'TranscriptionSession',
 ]

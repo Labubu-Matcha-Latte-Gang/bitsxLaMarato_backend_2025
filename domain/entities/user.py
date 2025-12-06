@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from helpers.enums.gender import Gender
+from helpers.enums.question_types import QuestionType
 from helpers.enums.user_role import UserRole
 from domain.services.security import PasswordHasher
+
+if TYPE_CHECKING:
+    from domain.services.recommendation import DailyQuestionFilterStrategy
+    from domain.repositories.interfaces import IScoreRepository, ITranscriptionAnalysisRepository
+    from domain.services.recommendation import ActivityFilterStrategy
 
 @dataclass
 class User(ABC):
@@ -159,11 +165,39 @@ class Patient(User):
     def remove_role_associations(self) -> None:
         self.doctors.clear()
 
-    def get_daily_question_filters(self) -> dict:
-        return {}
+    def get_daily_question_filters(
+        self,
+        score_repo: IScoreRepository,
+        transcription_repo: ITranscriptionAnalysisRepository,
+        strategy: DailyQuestionFilterStrategy | None = None,
+    ) -> Dict[str, float | QuestionType]:
+        """
+        Generate filters for selecting the patient's daily question using an
+        injectable strategy.
+        """
 
-    def get_recommended_activity_filters(self) -> dict:
-        return {}
+        if strategy is None:
+            from domain.services.recommendation import ScoreBasedQuestionStrategy
+            strategy = ScoreBasedQuestionStrategy()
+
+        return strategy.get_filters(self, score_repo, transcription_repo)
+
+    def get_recommended_activity_filters(
+        self,
+        score_repo: IScoreRepository,
+        transcription_repo: ITranscriptionAnalysisRepository,
+        strategy: Optional[ActivityFilterStrategy] = None,
+    ) -> Dict[str, float]:
+        """
+        Generate filters for selecting a recommended activity for the patient
+        using an injectable strategy.
+        """
+
+        if strategy is None:
+            from domain.services.recommendation import ScoreBasedActivityStrategy
+            strategy = ScoreBasedActivityStrategy()
+
+        return strategy.get_filters(self, score_repo, transcription_repo)
 
     @property
     def doctor_emails(self) -> List[str]:

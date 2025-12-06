@@ -27,6 +27,7 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyResetCodeRepository,
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
+    SQLAlchemyTranscriptionAnalysisRepository
 )
 from sqlalchemy.orm import Session
 
@@ -116,7 +117,14 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         question_repo = SQLAlchemyQuestionRepository(self.session)
-        return QuestionService(question_repo=question_repo, uow=uow)
+        score_repo = SQLAlchemyScoreRepository(self.session)
+        transcription_repo = SQLAlchemyTranscriptionAnalysisRepository(self.session)
+        return QuestionService(
+            question_repo=question_repo,
+            uow=uow,
+            score_repo=score_repo,
+            transcription_repo=transcription_repo,
+        )
 
     def build_activity_service(self) -> ActivityService:
         """
@@ -126,7 +134,14 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         activity_repo = SQLAlchemyActivityRepository(self.session)
-        return ActivityService(activity_repo=activity_repo, uow=uow)
+        score_repo = SQLAlchemyScoreRepository(self.session)
+        transcription_repo = SQLAlchemyTranscriptionAnalysisRepository(self.session)
+        return ActivityService(
+            activity_repo=activity_repo,
+            uow=uow,
+            score_repo=score_repo,
+            transcription_repo=transcription_repo,
+        )
 
     def build_patient_service(self) -> PatientService:
         """

@@ -6,7 +6,8 @@ from typing import List
 
 from domain.entities.question import Question
 from domain.entities.user import Patient
-from domain.repositories import IQuestionRepository
+from domain.repositories import IQuestionRepository, IScoreRepository, ITranscriptionAnalysisRepository
+from domain.services.recommendation import DailyQuestionFilterStrategy
 from domain.unit_of_work import IUnitOfWork
 from helpers.exceptions.question_exceptions import (
     QuestionCreationException,
@@ -16,9 +17,17 @@ from helpers.exceptions.question_exceptions import (
 
 
 class QuestionService:
-    def __init__(self, question_repo: IQuestionRepository, uow: IUnitOfWork):
+    def __init__(
+        self,
+        question_repo: IQuestionRepository,
+        uow: IUnitOfWork,
+        score_repo: IScoreRepository,
+        transcription_repo: ITranscriptionAnalysisRepository,
+    ) -> None:
         self.question_repo = question_repo
         self.uow = uow
+        self.score_repo = score_repo
+        self.transcription_repo = transcription_repo
 
     def create_questions(self, payloads: List[dict]) -> List[Question]:
         try:
@@ -75,8 +84,18 @@ class QuestionService:
             self.question_repo.remove(question)
             self.uow.commit()
 
-    def get_daily_question(self, patient: Patient) -> Question:
-        filters = patient.get_daily_question_filters()
+    def get_daily_question(self, patient: Patient, strategy: DailyQuestionFilterStrategy | None = None) -> Question:
+        if not strategy:
+            from domain.services.recommendation import ScoreBasedQuestionStrategy
+            strategy = ScoreBasedQuestionStrategy()
+        try:
+            filters = patient.get_daily_question_filters(
+                strategy=strategy,
+                score_repo=self.score_repo,
+                transcription_repo=self.transcription_repo,
+            )
+        except ValueError:
+            filters = {}
         questions = self.question_repo.list(filters)
         if not questions:
             questions = self.question_repo.list({})
