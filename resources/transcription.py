@@ -1,4 +1,5 @@
 import os
+import subprocess
 import tempfile
 import json
 from flask import request, current_app
@@ -17,6 +18,8 @@ from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 from schemas import TranscriptionChunkSchema, TranscriptionCompleteSchema, TranscriptionResponseSchema
 
 blp = Blueprint('transcription', __name__, description="Operacions de transcripció d'àudio en temps real (Persistència en DB).")
+
+SESSION_HEADERS = {}
 
 def get_azure_client():
     api_key = current_app.config.get("AZURE_OPENAI_API_KEY")
@@ -60,75 +63,86 @@ class TranscriptionChunkResource(MethodView):
     def post(self, form_data):
         session_id = form_data['session_id']
         chunk_index = form_data['chunk_index']
-        
+
         if 'audio_blob' not in request.files:
             abort(400, message="Falta el fitxer 'audio_blob'.")
-            
+
         audio_file = request.files['audio_blob']
         if audio_file.filename == '':
             abort(400, message="El fitxer no té nom.")
 
         temp_path = None
+        converted_wav_path = None
+        fixed_input_path = None
+        self.logger.info(f"Processing chunk {chunk_index} for session {session_id}", module="Transcription")
         try:
-            self.logger.info(f"Processing DB chunk {chunk_index} for session {session_id}", module="Transcription")
-            
-            # 1. Guardar temporalment al disc
             suffix = os.path.splitext(audio_file.filename)[1] or ".webm"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
                 audio_file.save(temp_audio.name)
                 temp_path = temp_audio.name
 
-            # ---------------------------------------------------------
-            # 2. ANÀLISI DE SENYAL (Abans d'enviar a OpenAI)
-            # ---------------------------------------------------------
-            # Això ens dona mètriques de "Velocitat de Processament" reals (pauses, fonació)
-            try:
-                acoustic_metrics = analyze_audio_signal(temp_path)
-            except Exception as e:
-                self.logger.error(
-                    "Error analitzant el senyal d'àudio, es posen mètriques per defecte",
-                    module="Transcription",
-                    error=e,
-                )
-                acoustic_metrics = {
-                    "duration_total": 0.0,
-                    "active_speech_time": 0.0,
-                    "pause_time": 0.0,
-                    "phonation_ratio": 0.0,
-                }
+            # Si el formato no es WAV, prepararlo para conversión (reparar WebM si hace falta)
+            if suffix != ".wav":
+                # Reparar encabezado si no es el primer chunk y es WebM
+                if suffix == ".webm":
+                    with open(temp_path, "rb") as f:
+                        full_data = f.read()
 
-            # ---------------------------------------------------------
-            # 3. TRANSCRIPCIÓ (Azure OpenAI)
-            # ---------------------------------------------------------
+                    if int(chunk_index) == 0:
+                        cluster_start = full_data.find(b'\x1f\x43\xb6\x75')
+                        header = full_data if cluster_start == -1 else full_data[:cluster_start]
+                        SESSION_HEADERS[session_id] = header
+                        final_data = full_data
+                    else:
+                        header = SESSION_HEADERS.get(session_id)
+                        if not header:
+                            abort(400, message="No s'ha trobat capçalera per aquesta sessió.")
+                        final_data = header + full_data
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as fixed_file:
+                        fixed_file.write(final_data)
+                        fixed_input_path = fixed_file.name
+                else:
+                    fixed_input_path = temp_path  # otro formato no WebM: usar tal cual
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as converted:
+                    converted_wav_path = converted.name
+
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", fixed_input_path,
+                    "-ac", "1", "-ar", "16000",
+                    converted_wav_path
+                ], check=True)
+            else:
+                converted_wav_path = temp_path
+
+            # Análisis acústico (físico)
+            acoustic_metrics = analyze_audio_signal(converted_wav_path)
+
+            # Transcripción via OpenAI
             client = get_azure_client()
             deployment_name = current_app.config.get("AZURE_OPENAI_DEPLOYMENT_NAME")
-            
-            with open(temp_path, "rb") as file_to_send:
+
+            with open(converted_wav_path, "rb") as file_to_send:
                 transcript = client.audio.transcriptions.create(
                     model=deployment_name,
                     file=file_to_send,
                     language="ca",
                     response_format="verbose_json"
                 )
-                text_result = transcript.text
-                segments = transcript.segments
 
-            # ---------------------------------------------------------
-            # 4. ANÀLISI LINGÜÍSTIC (spaCy)
-            # ---------------------------------------------------------
-            # Això ens dona mètriques d'"Accés Lèxic" (Anomia, riquesa verbal)
+            text_result = transcript.text
+            segments = transcript.segments
+
+            # Análisis lingüístico
             linguistic_metrics = analyze_linguistics(text_result)
 
-            # ---------------------------------------------------------
-            # 5. UNIFICAR MÈTRIQUES
-            # ---------------------------------------------------------
             combined_metrics = {
-                **acoustic_metrics,   # duration, phonation_ratio, pause_time...
-                **linguistic_metrics, # p_n_ratio, idea_density, noun_count...
-                "raw_latency": segments[0].start if segments else 0 # Access attribute, not dictionary
+                **acoustic_metrics,
+                **linguistic_metrics,
+                "raw_latency": segments[0].start if segments else 0
             }
 
-            # 6. Guardar a PostgreSQL
             new_chunk = TranscriptionChunk(
                 session_id=session_id,
                 chunk_index=chunk_index,
@@ -138,13 +152,12 @@ class TranscriptionChunkResource(MethodView):
             db.session.add(new_chunk)
             db.session.commit()
 
-            # Retornem les dades perquè el Frontend pugui pintar gràfiques en temps real
             return {
-                "status": "success", 
+                "status": "success",
                 "partial_text": text_result,
-                "analysis": combined_metrics 
+                "analysis": combined_metrics
             }, 200
-        
+
         except IntegrityError as e:
             db.session.rollback()
             mapped = map_integrity_error(e)
@@ -155,10 +168,9 @@ class TranscriptionChunkResource(MethodView):
             self.logger.error("Error transcribing chunk", module="Transcription", error=e)
             abort(500, message=f"S'ha produït un error inesperat: {str(e)}")
         finally:
-            # Esborrar fitxer temporal sempre
-            if temp_path and os.path.exists(temp_path):
-                os.remove(temp_path)
-
+            for path in [temp_path, fixed_input_path, converted_wav_path]:
+                if path and os.path.exists(path):
+                    os.remove(path)
 
 @blp.route('/complete')
 class TranscriptionCompleteResource(MethodView):
