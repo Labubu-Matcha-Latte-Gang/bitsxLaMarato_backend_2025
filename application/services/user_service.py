@@ -4,7 +4,7 @@ import base64
 import json
 from pathlib import Path
 
-from typing import Dict
+from typing import Dict, TypedDict, Optional
 
 from domain.entities.user import Admin, Doctor, Patient, User
 from domain.repositories import (
@@ -31,6 +31,69 @@ from models.patient import Patient as PatientModel
 from models.score import Score
 from models.user import User as UserModel
 
+class PatientRolePayload(TypedDict):
+    """Patient role-specific data."""
+    ailments: Optional[str]
+    gender: str
+    age: int
+    treatments: Optional[str]
+    height_cm: float
+    weight_kg: float
+    doctors: list[str]
+
+class DoctorRolePayload(TypedDict):
+    """Doctor role-specific data."""
+    patients: list[str]
+
+class AdminRolePayload(TypedDict):
+    """Admin role-specific data (empty)."""
+    pass
+
+class PatientPayload(TypedDict):
+    """Patient basic information with role-specific data."""
+    email: str
+    name: str
+    surname: str
+    role: PatientRolePayload
+
+class QuestionData(TypedDict):
+    """Basic question information."""
+    id: str
+    text: str
+    question_type: str
+    difficulty: float
+
+class AnalysisMetrics(TypedDict):
+    """Analysis metrics from question answer."""
+    pass
+
+class QuestionPayload(TypedDict):
+    """Answered question with analysis metrics."""
+    question: QuestionData
+    answered_at: str
+    analysis: AnalysisMetrics
+
+class ScorePayload(TypedDict):
+    """Activity score information for a patient."""
+    activity_id: str
+    activity_title: str
+    activity_type: Optional[str]
+    completed_at: str
+    score: float
+    seconds_to_finish: float
+
+class GraphFilePayload(TypedDict):
+    """Base64-encoded HTML graph file."""
+    filename: str
+    content_type: str
+    content: str
+
+class PatientData(TypedDict):
+    """Complete patient data including demographics, scores, questions and graphs."""
+    patient: PatientPayload
+    scores: list[ScorePayload]
+    questions: list[QuestionPayload]
+    graph_files: list[GraphFilePayload]
 
 class UserService:
     """
@@ -144,7 +207,7 @@ class UserService:
                 self.user_repo.remove(user)
             self.uow.commit()
 
-    def get_patient_data(self, requester: User, patient: Patient) -> dict:
+    def get_patient_data(self, requester: User, patient: Patient) -> PatientData:
         """
         Assemble a comprehensive payload for the given patient including basic
         demographics, activity scores, answered questions and generated graph
