@@ -35,7 +35,7 @@ class QRResource(MethodView):
         summary="Obtenir un codi QR per a l'informe mèdic.",
         description="Genera un codi QR que permet obtenir l'informe mèdic d'un pacient.",
     )
-    @blp.response(200, description="Codi QR generat correctament.", content_type="image/png")
+    @blp.response(200, description="Codi QR generat correctament.", content_type=["image/png", "image/svg+xml"])
     @blp.response(401, description="Falta o és invàlid el JWT.")
     @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
