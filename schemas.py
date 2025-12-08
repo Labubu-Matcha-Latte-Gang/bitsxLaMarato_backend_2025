@@ -1542,3 +1542,10 @@ class ActivityCompleteResponseSchema(Schema):
             "example": 120.3,
         },
     )
+
+class QRGenerateSchema(Schema):
+    """Schema for generating QR codes."""
+
+    class Meta:
+        description = "Paràmetres per generar un codi QR per a obtenir un informe mèdic."
+        example = {"doctor_email": "doctor@example.com"} #TODO: update example
