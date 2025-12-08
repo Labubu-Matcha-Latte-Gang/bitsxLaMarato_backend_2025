@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe Clínic - Seguiment Cognitiu</title>
+    <style>
+        /* CONFIGURACIÓ DE PÀGINA PER A PDF */
+        @page {
+            size: A4;
+            margin: 2.5cm;
+            @top-right {
+                content: "Informe Confidencial";
+                font-size: 9pt;
+                color: #888;
+                font-family: 'Helvetica', sans-serif;
+            }
+            @bottom-center {
+                content: "Pàgina " counter(page) " de " counter(pages);
+                font-size: 10pt;
+                font-family: 'Helvetica', sans-serif;
+            }
+        }
+
+        /* ESTILS GENERALS */
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: #333;
+            line-height: 1.5;
+            font-size: 12pt;
+        }
+
+        /* ENCAPÇALAMENT */
+        .header {
+            border-bottom: 2px solid #b30000; /* Vermell fosc per context mèdic/alerta o blau corporatiu */
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #2c3e50;
+            text-transform: uppercase;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .date {
+            text-align: right;
+            font-size: 11pt;
+            color: #555;
+        }
+
+        /* SECCIONS */
+        h2 {
+            color: #2c3e50;
+            border-left: 5px solid #b30000;
+            padding-left: 10px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 16pt;
+        }
+
+        h3 {
+            color: #555;
+            font-size: 14pt;
+            margin-top: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        /* TAULA DE DADES DEL PACIENT */
+        .patient-info-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .row { display: table-row; }
+        .cell { display: table-cell; padding: 5px 15px; width: 50%; vertical-align: top; }
+        
+        .label {
+            font-weight: bold;
+            color: #555;
+            display: block;
+            font-size: 10pt;
+            text-transform: uppercase;
+        }
+        
+        .value {
+            font-size: 12pt;
+            color: #000;
+        }
+
+        /* TAULA DE RESULTATS */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 11pt;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            color: #333;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) { background-color: #fcfcfc; }
+
+        /* TAGS/ETIQUETES */
+        .tag {
+            background-color: #e2e8f0;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.9em;
+            margin-right: 4px;
+            display: inline-block;
+        }
+
+        /* GRÀFICS */
+        .graph-container {
+            text-align: center;
+            margin: 30px 0;
+            page-break-inside: avoid; /* Evita que el gràfic es talli */
+        }
+
+        .graph-container img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #eee;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .caption {
+            font-size: 10pt;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        /* NOTES FINALS */
+        .disclaimer {
+            margin-top: 50px;
+            font-size: 9pt;
+            color: #999;
+            text-align: justify;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Informe de Seguiment Cognitiu</h1>
+            <div class="subtitle">Unitat de Neuropsicologia i Oncologia</div>
+        </div>
+        <div class="date">
+            Data d'emissió: {{ data_informe }}
+        </div>
+    </div>
+
+    <h2>Dades del Pacient</h2>
+    <div class="patient-info-grid">
+        <div class="row">
+            <div class="cell">
+                <span class="label">Nom Complet</span>
+                <span class="value">{{ data.patient.name }} {{ data.patient.surname }}</span>
+            </div>
+            <div class="cell">
+                <span class="label">Correu Electrònic / ID</span>
+                <span class="value">{{ data.patient.email }}</span>
+            </div>
+        </div>
+        <div class="row">
+            <div class="cell">
+                <span class="label">Edat / Gènere</span>
+                <span class="value">{{ data.patient.role.age }} anys / {{ data.patient.role.gender }}</span>
+            </div>
+            <div class="cell">
+                <span class="label">Antropometria</span>
+                <span class="value">{{ data.patient.role.height_cm }} cm / {{ data.patient.role.weight_kg }} kg</span>
+            </div>
+        </div>
+    </div>
+
+    <h2>Context Clínic</h2>
+    <p><strong>Diagnòstic / Dolències:</strong><br>
+    {{ data.patient.role.ailments or "No especificat" }}</p>
+
+    <p><strong>Tractaments en curs:</strong><br>
+    {{ data.patient.role.treatments or "Sense tractament actiu registrat" }}</p>
+
+    <p><strong>Equip Mèdic Responsable:</strong></p>
+    <ul>
+        {% for doctor in data.patient.role.doctors %}
+            <li>Dr./Dra. {{ doctor }}</li>
+        {% else %}
+            <li>No assignat</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Avaluació Funcional i Cognitiva</h2>
+    <p>Resum de les activitats realitzades per avaluar l'estat cognitiu durant el tractament:</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Activitat</th>
+                <th>Tipus</th>
+                <th>Data Completada</th>
+                <th>Temps (s)</th>
+                <th>Puntuació</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for score in data.scores %}
+            <tr>
+                <td>{{ score.activity_title }}</td>
+                <td>{{ score.activity_type or "-" }}</td>
+                <td>{{ score.completed_at }}</td>
+                <td>{{ "%.1f"|format(score.seconds_to_finish) }} s</td>
+                <td><strong>{{ "%.2f"|format(score.score) }}</strong></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center;">No s'han registrat activitats en aquest període.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if data.questions %}
+    <h3>Detall de Respostes Seleccionades</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Pregunta</th>
+                <th>Dificultat</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for q in data.questions %}
+            <tr>
+                <td>{{ q.question.text }}</td>
+                <td>{{ q.question.difficulty }}</td>
+                <td>{{ q.answered_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if data.graph_files %}
+    <div style="page-break-before: always;"></div> <h2>Gràfics d'Evolució</h2>
+    <p>Visualització de tendències en el rendiment cognitiu:</p>
+
+    {% for graph in data.graph_files %}
+    <div class="graph-container">
+        <img src="data:{{ graph.content_type }};base64,{{ graph.content }}" alt="Gràfic de dades">
+        <div class="caption">{{ graph.filename }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="disclaimer">
+        <p>
+            <strong>Avís de confidencialitat:</strong> Aquest document conté dades de salut protegides. 
+            El seu ús està restringit exclusivament al seguiment mèdic del pacient esmentat. 
+            Si ha rebut aquest document per error, si us plau destrueixi'l immediatament.
+        </p>
+    </div>
+
+</body>
+</html>
