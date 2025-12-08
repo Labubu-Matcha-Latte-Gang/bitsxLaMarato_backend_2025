@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from flask import Response, jsonify, send_file
+from flask import send_file
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import IntegrityError
@@ -13,21 +12,10 @@ from helpers.decorators import roles_required
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.pdf_exceptions import PDFGenerationException
 from helpers.exceptions.qr_exceptions import QRGenerationException
-from helpers.exceptions.question_exceptions import (
-    QuestionCreationException,
-    QuestionNotFoundException,
-    QuestionUpdateException,
-)
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
 from schemas import (
     QRGenerateSchema,
-    QuestionBulkCreateSchema,
-    QuestionIdSchema,
-    QuestionPartialUpdateSchema,
-    QuestionQuerySchema,
-    QuestionResponseSchema,
-    QuestionUpdateSchema,
 )
 
 blp = Blueprint('qr', __name__, description="Generació de codi QR per obtenir informes de pacients.")
@@ -69,9 +57,10 @@ class QRResource(MethodView):
             patient_data = user_service.get_patient_data(patient, patient)
             pdf_bytes, date = pdf_service.generate_patient_report(patient_data, ZoneInfo(data.get("timezone", "Europe/Madrid")))
 
+            file_format = data.get("format", "svg")
             qr_payload = QRPayload(
                 data=pdf_bytes,
-                format=data.get("format", "svg"),
+                format=file_format,
                 fill_color=data.get("fill_color", "#000000"),
                 back_color=data.get("back_color", "#FFFFFF"),
                 box_size=data.get("box_size", 10),
@@ -80,12 +69,12 @@ class QRResource(MethodView):
             qr, content_type = qr_service.generate_qr_code(qr_payload)
 
             date_for_filename = date.replace("/", "-")
-
+            
             return send_file(
                 qr,
                 mimetype=content_type,
                 as_attachment=True,
-                download_name=f"qr_{patient_email.split('@')[0]}_{date_for_filename}.{data.get('format', 'svg')}",
+                download_name=f"qr_{patient_email.split('@')[0]}_{date_for_filename}.{file_format}",
             )
         except DataIntegrityException as e:
             db.session.rollback()
