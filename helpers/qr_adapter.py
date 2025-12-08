@@ -5,6 +5,7 @@ import qrcode.image.svg
 import io
 
 from helpers.debugger.logger import AbstractLogger
+from helpers.exceptions.qr_exceptions import QRGenerationException
 
 logger = AbstractLogger.get_instance()
 
@@ -76,4 +77,4 @@ class QRAdapter(AbstractQRAdapter):
                 return stream, "image/png"
         except Exception as e:
             logger.error("Error generating QR code", module="QRAdapter", error=e)
-            raise e
+            raise QRGenerationException("Error al generar el codi QR.") from e
