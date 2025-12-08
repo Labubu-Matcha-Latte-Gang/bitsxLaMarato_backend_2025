@@ -4,6 +4,7 @@ from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import IntegrityError
 from flask_jwt_extended import get_jwt_identity
+from zoneinfo import ZoneInfo
 
 from application.services.qr_service import QRPayload
 from db import db
@@ -59,9 +60,14 @@ class QRResource(MethodView):
             service_factory = ServiceFactory.get_instance()
             pdf_service = service_factory.build_pdf_generation_service()
             qr_service = service_factory.build_qr_service()
+            user_service = service_factory.build_user_service()
+            patient_service = service_factory.build_patient_service()
 
             patient_email: str = get_jwt_identity()
-            pdf_bytes = pdf_service.generate_patient_report(patient_email)
+            patient = patient_service.get_patient(patient_email)
+
+            patient_data = user_service.get_patient_data(patient, patient)
+            pdf_bytes, date = pdf_service.generate_patient_report(patient_data, ZoneInfo(data.get("timezone", "Europe/Madrid")))
 
             qr_payload = QRPayload(
                 data=pdf_bytes,
@@ -73,14 +79,13 @@ class QRResource(MethodView):
             )
             qr, content_type = qr_service.generate_qr_code(qr_payload)
 
-            datetime_now = datetime.now(timezone.utc)
-            now_seconds = int(datetime_now.timestamp())
+            date_for_filename = date.replace("/", "-")
 
             return send_file(
                 qr,
                 mimetype=content_type,
                 as_attachment=True,
-                download_name=f"qr_{patient_email.split('@')[0]}_{now_seconds}.{data.get('format', 'svg')}",
+                download_name=f"qr_{patient_email.split('@')[0]}_{date_for_filename}.{data.get('format', 'svg')}",
             )
         except DataIntegrityException as e:
             db.session.rollback()
