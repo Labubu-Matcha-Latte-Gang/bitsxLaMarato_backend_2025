@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from application.services.pdf_generation_service import PDFGenerationService
+from application.services.qr_service import QRService
 from db import db
 from application.services import (
     ActivityService,
@@ -229,4 +231,28 @@ class ServiceFactory:
         return ScoreService(
             score_repo=score_repo,
             uow=uow,
+        )
+
+    def build_qr_service(self) -> QRService:
+        """
+        Build a QRService with its dependencies.
+        Returns:
+            QRService: The constructed QRService instance.
+        """
+        adapter_factory = AbstractAdapterFactory.get_instance()
+        return QRService(
+            adapter_factory=adapter_factory,
+        )
+    
+    def build_pdf_generation_service(self) -> PDFGenerationService:
+        """
+        Build a PDFGenerationService with its dependencies.
+        Returns:
+            PDFGenerationService: The constructed PDFGenerationService instance.
+        """
+        patient_repo = SQLAlchemyPatientRepository(self.session)
+        adapter_factory = AbstractAdapterFactory.get_instance()
+        return PDFGenerationService(
+            patient_repo=patient_repo,
+            adapter_factory=adapter_factory,
         )
