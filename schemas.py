@@ -1,5 +1,6 @@
 from marshmallow import Schema, fields, validate
 from helpers.enums.gender import Gender
+from helpers.enums.qr_code_format import QRCodeFormat
 from helpers.enums.question_types import QuestionType
 
 GENDER_VALUES = [gender.value for gender in Gender]
@@ -7,6 +8,8 @@ GENDER_DESCRIPTION = f"Gènere del pacient. Valors acceptats: {', '.join(GENDER_
 QUESTION_TYPE_VALUES = [question_type.value for question_type in QuestionType]
 QUESTION_TYPE_DESCRIPTION = f"Tipus de pregunta. Valors acceptats: {', '.join(QUESTION_TYPE_VALUES)}."
 ACTIVITY_TYPE_DESCRIPTION = f"Tipus d'activitat. Valors acceptats: {', '.join(QUESTION_TYPE_VALUES)}."
+QR_CODE_FORMAT_VALUES = [format.value for format in QRCodeFormat]
+QR_CODE_FORMAT_DESCRIPTION = f"Format del codi QR. Valors acceptats: {', '.join(QR_CODE_FORMAT_VALUES)}."
 
 password_complexity = validate.Regexp(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
@@ -1548,4 +1551,68 @@ class QRGenerateSchema(Schema):
 
     class Meta:
         description = "Paràmetres per generar un codi QR per a obtenir un informe mèdic."
-        example = {"doctor_email": "doctor@example.com"} #TODO: update example
+        example = {
+            "timezone": "Europe/Madrid",
+            "format": "svg",
+            "fill_color": "#000000",
+            "back_color": "#FFFFFF",
+            "box_size": 10,
+            "border": 4,
+        }
+
+    timezone = fields.String(
+        required=False,
+        load_default="Europe/Madrid",
+        metadata={
+            "description": "Zona horària del metge que sol·licita el codi QR en format `Area/Location`.",
+            "example": "Europe/Madrid",
+        },
+    )
+
+    format = fields.Enum(
+        QRCodeFormat,
+        required=False,
+        load_default=QRCodeFormat.SVG,
+        by_value=True,
+        metadata={
+            "description": QR_CODE_FORMAT_DESCRIPTION,
+            "enum": QR_CODE_FORMAT_VALUES,
+            "example": "svg",
+        },
+    )
+
+    fill_color = fields.String(
+        required=False,
+        load_default="#000000",
+        metadata={
+            "description": "Color de primer pla del codi QR en format hexadecimal.",
+            "example": "#000000",
+        },
+    )
+
+    back_color = fields.String(
+        required=False,
+        load_default="#FFFFFF",
+        metadata={
+            "description": "Color de fons del codi QR en format hexadecimal.",
+            "example": "#FFFFFF",
+        },
+    )
+
+    box_size = fields.Integer(
+        required=False,
+        load_default=10,
+        metadata={
+            "description": "Mida de cada quadre del codi QR.",
+            "example": 10,
+        },
+    )
+
+    border = fields.Integer(
+        required=False,
+        load_default=4,
+        metadata={
+            "description": "Amplada de la vora del codi QR.",
+            "example": 4,
+        },
+    )
