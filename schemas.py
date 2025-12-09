@@ -1546,6 +1546,26 @@ class ActivityCompleteResponseSchema(Schema):
         },
     )
 
+class ReportGenerateSchema(Schema):
+    """
+    Esquema per generar informes mèdics.
+    """
+
+    class Meta:
+        description = "Paràmetres per generar un informe mèdic d'un pacient."
+        example = {
+            "timezone": "Europe/Madrid",
+        }
+
+    timezone = fields.String(
+        required=False,
+        load_default="Europe/Madrid",
+        metadata={
+            "description": "Zona horària del metge que sol·licita el codi QR en format `Area/Location`.",
+            "example": "Europe/Madrid",
+        },
+    )
+
 class QRGenerateSchema(Schema):
     """Schema for generating QR codes."""
 
