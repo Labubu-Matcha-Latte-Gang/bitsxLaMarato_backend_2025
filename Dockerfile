@@ -3,10 +3,19 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROME_PATH=/usr/lib/chromium/
+
 WORKDIR /app
 
 # Instalar dependencias del sistema (ffmpeg para audio, compiladores)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    fonts-liberation \
+    libnss3 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
     ffmpeg \
     libsndfile1 \
     build-essential \
