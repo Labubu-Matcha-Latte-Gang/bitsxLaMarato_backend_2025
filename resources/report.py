@@ -65,7 +65,7 @@ class ReportResource(MethodView):
             
             current_user = user_service.get_user_by_token(token)
 
-            patient_data = user_service.get_patient_data(current_user, patient)
+            patient_data = user_service.get_patient_data(current_user, patient, graph_format="png")
 
             try:
                 zone_info = ZoneInfo(query_params.get("timezone", "Europe/Madrid"))
