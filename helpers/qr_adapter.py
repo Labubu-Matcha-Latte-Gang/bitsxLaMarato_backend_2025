@@ -3,6 +3,10 @@ from typing import Literal
 import qrcode
 import qrcode.image.svg
 import io
+import base64
+import mimetypes
+import xml.etree.ElementTree as ET
+from PIL import Image, ImageDraw
 
 from helpers.debugger.logger import AbstractLogger
 from helpers.exceptions.qr_exceptions import QRGenerationException
@@ -27,7 +31,7 @@ class AbstractQRAdapter(ABC):
         return color
 
     @abstractmethod
-    def generate_qr(self, data: bytes | str, format: Literal['png', 'svg'] = 'svg', fill_color: str = '#000000', back_color: str = '#FFFFFF', box_size: int = 10, border: int = 4) -> tuple[io.BytesIO, str]:
+    def generate_qr(self, data: bytes | str, format: Literal['png', 'svg'] = 'svg', fill_color: str = '#000000', back_color: str = '#FFFFFF', box_size: int = 10, border: int = 4, logo_path: str = 'static/labubu-logo.png') -> tuple[io.BytesIO, str]:
         """
         Generate a QR code based on the provided data.
 
@@ -38,6 +42,7 @@ class AbstractQRAdapter(ABC):
             back_color (str): Background color of the QR code. Default is white.
             box_size (int): Size of each box in the QR code. Default is 10.
             border (int): Border size around the QR code. Default is 4.
+            logo_path (str): Path to the logo image to embed in the QR code. Default is 'static/labubu-logo.png'.
         Returns:
             tuple[io.BytesIO, str]: A tuple containing the QR code image as a BytesIO stream and the content type.
         """
@@ -46,7 +51,102 @@ class AbstractQRAdapter(ABC):
 class QRAdapter(AbstractQRAdapter):
     """Concrete adapter for generating QR codes."""
 
-    def generate_qr(self, data: bytes | str, format: Literal['png', 'svg'] = 'svg', fill_color: str = '#000000', back_color: str = '#FFFFFF', box_size: int = 10, border: int = 4) -> tuple[io.BytesIO, str]:
+    def __image_to_base64(self, image: Image.Image) -> str:
+        """Converts a PIL Image to a base64 string suitable for SVG."""
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        encoded_string = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{encoded_string}"
+        
+    def __post_process_svg(self, svg_data: bytes, fill_color: str, back_color: str, logo_path: str = None) -> bytes:
+        """
+        Manipulate the SVG XML to:
+        1. Set the global background color.
+        2. Set the QR modules (path) color.
+        3. Inject the logo with its background (if logo_path provided).
+        Args:
+            svg_data (bytes): Original SVG data.
+            fill_color (str): Color for the QR code modules.
+            back_color (str): Background color for the SVG.
+            logo_path (str): Path to the logo image to embed in the QR code.
+        Returns:
+            bytes: The modified SVG data.
+        """
+        try:
+            ET.register_namespace('', "http://www.w3.org/2000/svg")
+            tree = ET.ElementTree(ET.fromstring(svg_data))
+            root = tree.getroot()
+            
+            global_bg = ET.Element("rect", {
+                "width": "100%",
+                "height": "100%",
+                "fill": back_color,
+                "x": "0",
+                "y": "0"
+            })
+            root.insert(0, global_bg)
+
+            path_element = root.find("{http://www.w3.org/2000/svg}path")
+            if path_element is not None:
+                path_element.set("fill", fill_color)
+                if "stroke" in path_element.attrib:
+                    del path_element.attrib["stroke"]
+
+            if logo_path:
+                recolored_img = self.__get_recolored_logo(logo_path, fill_color)
+                logo_b64 = self.__image_to_base64(recolored_img)
+
+                pos_x = "38%"
+                pos_y = "38%"
+                width = "24%"
+                height = "24%"
+
+                logo_bg_rect = ET.Element("rect", {
+                    "x": pos_x,
+                    "y": pos_y,
+                    "width": width,
+                    "height": height,
+                    "fill": back_color,
+                    "rx": "7%",
+                    "ry": "7%"
+                })
+                root.append(logo_bg_rect)
+
+                image_element = ET.Element("image", {
+                    "href": logo_b64,
+                    "x": pos_x,
+                    "y": pos_y,
+                    "width": width,
+                    "height": height,
+                    "preserveAspectRatio": "xMidYMid meet"
+                })
+                root.append(image_element)
+            
+            out_stream = io.BytesIO()
+            tree.write(out_stream, encoding='utf-8', xml_declaration=True)
+            out_stream.seek(0)
+            return out_stream.read()
+            
+        except Exception as e:
+            logger.error(f"Error post-processing SVG: {e}", module="QRAdapter")
+            return svg_data
+        
+    def __get_recolored_logo(self, logo_path: str, fill_color: str) -> Image.Image:
+        """
+        Loads the logo and replaces all non-transparent pixels with fill_color.
+        Returns a PIL Image object.
+        """
+        logo = Image.open(logo_path).convert("RGBA")
+        
+        solid_color_img = Image.new("RGBA", logo.size, fill_color)
+        
+        transparent_img = Image.new("RGBA", logo.size, (0, 0, 0, 0))
+        
+        recolored_logo = Image.composite(solid_color_img, transparent_img, logo)
+        
+        return recolored_logo
+
+    def generate_qr(self, data: bytes | str, format: Literal['png', 'svg'] = 'svg', fill_color: str = '#000000', back_color: str = '#FFFFFF', box_size: int = 10, border: int = 4, logo_path: str = 'static/labubu-logo.png') -> tuple[io.BytesIO, str]:
         logger.info("Generating QR code", module="QRAdapter", metadata={"format": format, "fill_color": fill_color, "back_color": back_color, "box_size": box_size, "border": border})
         try:
             qr = qrcode.QRCode(
@@ -66,12 +166,42 @@ class QRAdapter(AbstractQRAdapter):
             if format.lower() == 'svg':
                 factory = qrcode.image.svg.SvgPathImage
                 img = qr.make_image(image_factory=factory, fill_color=fill_color, back_color=back_color)
-                img.save(stream)
+
+                temp_stream = io.BytesIO()
+                img.save(temp_stream)
+                svg_bytes = temp_stream.getvalue()
+
+                svg_bytes = self.__post_process_svg(svg_bytes, fill_color, back_color, logo_path)
+
+                stream.write(svg_bytes)
                 stream.seek(0)
                 return stream, "image/svg+xml"
             
             else: # PNG
-                img = qr.make_image(fill_color=fill_color, back_color=back_color)
+                img = qr.make_image(fill_color=fill_color, back_color=back_color).convert("RGBA")
+                if logo_path:
+                    try:
+                        logo = self.__get_recolored_logo(logo_path, fill_color)
+                        qr_width = img.size[0]
+                        logo_max_size = qr_width // 4  
+                        logo.thumbnail((logo_max_size, logo_max_size), Image.Resampling.LANCZOS)
+
+                        logo_pos = ((img.size[0] - logo.size[0]) // 2, (img.size[1] - logo.size[1]) // 2)
+                        logo_bg = Image.new("RGBA", logo.size, back_color)
+
+                        mask_bg = Image.new("L", logo.size, 0)
+                        draw = ImageDraw.Draw(mask_bg)
+
+                        radius = min(logo.size) // 5 
+                        draw.rounded_rectangle([(0, 0), logo.size], radius=radius, fill=255)
+
+                        img.paste(logo_bg, logo_pos, mask=mask_bg)
+                        
+                        mask = logo if logo.mode == 'RGBA' else None
+                        img.paste(logo, logo_pos, mask)
+                    except Exception as e:
+                        logger.error(f"Could not process logo: {e}", module="QRAdapter")
+
                 img.save(stream, format="PNG")
                 stream.seek(0)
                 return stream, "image/png"
