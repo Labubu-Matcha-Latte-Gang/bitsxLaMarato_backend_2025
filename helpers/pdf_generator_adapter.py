@@ -16,7 +16,7 @@ class AbstractPDFGeneratorAdapter(ABC):
     logger = AbstractLogger.get_instance()
 
     @classmethod
-    def _transform_gender(cls, gender: str) -> str:
+    def __transform_gender(cls, gender: str) -> str:
         """
         Transform gender representation.
         Args:
@@ -34,7 +34,7 @@ class AbstractPDFGeneratorAdapter(ABC):
         return gender
     
     @classmethod
-    def _transform_date(cls, date_str: str) -> str:
+    def __transform_date(cls, date_str: str) -> str:
         """
         Transform date string from ISO format to Catalan format.
         
@@ -64,10 +64,9 @@ class AbstractPDFGeneratorAdapter(ABC):
             dict: The transformed patient data.
         """
         try:
-            patient_data['patient']['role']['gender'] = cls._transform_gender(patient_data['patient']['role']['gender'])
+            patient_data['patient']['role']['gender'] = cls.__transform_gender(patient_data['patient']['role']['gender'])
             for score in patient_data['scores']:
-                score['completed_at'] = cls._transform_date(score['completed_at'])
-
+                score['completed_at'] = cls.__transform_date(score['completed_at'])
 
             return patient_data
         except KeyError as e:
