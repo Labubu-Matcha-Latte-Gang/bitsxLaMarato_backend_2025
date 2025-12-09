@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from datetime import timedelta
 import json
 from pathlib import Path
 
@@ -135,6 +136,9 @@ class UserService:
 
     def register_admin(self, email: str, password: str, name: str, surname: str) -> Admin:
         return self.admin_service.register_admin(email, password, name, surname)
+    
+    def create_access_token(self, email: str, expiration: Optional[timedelta] = None) -> str:
+        return self.token_service.generate(email, expiration)
 
     def login(self, email: str, password: str) -> str:
         user = self.user_repo.get_by_email(email)
@@ -142,13 +146,17 @@ class UserService:
             raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
         if not user.check_password(password, self.hasher):
             raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
-        return self.token_service.generate(user.email)
+        return self.create_access_token(user.email)
 
     def get_user(self, email: str) -> User:
         user = self.user_repo.get_by_email(email)
         if user is None:
             raise UserNotFoundException("Usuari no trobat.")
         return user
+    
+    def get_user_by_token(self, token: str) -> User:
+        email = self.token_service.parse(token)
+        return self.get_user(email)
 
     def update_user(self, email: str, update_data: dict) -> User:
         user = self.user_repo.get_by_email(email)
