@@ -1555,6 +1555,7 @@ class ReportGenerateSchema(Schema):
         description = "Paràmetres per generar un informe mèdic d'un pacient."
         example = {
             "timezone": "Europe/Madrid",
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
         }
 
     timezone = fields.String(
@@ -1563,6 +1564,14 @@ class ReportGenerateSchema(Schema):
         metadata={
             "description": "Zona horària del metge que sol·licita el codi QR en format `Area/Location`.",
             "example": "Europe/Madrid",
+        },
+    )
+
+    access_token = fields.String(
+        required=True,
+        metadata={
+            "description": "Token d'accés per obtenir l'informe mèdic.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
         },
     )
 
