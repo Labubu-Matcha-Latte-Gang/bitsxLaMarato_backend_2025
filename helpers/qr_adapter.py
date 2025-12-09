@@ -62,7 +62,7 @@ class QRAdapter(AbstractQRAdapter):
             
         return f"data:{mime_type};base64,{encoded_string}"
 
-    def __embed_logo_in_svg(self, svg_data: bytes, logo_path: str) -> bytes:
+    def __embed_logo_in_svg(self, svg_data: bytes, logo_path: str, back_color: str) -> bytes:
         """Manipulate the SVG XML to inject the <image> tag."""
         try:
             # Register SVG namespace so ElementTree doesn't add 'ns0:' prefix to tags
@@ -72,16 +72,29 @@ class QRAdapter(AbstractQRAdapter):
             root = tree.getroot()
             
             logo_b64 = self.__get_logo_base64(logo_path)
+
+            pos_x = "38%"
+            pos_y = "38%"
+            width = "24%"
+            height = "24%"
+
+            bg_rect = ET.Element("rect", {
+                "x": pos_x,
+                "y": pos_y,
+                "width": width,
+                "height": height,
+                "fill": back_color
+            })
+            root.append(bg_rect)
             
             image_element = ET.Element("image", {
                 "href": logo_b64,
-                "x": "38%",
-                "y": "38%",
-                "width": "24%",
-                "height": "24%",
+                "x": pos_x,
+                "y": pos_y,
+                "width": width,
+                "height": height,
                 "preserveAspectRatio": "xMidYMid meet"
             })
-            
             root.append(image_element)
             
             out_stream = io.BytesIO()
@@ -119,7 +132,7 @@ class QRAdapter(AbstractQRAdapter):
                 svg_bytes = temp_stream.getvalue()
 
                 if logo_path:
-                    svg_bytes = self.__embed_logo_in_svg(svg_bytes, logo_path)
+                    svg_bytes = self.__embed_logo_in_svg(svg_bytes, logo_path, back_color)
 
                 stream.write(svg_bytes)
                 stream.seek(0)
@@ -133,7 +146,11 @@ class QRAdapter(AbstractQRAdapter):
                         qr_width = img.size[0]
                         logo_max_size = qr_width // 4  
                         logo.thumbnail((logo_max_size, logo_max_size), Image.Resampling.LANCZOS)
+
                         logo_pos = ((img.size[0] - logo.size[0]) // 2, (img.size[1] - logo.size[1]) // 2)
+                        logo_bg = Image.new("RGBA", logo.size, back_color)
+                        img.paste(logo_bg, logo_pos)
+                        
                         mask = logo if logo.mode == 'RGBA' else None
                         img.paste(logo, logo_pos, mask)
                     except Exception as e:
