@@ -6,7 +6,7 @@ import io
 import base64
 import mimetypes
 import xml.etree.ElementTree as ET
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from helpers.debugger.logger import AbstractLogger
 from helpers.exceptions.qr_exceptions import QRGenerationException
@@ -61,41 +61,68 @@ class QRAdapter(AbstractQRAdapter):
             encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
             
         return f"data:{mime_type};base64,{encoded_string}"
-
-    def __embed_logo_in_svg(self, svg_data: bytes, logo_path: str, back_color: str) -> bytes:
-        """Manipulate the SVG XML to inject the <image> tag."""
+        
+    def __post_process_svg(self, svg_data: bytes, fill_color: str, back_color: str, logo_path: str = None) -> bytes:
+        """
+        Manipulate the SVG XML to:
+        1. Set the global background color.
+        2. Set the QR modules (path) color.
+        3. Inject the logo with its background (if logo_path provided).
+        Args:
+            svg_data (bytes): Original SVG data.
+            fill_color (str): Color for the QR code modules.
+            back_color (str): Background color for the SVG.
+            logo_path (str): Path to the logo image to embed in the QR code.
+        Returns:
+            bytes: The modified SVG data.
+        """
         try:
-            # Register SVG namespace so ElementTree doesn't add 'ns0:' prefix to tags
             ET.register_namespace('', "http://www.w3.org/2000/svg")
-            
             tree = ET.ElementTree(ET.fromstring(svg_data))
             root = tree.getroot()
             
-            logo_b64 = self.__get_logo_base64(logo_path)
-
-            pos_x = "38%"
-            pos_y = "38%"
-            width = "24%"
-            height = "24%"
-
-            bg_rect = ET.Element("rect", {
-                "x": pos_x,
-                "y": pos_y,
-                "width": width,
-                "height": height,
-                "fill": back_color
+            global_bg = ET.Element("rect", {
+                "width": "100%",
+                "height": "100%",
+                "fill": back_color,
+                "x": "0",
+                "y": "0"
             })
-            root.append(bg_rect)
-            
-            image_element = ET.Element("image", {
-                "href": logo_b64,
-                "x": pos_x,
-                "y": pos_y,
-                "width": width,
-                "height": height,
-                "preserveAspectRatio": "xMidYMid meet"
-            })
-            root.append(image_element)
+            root.insert(0, global_bg)
+
+            path_element = root.find("{http://www.w3.org/2000/svg}path")
+            if path_element is not None:
+                path_element.set("fill", fill_color)
+                if "stroke" in path_element.attrib:
+                    del path_element.attrib["stroke"]
+
+            if logo_path:
+                logo_b64 = self.__get_logo_base64(logo_path)
+                pos_x = "38%"
+                pos_y = "38%"
+                width = "24%"
+                height = "24%"
+
+                logo_bg_rect = ET.Element("rect", {
+                    "x": pos_x,
+                    "y": pos_y,
+                    "width": width,
+                    "height": height,
+                    "fill": back_color,
+                    "rx": "7%",
+                    "ry": "7%"
+                })
+                root.append(logo_bg_rect)
+
+                image_element = ET.Element("image", {
+                    "href": logo_b64,
+                    "x": pos_x,
+                    "y": pos_y,
+                    "width": width,
+                    "height": height,
+                    "preserveAspectRatio": "xMidYMid meet"
+                })
+                root.append(image_element)
             
             out_stream = io.BytesIO()
             tree.write(out_stream, encoding='utf-8', xml_declaration=True)
@@ -103,8 +130,8 @@ class QRAdapter(AbstractQRAdapter):
             return out_stream.read()
             
         except Exception as e:
-            logger.error(f"Error embedding logo in SVG: {e}", module="QRAdapter")
-            return svg_data  # If it fails, return the original SVG without the logo
+            logger.error(f"Error post-processing SVG: {e}", module="QRAdapter")
+            return svg_data
 
     def generate_qr(self, data: bytes | str, format: Literal['png', 'svg'] = 'svg', fill_color: str = '#000000', back_color: str = '#FFFFFF', box_size: int = 10, border: int = 4, logo_path: str = 'static/labubu-logo.png') -> tuple[io.BytesIO, str]:
         logger.info("Generating QR code", module="QRAdapter", metadata={"format": format, "fill_color": fill_color, "back_color": back_color, "box_size": box_size, "border": border})
@@ -131,8 +158,7 @@ class QRAdapter(AbstractQRAdapter):
                 img.save(temp_stream)
                 svg_bytes = temp_stream.getvalue()
 
-                if logo_path:
-                    svg_bytes = self.__embed_logo_in_svg(svg_bytes, logo_path, back_color)
+                svg_bytes = self.__post_process_svg(svg_bytes, fill_color, back_color, logo_path)
 
                 stream.write(svg_bytes)
                 stream.seek(0)
@@ -149,7 +175,14 @@ class QRAdapter(AbstractQRAdapter):
 
                         logo_pos = ((img.size[0] - logo.size[0]) // 2, (img.size[1] - logo.size[1]) // 2)
                         logo_bg = Image.new("RGBA", logo.size, back_color)
-                        img.paste(logo_bg, logo_pos)
+
+                        mask_bg = Image.new("L", logo.size, 0)
+                        draw = ImageDraw.Draw(mask_bg)
+
+                        radius = min(logo.size) // 5 
+                        draw.rounded_rectangle([(0, 0), logo.size], radius=radius, fill=255)
+
+                        img.paste(logo_bg, logo_pos, mask=mask_bg)
                         
                         mask = logo if logo.mode == 'RGBA' else None
                         img.paste(logo, logo_pos, mask)
