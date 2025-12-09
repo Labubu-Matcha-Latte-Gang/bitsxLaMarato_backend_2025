@@ -51,16 +51,12 @@ class AbstractQRAdapter(ABC):
 class QRAdapter(AbstractQRAdapter):
     """Concrete adapter for generating QR codes."""
 
-    def __get_logo_base64(self, logo_path: str) -> str:
-        """Read the local file and convert it to a base64 string with its mime type."""
-        mime_type, _ = mimetypes.guess_type(logo_path)
-        if not mime_type:
-            mime_type = "image/png"
-            
-        with open(logo_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-            
-        return f"data:{mime_type};base64,{encoded_string}"
+    def __image_to_base64(self, image: Image.Image) -> str:
+        """Converts a PIL Image to a base64 string suitable for SVG."""
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        encoded_string = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{encoded_string}"
         
     def __post_process_svg(self, svg_data: bytes, fill_color: str, back_color: str, logo_path: str = None) -> bytes:
         """
@@ -97,7 +93,9 @@ class QRAdapter(AbstractQRAdapter):
                     del path_element.attrib["stroke"]
 
             if logo_path:
-                logo_b64 = self.__get_logo_base64(logo_path)
+                recolored_img = self.__get_recolored_logo(logo_path, fill_color)
+                logo_b64 = self.__image_to_base64(recolored_img)
+
                 pos_x = "38%"
                 pos_y = "38%"
                 width = "24%"
@@ -132,6 +130,21 @@ class QRAdapter(AbstractQRAdapter):
         except Exception as e:
             logger.error(f"Error post-processing SVG: {e}", module="QRAdapter")
             return svg_data
+        
+    def __get_recolored_logo(self, logo_path: str, fill_color: str) -> Image.Image:
+        """
+        Loads the logo and replaces all non-transparent pixels with fill_color.
+        Returns a PIL Image object.
+        """
+        logo = Image.open(logo_path).convert("RGBA")
+        
+        solid_color_img = Image.new("RGBA", logo.size, fill_color)
+        
+        transparent_img = Image.new("RGBA", logo.size, (0, 0, 0, 0))
+        
+        recolored_logo = Image.composite(solid_color_img, transparent_img, logo)
+        
+        return recolored_logo
 
     def generate_qr(self, data: bytes | str, format: Literal['png', 'svg'] = 'svg', fill_color: str = '#000000', back_color: str = '#FFFFFF', box_size: int = 10, border: int = 4, logo_path: str = 'static/labubu-logo.png') -> tuple[io.BytesIO, str]:
         logger.info("Generating QR code", module="QRAdapter", metadata={"format": format, "fill_color": fill_color, "back_color": back_color, "box_size": box_size, "border": border})
@@ -168,7 +181,7 @@ class QRAdapter(AbstractQRAdapter):
                 img = qr.make_image(fill_color=fill_color, back_color=back_color).convert("RGBA")
                 if logo_path:
                     try:
-                        logo = Image.open(logo_path)
+                        logo = self.__get_recolored_logo(logo_path, fill_color)
                         qr_width = img.size[0]
                         logo_max_size = qr_width // 4  
                         logo.thumbnail((logo_max_size, logo_max_size), Image.Resampling.LANCZOS)
