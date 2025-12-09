@@ -16,6 +16,7 @@ from resources.question import blp as QuestionBlueprint
 from resources.activity import blp as ActivityBlueprint
 from resources.documentation import blp as DocumentationBlueprint
 from resources.qr import blp as QRBlueprint
+from resources.report import blp as ReportBlueprint
 
 def create_app(settings_module: str = 'globals') -> Flask:
     """
@@ -113,6 +114,7 @@ def create_app(settings_module: str = 'globals') -> Flask:
     api.register_blueprint(ActivityBlueprint, url_prefix=getApiPrefix('activity'))
     api.register_blueprint(DocumentationBlueprint, url_prefix=getApiPrefix('swagger-doc'))
     api.register_blueprint(QRBlueprint, url_prefix=getApiPrefix('qr'))
+    api.register_blueprint(ReportBlueprint, url_prefix=getApiPrefix('report'))
     
     # SIMPLIFIED TRANSCRIPTION ENDPOINT (bypasses flask-smorest)
     # This endpoint handles MediaRecorder WebM chunks that flask-smorest can't parse
