@@ -48,6 +48,7 @@ class QRResource(MethodView):
         """
         Obté un codi QR per a l'informe mèdic del pacient.
         Es pot generar tant en format PNG com SVG, però es recomana SVG per la seva flexibilitat a l'hora d'aplicar-li estils.
+        Compte! Si el `fill_color` i el `back_color` s'assemblen massa, el codi QR podria no ser llegible.
         """
         try:
             service_factory = ServiceFactory.get_instance()
