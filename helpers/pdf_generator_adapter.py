@@ -5,6 +5,7 @@ from weasyprint import HTML
 from typing import TYPE_CHECKING
 from helpers.debugger.logger import AbstractLogger
 from helpers.exceptions.pdf_exceptions import PDFGenerationException, ReportDataTransformationException
+from datetime import datetime
 
 if TYPE_CHECKING:
     from application.services.user_service import PatientData
@@ -14,8 +15,46 @@ class AbstractPDFGeneratorAdapter(ABC):
 
     logger = AbstractLogger.get_instance()
 
-    @staticmethod
-    def _transform_patient_data(patient_data: PatientData) -> dict:
+    @classmethod
+    def _transform_gender(cls, gender: str) -> str:
+        """
+        Transform gender representation.
+        Args:
+            gender (str): Original gender string.
+        Returns:
+            str: Transformed gender string.
+        """
+        match gender:
+            case 'male':
+                gender = 'Home'
+            case 'female':
+                gender = 'Dona'
+            case _:
+                gender = 'Altres'
+        return gender
+    
+    @classmethod
+    def _transform_date(cls, date_str: str) -> str:
+        """
+        Transform date string from ISO format to Catalan format.
+        
+        Args:
+            date_str (str): Date string in ISO 8601 format (e.g., '2025-12-09T11:27:12.204643+00:00').
+        
+        Returns:
+            str: Formatted date string as 'DD/MM/YYYY HH:MM:SS'.
+        
+        Raises:
+            ReportDataTransformationException: If date parsing fails.
+        """
+        try:
+            dt = datetime.fromisoformat(date_str)
+            return dt.strftime('%d/%m/%Y %H:%M:%S')
+        except ValueError as e:
+            raise ReportDataTransformationException("Error al transformar la data del pacient.") from e
+
+    @classmethod
+    def _transform_patient_data(cls, patient_data: PatientData) -> dict:
         """Transform patient data into a serializable dictionary.
 
         Args:
@@ -25,13 +64,10 @@ class AbstractPDFGeneratorAdapter(ABC):
             dict: The transformed patient data.
         """
         try:
-            match patient_data['patient']['role']['gender']:
-                case 'male':
-                    patient_data['patient']['role']['gender'] = 'Home'
-                case 'female':
-                    patient_data['patient']['role']['gender'] = 'Dona'
-                case _:
-                    patient_data['patient']['role']['gender'] = 'Altres'
+            patient_data['patient']['role']['gender'] = cls._transform_gender(patient_data['patient']['role']['gender'])
+            for score in patient_data['scores']:
+                score['completed_at'] = cls._transform_date(score['completed_at'])
+
 
             return patient_data
         except KeyError as e:
