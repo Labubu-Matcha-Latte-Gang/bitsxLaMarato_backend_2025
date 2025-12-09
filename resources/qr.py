@@ -43,6 +43,7 @@ class QRResource(MethodView):
     def post(self, data: dict):
         """
         Obté un codi QR per a l'informe mèdic del pacient.
+        Es pot generar tant en format PNG com SVG, però es recomana SVG per la seva flexibilitat a l'hora d'aplicar-li estils.
         """
         try:
             service_factory = ServiceFactory.get_instance()
@@ -57,7 +58,7 @@ class QRResource(MethodView):
             patient_data = user_service.get_patient_data(patient, patient)
             pdf_bytes, date = pdf_service.generate_patient_report(patient_data, ZoneInfo(data.get("timezone", "Europe/Madrid")))
 
-            file_format = data.get("format", "svg")
+            file_format = data.get("format", "svg").value
             qr_payload = QRPayload(
                 data=pdf_bytes,
                 format=file_format,
