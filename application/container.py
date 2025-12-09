@@ -250,9 +250,7 @@ class ServiceFactory:
         Returns:
             PDFGenerationService: The constructed PDFGenerationService instance.
         """
-        patient_repo = SQLAlchemyPatientRepository(self.session)
         adapter_factory = AbstractAdapterFactory.get_instance()
         return PDFGenerationService(
-            patient_repo=patient_repo,
             adapter_factory=adapter_factory,
         )
