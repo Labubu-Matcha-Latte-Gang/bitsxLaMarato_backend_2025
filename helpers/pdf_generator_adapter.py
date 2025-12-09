@@ -1,9 +1,12 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
-
-from application.services.user_service import PatientData
+from typing import TYPE_CHECKING
 from helpers.exceptions.pdf_exceptions import PDFGenerationException
+
+if TYPE_CHECKING:
+    from application.services.user_service import PatientData
 
 class AbstractPDFGeneratorAdapter(ABC):
     """Abstract adapter for generating PDF documents."""
