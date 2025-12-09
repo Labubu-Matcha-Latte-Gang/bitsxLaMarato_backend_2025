@@ -29,7 +29,6 @@ class ReportResource(MethodView):
 
     logger = AbstractLogger.get_instance()
 
-    @roles_required([UserRole.ADMIN, UserRole.DOCTOR, UserRole.PATIENT])
     @blp.arguments(PatientEmailPathSchema, location="path")
     @blp.arguments(ReportGenerateSchema, location="query")
     @blp.doc(
@@ -38,6 +37,7 @@ class ReportResource(MethodView):
             "Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; "
             "els pacients poden obtenir el seu propi informe."
         ),
+        security=[]
     )
     @blp.response(200, description="Informe mèdic generat correctament.", content_type="application/pdf")
     @blp.response(400, description="Zona horària invàlida.")
@@ -59,8 +59,11 @@ class ReportResource(MethodView):
             patient_email: str = path_args["email"]
             patient = patient_service.get_patient(patient_email)
 
-            current_email: str = get_jwt_identity()
-            current_user = user_service.get_user(current_email)
+            token = query_params.get("access_token")
+            if not token:
+                raise PermissionError("Cal un token vàlid per accedir a l'informe.")
+            
+            current_user = user_service.get_user_by_token(token)
 
             patient_data = user_service.get_patient_data(current_user, patient)
 
