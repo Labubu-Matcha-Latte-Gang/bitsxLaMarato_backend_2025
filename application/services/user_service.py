@@ -4,6 +4,7 @@ import base64
 from datetime import timedelta
 import json
 from pathlib import Path
+import plotly.io as pio
 
 from typing import Dict, TypedDict, Optional
 
@@ -15,6 +16,7 @@ from domain.repositories import (
 )
 from domain.services.security import PasswordHasher
 from domain.unit_of_work import IUnitOfWork
+from helpers.debugger.logger import AbstractLogger
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     InvalidCredentialsException,
@@ -103,6 +105,8 @@ class UserService:
     """
 
     GRAPH_TMP_DIR = Path(__file__).resolve().parent.parent.parent / "tmp"
+
+    logger = AbstractLogger.get_instance()
 
     def __init__(
         self,
@@ -215,7 +219,7 @@ class UserService:
                 self.user_repo.remove(user)
             self.uow.commit()
 
-    def get_patient_data(self, requester: User, patient: Patient) -> PatientData:
+    def get_patient_data(self, requester: User, patient: Patient, graph_format: str = 'html') -> PatientData:
         """
         Assemble a comprehensive payload for the given patient including basic
         demographics, activity scores, answered questions and generated graph
@@ -226,6 +230,7 @@ class UserService:
             requester (User): The user requesting the data.  Must be an admin,
                 assigned doctor or the patient themselves.
             patient (Patient): The patient whose data is being requested.
+            graph_format (str): The format for graph files
 
         Returns:
             dict: A dictionary ready to be serialized as JSON containing:
@@ -287,8 +292,9 @@ class UserService:
         graph_files: list[dict] = []
         if graphs:
             try:
-                graph_files = self._build_graph_files(graphs)
-            except Exception:
+                graph_files = self._build_graph_files(graphs, fmt=graph_format)
+            except Exception as e:
+                self.logger.error("Error generating graph files for patient data", module="UserService", error=e)
                 graph_files = []
 
         return {
@@ -298,9 +304,9 @@ class UserService:
             "graph_files": graph_files,
         }
 
-    def _build_graph_files(self, graphs: Dict[str, dict]) -> list[dict]:
+    def _build_graph_files(self, graphs: Dict[str, dict], fmt: str = 'html') -> list[dict]:
         """
-        Persist graph figures as HTML fragments in the tmp directory and return
+        Persist graph figures as HTML fragments or PNG in the tmp directory and return
         them as base64-encoded payloads. All files in the tmp directory are
         removed once the payload is built.
         """
@@ -310,15 +316,30 @@ class UserService:
         try:
             for name, figure in graphs.items():
                 sanitized_name = name.replace(" ", "_")
-                file_path = self.GRAPH_TMP_DIR / f"{sanitized_name}.html"
-                html_content = self._figure_to_html(name, figure)
-                file_path.write_text(html_content, encoding="utf-8")
-                encoded_content = base64.b64encode(file_path.read_bytes()).decode("ascii")
-                created_files.append({
-                    "filename": file_path.name,
-                    "content_type": "text/html",
-                    "content": encoded_content,
-                })
+                if fmt == "png":
+                    img_bytes = pio.to_image(figure, format="png", width=800, height=400, scale=2)
+                    
+                    encoded_content = base64.b64encode(img_bytes).decode("ascii")
+                    
+                    created_files.append({
+                        "filename": f"{sanitized_name}.png",
+                        "content_type": "image/png",
+                        "content": encoded_content,
+                    })
+                
+                else:
+                    file_path = self.GRAPH_TMP_DIR / f"{sanitized_name}.html"
+                    html_content = self._figure_to_html(name, figure)
+                    file_path.write_text(html_content, encoding="utf-8")
+                    
+                    encoded_content = base64.b64encode(file_path.read_bytes()).decode("ascii")
+                    
+                    created_files.append({
+                        "filename": file_path.name,
+                        "content_type": "text/html",
+                        "content": encoded_content,
+                    })
+
             return created_files
         finally:
             self._cleanup_tmp_graph_dir()
