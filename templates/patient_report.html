@@ -31,7 +31,7 @@
 
         /* ENCAPÇALAMENT */
         .header {
-            border-bottom: 2px solid #b30000; /* Vermell fosc per context mèdic/alerta o blau corporatiu */
+            border-bottom: 2px solid #b30000;
             padding-bottom: 15px;
             margin-bottom: 30px;
             display: flex;
@@ -66,6 +66,7 @@
             margin-top: 30px;
             margin-bottom: 15px;
             font-size: 16pt;
+            page-break-after: avoid;
         }
 
         h3 {
@@ -74,6 +75,7 @@
             margin-top: 20px;
             border-bottom: 1px solid #eee;
             padding-bottom: 5px;
+            page-break-after: avoid;
         }
 
         /* TAULA DE DADES DEL PACIENT */
@@ -102,12 +104,24 @@
             color: #000;
         }
 
+        /* INTERPRETACIÓ LLM */
+        .interpretation-box {
+            background-color: #fffbfc; /* Lleuger to càlid/vermellós molt suau o blanc */
+            border-left: 2px solid #ddd;
+            padding: 10px 15px;
+            text-align: justify;
+            font-style: italic;
+            color: #444;
+            margin-bottom: 30px;
+        }
+
         /* TAULA DE RESULTATS */
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
             font-size: 11pt;
+            page-break-inside: auto;
         }
 
         th, td {
@@ -122,23 +136,14 @@
             font-weight: bold;
         }
 
+        tr { page-break-inside: avoid; page-break-after: auto; }
         tr:nth-child(even) { background-color: #fcfcfc; }
-
-        /* TAGS/ETIQUETES */
-        .tag {
-            background-color: #e2e8f0;
-            border-radius: 4px;
-            padding: 2px 6px;
-            font-size: 0.9em;
-            margin-right: 4px;
-            display: inline-block;
-        }
 
         /* GRÀFICS */
         .graph-container {
             text-align: center;
             margin: 30px 0;
-            page-break-inside: avoid; /* Evita que el gràfic es talli */
+            page-break-inside: avoid;
         }
 
         .graph-container img {
@@ -163,6 +168,36 @@
             text-align: justify;
             border-top: 1px solid #ddd;
             padding-top: 10px;
+        }
+
+        /* ESTILOS PARA EL CONTENIDO MARKDOWN (LLM) */
+        .interpretation-box p {
+            margin-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        .interpretation-box ul, .interpretation-box ol {
+            margin-top: 5px;
+            margin-bottom: 10px;
+            padding-left: 20px;
+        }
+
+        .interpretation-box li {
+            margin-bottom: 5px;
+        }
+
+        .interpretation-box strong {
+            color: #2c3e50; /* Un poco más oscuro para resaltar conceptos clave */
+        }
+        
+        /* Por si el LLM genera títulos dentro del resumen */
+        .interpretation-box h3, .interpretation-box h4 {
+            font-size: 12pt;
+            color: #b30000;
+            border: none;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            padding: 0;
         }
     </style>
 </head>
@@ -218,6 +253,28 @@
         {% endfor %}
     </ul>
 
+    <h2>Anàlisi i Interpretació (IA)</h2>
+    <div class="interpretation-box">
+        {{ llm_summary | markdown_to_html | safe }}
+        
+        {% if not llm_summary %}
+        <p>Pendent de generació automàtica del resum clínic.</p>
+        {% endif %}
+    </div>
+
+    {% if data.graph_files %}
+    <div style="page-break-before: always;"></div> 
+    <h2>Gràfics d'Evolució</h2>
+    <p>Visualització de tendències en el rendiment cognitiu:</p>
+
+    {% for graph in data.graph_files %}
+    <div class="graph-container">
+        <img src="data:{{ graph.content_type }};base64,{{ graph.content }}" alt="Gràfic de dades">
+        <div class="caption">{{ graph.filename }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
     <h2>Avaluació Funcional i Cognitiva</h2>
     <p>Resum de les activitats realitzades per avaluar l'estat cognitiu durant el tractament:</p>
     
@@ -268,18 +325,6 @@
             {% endfor %}
         </tbody>
     </table>
-    {% endif %}
-
-    {% if data.graph_files %}
-    <div style="page-break-before: always;"></div> <h2>Gràfics d'Evolució</h2>
-    <p>Visualització de tendències en el rendiment cognitiu:</p>
-
-    {% for graph in data.graph_files %}
-    <div class="graph-container">
-        <img src="data:{{ graph.content_type }};base64,{{ graph.content }}" alt="Gràfic de dades">
-        <div class="caption">{{ graph.filename }}</div>
-    </div>
-    {% endfor %}
     {% endif %}
 
     <div class="disclaimer">
