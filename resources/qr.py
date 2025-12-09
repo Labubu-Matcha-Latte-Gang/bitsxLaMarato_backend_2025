@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from flask import send_file
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
@@ -10,10 +11,13 @@ from db import db
 from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
 from helpers.enums.user_role import UserRole
-from helpers.exceptions.pdf_exceptions import PDFGenerationException
+from helpers.exceptions.pdf_exceptions import InvalidZoneInfoException, PDFGenerationException
 from helpers.exceptions.qr_exceptions import QRGenerationException
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
+from flask import request
+from helpers.exceptions.user_exceptions import UserNotFoundException
+from urllib.parse import urlencode
 from schemas import (
     QRGenerateSchema,
 )
@@ -47,20 +51,34 @@ class QRResource(MethodView):
         """
         try:
             service_factory = ServiceFactory.get_instance()
-            pdf_service = service_factory.build_pdf_generation_service()
             qr_service = service_factory.build_qr_service()
             user_service = service_factory.build_user_service()
             patient_service = service_factory.build_patient_service()
 
             patient_email: str = get_jwt_identity()
-            patient = patient_service.get_patient(patient_email)
+            patient_exists = patient_service.patient_exists(patient_email)
 
-            patient_data = user_service.get_patient_data(patient, patient)
-            pdf_bytes, date = pdf_service.generate_patient_report(patient_data, ZoneInfo(data.get("timezone", "Europe/Madrid")))
+            if not patient_exists:
+                raise UserNotFoundException("Pacient no trobat.")
+
+            try:
+                zone_info = ZoneInfo(data.get("timezone", "Europe/Madrid"))
+            except Exception as e:
+                self.logger.error("Invalid timezone provided", module="QRResource", metadata={"timezone": data.get("timezone")})
+                raise InvalidZoneInfoException("Zona horària invàlida.") from e
+
+            time_delta = timedelta(minutes=10)
+            token = user_service.create_access_token(patient_email, time_delta)
+
+            query_params = {
+                "timezone": data.get("timezone", "Europe/Madrid"),
+                "access_token": token
+            }
+            url_pdf_endpoint = f"{request.host_url}api/v1/report/{patient_email}?{urlencode(query_params)}"
 
             file_format = data.get("format", "svg").value
             qr_payload = QRPayload(
-                data=pdf_bytes,
+                data=url_pdf_endpoint,
                 format=file_format,
                 fill_color=data.get("fill_color", "#000000"),
                 back_color=data.get("back_color", "#FFFFFF"),
@@ -69,7 +87,8 @@ class QRResource(MethodView):
             )
             qr, content_type = qr_service.generate_qr_code(qr_payload)
 
-            date_for_filename = date.replace("/", "-")
+            date = datetime.now(zone_info).strftime("%d/%m/%Y_%H:%M:%S")
+            date_for_filename = date.replace("/", "-").replace(":", "-").replace(" ", "_")
             
             return send_file(
                 qr,
@@ -85,6 +104,10 @@ class QRResource(MethodView):
             db.session.rollback()
             self.logger.error("Error de base de dades en generar codi QR", module="QRResource", error=e)
             abort(500, message="Error de base de dades en generar el codi QR.")
+        except UserNotFoundException as e:
+            db.session.rollback()
+            self.logger.error("Usuari no trobat en generar codi QR", module="QRResource", error=e)
+            abort(404, message=str(e))
         except QRGenerationException as e:
             db.session.rollback()
             self.logger.error("Error en la generació del codi QR", module="QRResource", error=e)
