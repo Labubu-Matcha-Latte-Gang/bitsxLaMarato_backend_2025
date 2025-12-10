@@ -22,7 +22,7 @@ class AbstractLogger(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method")
     
-    def info(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None):
+    def info(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
         """
         Logs an informational message.
         Args:
@@ -30,9 +30,9 @@ class AbstractLogger(ABC):
             module (str | None, optional): The module where the log is generated. Defaults to None.
             metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
         """
-        return self.log(message, LogType.INFO, module, metadata)
+        return self.log(message, LogType.INFO, module, metadata, error)
     
-    def warning(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None):
+    def warning(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
         """
         Logs a warning message.
         Args:
@@ -40,7 +40,7 @@ class AbstractLogger(ABC):
             module (str | None, optional): The module where the log is generated. Defaults to None.
             metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
         """
-        return self.log(message, LogType.WARNING, module, metadata)
+        return self.log(message, LogType.WARNING, module, metadata, error)
     
     def error(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
         """
@@ -53,7 +53,7 @@ class AbstractLogger(ABC):
         """
         return self.log(message, LogType.ERROR, module, metadata, error)
     
-    def debug(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None):
+    def debug(self, message: str, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
         """
         Logs a debug message.
         Args:
@@ -61,7 +61,7 @@ class AbstractLogger(ABC):
             module (str | None, optional): The module where the log is generated. Defaults to None.
             metadata (dict[str, Any] | None, optional): Additional metadata for the log. Defaults to None.
         """
-        return self.log(message, LogType.DEBUG, module, metadata)
+        return self.log(message, LogType.DEBUG, module, metadata, error)
     
     def __call__(self, message: str, level: LogType = LogType.INFO, module: str | None = None, metadata: dict[str, Any] | None = None, error: Exception | None = None):
         """
