@@ -899,13 +899,23 @@ class TranscriptionCompleteSchema(Schema):
 
     class Meta:
         description = "Paràmetres per tancar una sessió i combinar tots els fragments."
-        example = {"session_id": "sessio-123"}
+        example = {
+            "session_id": "sessio-123",
+            "question_id": "7e9c5a2c-1234-4b1f-9a77-111122223333",
+        }
 
     session_id = fields.String(
         required=True,
         metadata={
             "description": "Identificador únic de la sessió d'enregistrament a finalitzar.",
             "example": "sessio-123",
+        },
+    )
+    question_id = fields.UUID(
+        required=True,
+        metadata={
+            "description": "Identificador de la pregunta contestada durant la sessió.",
+            "example": "7e9c5a2c-1234-4b1f-9a77-111122223333",
         },
     )
 
@@ -920,6 +930,7 @@ class TranscriptionResponseSchema(Schema):
         example = {
             "status": "completed",
             "transcription": "Bon dia, aquesta és la transcripció completa de la sessió.",
+            "question_id": "7e9c5a2c-1234-4b1f-9a77-111122223333",
         }
 
     status = fields.String(
@@ -940,6 +951,13 @@ class TranscriptionResponseSchema(Schema):
         required=False,
         metadata={
             "description": "Mètriques d'anàlisi (lingüística, executiva, etc.)",
+        },
+    )
+    question_id = fields.String(
+        required=False,
+        metadata={
+            "description": "Identificador de la pregunta vinculada a la transcripció.",
+            "example": "7e9c5a2c-1234-4b1f-9a77-111122223333",
         },
     )
 
