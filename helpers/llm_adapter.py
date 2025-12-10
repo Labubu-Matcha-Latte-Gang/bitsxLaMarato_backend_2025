@@ -71,6 +71,8 @@ class AbstractLlmAdapter(ABC):
                 lines.append(f"**Text:** {q_data.get('text', '')}")
                 lines.append(f"**Tipus:** {q_data.get('question_type', 'N/A')}")
                 lines.append(f"**Respost el:** {item.get('answered_at', 'N/A')}")
+                answer_text = item.get("answer_text") or "Sense resposta registrada"
+                lines.append(f"**Resposta transcrita:** {answer_text}")
                 lines.append("---")
         
         return "\n".join(lines)
