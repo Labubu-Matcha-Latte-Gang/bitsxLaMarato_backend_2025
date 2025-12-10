@@ -45,6 +45,7 @@ from models.question import Question
 from models.score import Score
 from models.user import User
 from models.transcription_session import TranscriptionSession
+from infrastructure.sqlalchemy.utils import normalise_metrics
 
 
 class SQLAlchemyUserRepository(IUserRepository):
@@ -593,7 +594,7 @@ class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
             question_domain = self.question_repo._to_domain(question_model)
             metrics: Dict[str, float] = {}
             if isinstance(assoc.analysis, dict):
-                metrics = self._normalise_metrics(assoc.analysis)
+                metrics = normalise_metrics(assoc.analysis)
 
             answered.append(
                 QuestionAnswer(
@@ -616,7 +617,7 @@ class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
         from models.associations import QuestionAnsweredAssociation  # late import
 
         timestamp = answered_at or datetime.now(timezone.utc)
-        metrics = self._normalise_metrics(analysis)
+        metrics = normalise_metrics(analysis)
 
         association: QuestionAnsweredAssociation | None = (
             self.session.query(QuestionAnsweredAssociation)
@@ -647,17 +648,6 @@ class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
             answered_at=timestamp,
             analysis=metrics,
         )
-
-    def _normalise_metrics(self, raw_metrics: Dict[str, float]) -> Dict[str, float]:
-        normalised: Dict[str, float] = {}
-        for key, value in raw_metrics.items():
-            if key is None:
-                continue
-            try:
-                normalised[str(key)] = float(value)
-            except (TypeError, ValueError):
-                continue
-        return normalised
 
 
 class SQLAlchemyTranscriptionAnalysisRepository(ITranscriptionAnalysisRepository):
@@ -700,7 +690,7 @@ class SQLAlchemyTranscriptionAnalysisRepository(ITranscriptionAnalysisRepository
         return analyses
 
     def record_session(self, patient_email: str, metrics: Dict[str, float]) -> TranscriptionAnalysis:
-        normalised = self._normalise_metrics(metrics)
+        normalised = normalise_metrics(metrics)
         session_row = TranscriptionSession(
             patient_email=patient_email,
             metrics=normalised,
@@ -714,14 +704,3 @@ class SQLAlchemyTranscriptionAnalysisRepository(ITranscriptionAnalysisRepository
             metrics=normalised,
             created_at=created_at,
         )
-
-    def _normalise_metrics(self, raw_metrics: Dict[str, float]) -> Dict[str, float]:
-        cleaned: Dict[str, float] = {}
-        for key, value in (raw_metrics or {}).items():
-            if key is None:
-                continue
-            try:
-                cleaned[str(key)] = float(value)
-            except (TypeError, ValueError):
-                continue
-        return cleaned
