@@ -68,6 +68,8 @@ class AbstractPDFGeneratorAdapter(ABC):
             patient_data['patient']['role']['gender'] = cls.__transform_gender(patient_data['patient']['role']['gender'])
             for score in patient_data['scores']:
                 score['completed_at'] = cls.__transform_date(score['completed_at'])
+            for question in patient_data.get('questions', []):
+                question['answered_at'] = cls.__transform_date(question['answered_at'])
 
             return patient_data
         except KeyError as e:
