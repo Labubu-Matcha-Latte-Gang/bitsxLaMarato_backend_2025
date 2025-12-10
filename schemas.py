@@ -1586,7 +1586,8 @@ class ReportGenerateSchema(Schema):
     )
 
     access_token = fields.String(
-        required=True,
+        required=False,
+        load_default=None,
         metadata={
             "description": "Token d'accés per obtenir l'informe mèdic.",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
