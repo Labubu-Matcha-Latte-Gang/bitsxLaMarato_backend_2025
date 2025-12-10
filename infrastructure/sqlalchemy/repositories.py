@@ -684,15 +684,8 @@ class SQLAlchemyTranscriptionAnalysisRepository(ITranscriptionAnalysisRepository
         )
         analyses: List[TranscriptionAnalysis] = []
         for row in rows:
-            # Ensure metrics is a dictionary of numeric values
-            metrics_dict: Dict[str, float] = {}
-            if isinstance(row.metrics, dict):
-                for k, v in row.metrics.items():
-                    try:
-                        metrics_dict[k] = float(v)
-                    except (TypeError, ValueError):
-                        # Skip non-numeric metric values
-                        continue
+            # Use the strategy to normalise metrics
+            metrics_dict = self.metrics_normaliser.normalise(row.metrics)
             analyses.append(
                 TranscriptionAnalysis(
                     patient_email=row.patient_email,
