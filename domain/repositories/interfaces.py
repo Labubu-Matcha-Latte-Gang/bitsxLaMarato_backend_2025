@@ -431,7 +431,7 @@ class IQuestionAnswerRepository(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def record_session(self, patient_email: str, metrics: Dict[str, float]) -> TranscriptionAnalysis:
+    def record_session(self, patient_email: str, metrics: dict[str, float]) -> TranscriptionAnalysis:
         """
         Persist a new transcription analysis session for the given patient.
 
