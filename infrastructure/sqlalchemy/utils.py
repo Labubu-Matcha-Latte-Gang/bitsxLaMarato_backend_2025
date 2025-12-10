@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 def normalise_metrics(raw_metrics: Optional[Dict[Any, Any]]) -> Dict[str, float]:
     """
-    Normalize a dictionary of metrics by ensuring all keys are strings
+    Normalise a dictionary of metrics by ensuring all keys are strings
     and all values are floats. Invalid entries are skipped.
 
     Args:
