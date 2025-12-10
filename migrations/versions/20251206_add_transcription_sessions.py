@@ -12,8 +12,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision = "add_transcription_sessions"       # <-- AJUSTA este ID
-down_revision = "cascade_delete_association_fks"  # <-- AJUSTA según tu cadena de migraciones
+revision = "add_transcription_sessions"
+down_revision = "create_transcription_chunks"
 branch_labels = None
 depends_on = None
 

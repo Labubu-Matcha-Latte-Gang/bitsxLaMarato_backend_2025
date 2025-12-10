@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20250206_apply_ondelete_cascades"
-down_revision = "20240913_update_timestamp_checks"
+down_revision = "20240913_drop_time_checks"
 branch_labels = None
 depends_on = None
 

@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "add_role_and_patient_checks"
-down_revision = None
+down_revision = "20250206_apply_ondelete_cascades"
 branch_labels = None
 depends_on = None
 
