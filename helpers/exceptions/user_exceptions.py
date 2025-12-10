@@ -25,3 +25,11 @@ class RelatedUserNotFoundException(Exception):
 class InvalidResetCodeException(Exception):
     """Exception raised when a provided reset code is invalid or expired."""
     pass
+
+class InvalidTokenException(Exception):
+    """Exception raised when a JWT access token is invalid."""
+    pass
+
+class ExpiredTokenException(Exception):
+    """Exception raised when a JWT access token has expired."""
+    pass

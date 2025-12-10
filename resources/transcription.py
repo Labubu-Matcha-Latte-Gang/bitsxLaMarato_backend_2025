@@ -5,7 +5,7 @@ import json
 from flask import request, current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from openai import AzureOpenAI
 from sqlalchemy.exc import IntegrityError
 
@@ -15,6 +15,12 @@ from helpers.debugger.logger import AbstractLogger
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from helpers.analysis_engine import analyze_audio_signal, analyze_linguistics, analyze_executive_functions
 from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
+from application.container import ServiceFactory
+from helpers.exceptions.question_exceptions import (
+    QuestionNotFoundException,
+    QuestionAnswerPersistenceException,
+)
+from helpers.exceptions.user_exceptions import UserNotFoundException
 from schemas import TranscriptionChunkSchema, TranscriptionCompleteSchema, TranscriptionResponseSchema
 
 blp = Blueprint('transcription', __name__, description="Operacions de transcripció d'àudio en temps real (Persistència en DB).")
@@ -453,6 +459,22 @@ class TranscriptionCompleteResource(MethodView):
     @blp.response(404, description="No s'han trobat fragments per a aquesta sessió.")
     def post(self, data):
         session_id = data['session_id']
+        question_id = data['question_id']
+        patient_email = get_jwt_identity()
+        factory = ServiceFactory.get_instance()
+        patient_service = factory.build_patient_service()
+        question_service = factory.build_question_service()
+
+        try:
+            patient = patient_service.get_patient(patient_email)
+        except UserNotFoundException as exc:
+            self.logger.error(
+                "Patient identity not found when finalising transcription",
+                module="Transcription",
+                metadata={"patient_email": patient_email, "session_id": session_id},
+                error=exc,
+            )
+            abort(404, message="Pacient no trobat.")
 
         try:
             # 1. Recuperar fragments
@@ -484,19 +506,50 @@ class TranscriptionCompleteResource(MethodView):
                 **linguistic_metrics
             }
 
-            # 4. Netejar la DB
+            # 4. Persistir la resposta del pacient i les mètriques
+            question_service.record_answer(
+                patient=patient,
+                question_id=question_id,
+                answer_text=full_text,
+                analysis=final_metrics,
+            )
+
+            # 5. Netejar la DB
             for chunk in chunks:
                 db.session.delete(chunk)
             db.session.commit()
             
-            self.logger.info(f"Session {session_id} completed. Metrics: {final_metrics}", module="Transcription")
+            self.logger.info(
+                f"Session {session_id} completed. Metrics: {final_metrics}",
+                module="Transcription",
+                metadata={"patient_email": patient_email, "question_id": str(question_id)},
+            )
 
             return {
                 "status": "completed",
                 "transcription": full_text,
-                "analysis": final_metrics 
+                "analysis": final_metrics,
+                "question_id": str(question_id),
             }, 200
 
+        except QuestionNotFoundException as e:
+            db.session.rollback()
+            self.logger.error(
+                "Question not found while registering transcription answer",
+                module="Transcription",
+                metadata={"patient_email": patient_email, "question_id": str(question_id)},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except QuestionAnswerPersistenceException as e:
+            db.session.rollback()
+            self.logger.error(
+                "Failed to persist answered question from transcription",
+                module="Transcription",
+                metadata={"patient_email": patient_email, "question_id": str(question_id)},
+                error=e,
+            )
+            abort(422, message=str(e))
         except IntegrityError as e:
             db.session.rollback()
             mapped = map_integrity_error(e)

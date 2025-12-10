@@ -73,6 +73,7 @@ class AnalysisMetrics(TypedDict):
 class QuestionPayload(TypedDict):
     """Answered question with analysis metrics."""
     question: QuestionData
+    answer_text: str
     answered_at: str
     analysis: AnalysisMetrics
 

@@ -1,5 +1,4 @@
 import pytest
-import sqlalchemy as sa
 from sqlalchemy import event
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -15,36 +14,32 @@ def app():
     return app
 
 
-@pytest.fixture(scope="session")
-def db_connection(app):
-    with app.app_context():
-        connection = db.engine.connect()
-    yield connection
-    connection.close()
-
-
 @pytest.fixture(scope="function")
-def db_session(app, db_connection):
-    transaction = db_connection.begin()
-    session_factory = sessionmaker(bind=db_connection)
-    session = scoped_session(session_factory)
+def db_session(app):
+    ctx = app.app_context()
+    ctx.push()
+
+    connection = db.engine.connect()
+    transaction = connection.begin()
+    SessionLocal = sessionmaker(bind=connection)
+    session = scoped_session(SessionLocal)
     db.session = session
 
     session.begin_nested()
 
-    @event.listens_for(session(), "after_transaction_end")
+    @event.listens_for(SessionLocal, "after_transaction_end")
     def restart_savepoint(sess, trans):
         if trans.nested and not trans._parent.nested:
-            session.begin_nested()
+            sess.begin_nested()
 
-    ctx = app.app_context()
-    ctx.push()
-
-    yield session
-
-    transaction.rollback()
-    session.remove()
-    ctx.pop()
+    try:
+        yield session
+    finally:
+        if transaction.is_active:
+            transaction.rollback()
+        session.remove()
+        connection.close()
+        ctx.pop()
 
 
 @pytest.fixture(scope="function")

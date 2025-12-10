@@ -17,3 +17,7 @@ class QuestionUpdateException(BaseQuestionException):
 class QuestionDeletionException(BaseQuestionException):
     """Exception raised when deleting a question fails."""
     pass
+
+class QuestionAnswerPersistenceException(BaseQuestionException):
+    """Exception raised when storing an answered question fails."""
+    pass

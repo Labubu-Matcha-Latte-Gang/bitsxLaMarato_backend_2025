@@ -379,6 +379,20 @@ class ITranscriptionAnalysisRepository(ABC):
         """
         raise NotImplementedError()
 
+    @abstractmethod
+    def record_session(self, patient_email: str, metrics: dict[str, float]) -> TranscriptionAnalysis:
+        """
+        Persist a new transcription analysis session for the given patient.
+
+        Args:
+            patient_email (str): Identifier of the patient.
+            metrics (Dict[str, float]): Normalised metrics captured by the transcription pipeline.
+
+        Returns:
+            TranscriptionAnalysis: Domain object representing the stored session.
+        """
+        raise NotImplementedError()
+
 class IScoreRepository(ABC):
     @abstractmethod
     def add(self, score: Score) -> None:
@@ -427,5 +441,28 @@ class IQuestionAnswerRepository(ABC):
         Returns:
             List[QuestionAnswer]: A list of domain objects representing each
                 answered question.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def record_answer(
+        self,
+        patient: Patient,
+        question: Question,
+        answer_text: str,
+        analysis: dict[str, float],
+        answered_at: Optional[datetime] = None,
+    ) -> "QuestionAnswer":
+        """
+        Persist or update the association between a patient and a question with
+        the provided answer analysis.
+
+        Args:
+            patient (Patient): Patient who answered.
+            question (Question): Question that was answered.
+            answer_text (str): Transcribed text of the patient's answer.
+            analysis (dict[str, float]): Metrics computed from the answer.
+            answered_at (datetime, optional): Timestamp of the answer. Defaults
+                to ``datetime.utcnow`` when omitted.
         """
         raise NotImplementedError()

@@ -2,15 +2,13 @@ from flask import send_file
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import IntegrityError
-from flask_jwt_extended import get_jwt_identity
 from zoneinfo import ZoneInfo
 
 from db import db
 from helpers.debugger.logger import AbstractLogger
-from helpers.decorators import roles_required
-from helpers.enums.user_role import UserRole
 from helpers.exceptions.pdf_exceptions import InvalidZoneInfoException, PDFGenerationException
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
+from helpers.exceptions.user_exceptions import ExpiredTokenException, InvalidTokenException
 from application.container import ServiceFactory
 from io import BytesIO
 from schemas import (
@@ -61,7 +59,7 @@ class ReportResource(MethodView):
 
             token = query_params.get("access_token")
             if not token:
-                raise PermissionError("Cal un token vàlid per accedir a l'informe.")
+                raise InvalidTokenException("Cal un token vàlid per accedir a l'informe.")
             
             current_user = user_service.get_user_by_token(token)
 
@@ -86,6 +84,12 @@ class ReportResource(MethodView):
                     as_attachment=True,
                     download_name=f"{patient_name}_report_{date_for_filename}.pdf",
                 )
+        except ExpiredTokenException as e:
+            self.logger.warning("Expired token when accessing patient report", module="ReportResource", error=e)
+            abort(401, message="El token ha caducat. Torna a iniciar sessió per generar l'informe.")
+        except InvalidTokenException as e:
+            self.logger.warning("Invalid token when accessing patient report", module="ReportResource", error=e)
+            abort(401, message=str(e))
         except DataIntegrityException as e:
             self.logger.error("Data integrity error", module="ReportResource", error=e)
             abort(409, message=str(e))

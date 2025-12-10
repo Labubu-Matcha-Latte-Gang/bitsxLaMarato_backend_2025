@@ -313,6 +313,7 @@
                 <th>Pregunta</th>
                 <th>Dificultat</th>
                 <th>Data</th>
+                <th>Resposta</th>
             </tr>
         </thead>
         <tbody>
@@ -321,6 +322,7 @@
                 <td>{{ q.question.text }}</td>
                 <td>{{ q.question.difficulty }}</td>
                 <td>{{ q.answered_at }}</td>
+                <td>{{ q.answer_text }}</td>
             </tr>
             {% endfor %}
         </tbody>
