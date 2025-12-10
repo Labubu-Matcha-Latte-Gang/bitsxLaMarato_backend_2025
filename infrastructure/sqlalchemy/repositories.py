@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable, List, Optional, Dict
 import uuid
 
@@ -11,6 +11,7 @@ from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
 from domain.entities.question_answer import QuestionAnswer
 from domain.entities.score import Score as ScoreDomain
+from domain.entities.transcription_analysis import TranscriptionAnalysis
 from domain.entities.user import Admin as AdminDomain
 from domain.entities.user import Doctor as DoctorDomain
 from domain.entities.user import Patient as PatientDomain
@@ -25,6 +26,7 @@ from domain.repositories import (
     IResetCodeRepository,
     IScoreRepository,
     IUserRepository,
+    ITranscriptionAnalysisRepository,
 )
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
@@ -42,6 +44,9 @@ from models.patient import Patient
 from models.question import Question
 from models.score import Score
 from models.user import User
+from models.transcription_session import TranscriptionSession
+from domain.strategies import IMetricsNormaliserStrategy
+from infrastructure.sqlalchemy.metrics_normaliser_strategy import MetricsNormaliserStrategy
 
 
 class SQLAlchemyUserRepository(IUserRepository):
@@ -563,25 +568,22 @@ class SQLAlchemyScoreRepository(IScoreRepository):
 
 class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
     """
-    SQLAlchemy implementation of the ``IQuestionAnswerRepository``.  This
-    repository reads answered questions from the association table joining
-    patients and questions.  It also derives simple analysis metrics on the
-    question text using the built-in analysis engine to provide cognitive
-    proxies when no voice transcription is available.
-
-    The returned domain objects expose the question entity, the timestamp when
-    it was answered and a dictionary of analysis metrics computed from the
-    question text.  Note that these metrics are approximations based solely
-    on the question content, as the actual spoken answer isn't stored in the
-    database.  Should a linkage to voice transcriptions be added in the
-    future, this repository can be updated to pull analysis directly from
-    the transcription records.
+    SQLAlchemy implementation of the ``IQuestionAnswerRepository``. This
+    repository persists and retrieves the association between patients and
+    their answered questions, including the transcribed answer text and the
+    cognitive metrics computed from the Azure OpenAI transcription pipeline.
     """
 
-    def __init__(self, session: Optional[Session] = None) -> None:
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        metrics_normaliser: Optional[IMetricsNormaliserStrategy] = None,
+    ) -> None:
         self.session: Session = session or db.session
         # Reuse the existing question repository for domain conversion
         self.question_repo = SQLAlchemyQuestionRepository(self.session)
+        # Use provided strategy or default to standard implementation
+        self.metrics_normaliser = metrics_normaliser or MetricsNormaliserStrategy()
 
     def list_by_patient(self, patient_email: str) -> List[QuestionAnswer]:
         # Fetch all answered question associations for the patient
@@ -593,29 +595,118 @@ class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
         )
         answered: List[QuestionAnswer] = []
         for assoc in associations:
-            # Convert the underlying question model to domain entity
             question_model = assoc.question
             if question_model is None:
                 continue
             question_domain = self.question_repo._to_domain(question_model)
-            answered_at = assoc.answered_at
-            # Derive basic analysis metrics from the question text using the
-            # analysis engine.  These metrics serve as placeholders until
-            # actual answer transcriptions are persisted and linked.
-            try:
-                from helpers.analysis_engine import analyze_linguistics, analyze_executive_functions
-                linguistics = analyze_linguistics(question_domain.text)
-                exec_metrics = analyze_executive_functions(question_domain.text)
-                # Flatten metrics; if there are overlapping keys, later values override
-                analysis: Dict[str, float] = {**linguistics, **exec_metrics}
-            except Exception:
-                # In case of any failure computing metrics (e.g. missing models), fall back to empty
-                analysis = {}
+            metrics: Dict[str, float] = {}
+            if isinstance(assoc.analysis, dict):
+                metrics = self.metrics_normaliser.normalise(assoc.analysis)
+
             answered.append(
                 QuestionAnswer(
                     question=question_domain,
-                    answered_at=answered_at,
-                    analysis=analysis,
+                    answer_text=assoc.answer_text or "",
+                    answered_at=assoc.answered_at,
+                    analysis=metrics,
                 )
             )
         return answered
+
+    def record_answer(
+        self,
+        patient: PatientDomain,
+        question: QuestionDomain,
+        answer_text: str,
+        analysis: Dict[str, float],
+        answered_at: Optional[datetime] = None,
+    ) -> QuestionAnswer:
+        from models.associations import QuestionAnsweredAssociation  # late import
+
+        timestamp = answered_at or datetime.now(timezone.utc)
+        metrics = self.metrics_normaliser.normalise(analysis)
+
+        association: QuestionAnsweredAssociation | None = (
+            self.session.query(QuestionAnsweredAssociation)
+            .filter(
+                QuestionAnsweredAssociation.patient_email == patient.email,
+                QuestionAnsweredAssociation.question_id == question.id,
+            )
+            .one_or_none()
+        )
+
+        if association:
+            association.answered_at = timestamp
+            association.answer_text = answer_text
+            association.analysis = metrics
+        else:
+            association = QuestionAnsweredAssociation(
+                patient_email=patient.email,
+                question_id=question.id,
+                answered_at=timestamp,
+                answer_text=answer_text,
+                analysis=metrics,
+            )
+            self.session.add(association)
+
+        return QuestionAnswer(
+            question=question,
+            answer_text=answer_text,
+            answered_at=timestamp,
+            analysis=metrics,
+        )
+
+
+class SQLAlchemyTranscriptionAnalysisRepository(ITranscriptionAnalysisRepository):
+    """
+    SQLAlchemy implementation of ``ITranscriptionAnalysisRepository``.  This
+    repository retrieves aggregated transcription sessions from the
+    ``transcription_sessions`` table and converts them into domain-level
+    ``TranscriptionAnalysis`` objects.
+    """
+
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        metrics_normaliser: Optional[IMetricsNormaliserStrategy] = None,
+    ) -> None:
+        self.session: Session = session or db.session
+        # Use provided strategy or default to standard implementation
+        self.metrics_normaliser = metrics_normaliser or MetricsNormaliserStrategy()
+
+    def list_by_patient(self, patient_email: str) -> List[TranscriptionAnalysis]:
+        # Query all sessions for the patient, oldest first
+        rows: List[TranscriptionSession] = (
+            self.session.query(TranscriptionSession)
+            .filter(TranscriptionSession.patient_email == patient_email)
+            .order_by(TranscriptionSession.created_at.asc())
+            .all()
+        )
+        analyses: List[TranscriptionAnalysis] = []
+        for row in rows:
+            # Use the strategy to normalise metrics
+            metrics_dict = self.metrics_normaliser.normalise(row.metrics)
+            analyses.append(
+                TranscriptionAnalysis(
+                    patient_email=row.patient_email,
+                    metrics=metrics_dict,
+                    created_at=row.created_at,
+                )
+            )
+        return analyses
+
+    def record_session(self, patient_email: str, metrics: Dict[str, float]) -> TranscriptionAnalysis:
+        normalised = self.metrics_normaliser.normalise(metrics)
+        session_row = TranscriptionSession(
+            patient_email=patient_email,
+            metrics=normalised,
+        )
+        self.session.add(session_row)
+        # Flush to obtain database-generated timestamp
+        self.session.flush()
+        created_at = session_row.created_at or datetime.now(timezone.utc)
+        return TranscriptionAnalysis(
+            patient_email=patient_email,
+            metrics=normalised,
+            created_at=created_at,
+        )

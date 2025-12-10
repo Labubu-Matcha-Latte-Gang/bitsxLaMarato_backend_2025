@@ -10,6 +10,7 @@ from domain.entities.user import User, Patient, Doctor, Admin
 from domain.entities.question import Question
 from domain.entities.question_answer import QuestionAnswer
 from domain.entities.activity import Activity
+from domain.entities.transcription_analysis import TranscriptionAnalysis
 
 
 class IUserRepository(ABC):
@@ -350,6 +351,48 @@ class IResetCodeRepository(ABC):
         """
         raise NotImplementedError()
 
+
+class ITranscriptionAnalysisRepository(ABC):
+    """
+    Repository abstraction for retrieving cognitive analysis sessions linked
+    to patients.  These sessions encapsulate metrics derived from voice
+    transcriptions (e.g., processing speed, lexical access) and are used
+    by recommendation strategies to adjust difficulty and content.
+
+    The application layer uses this interface to fetch all sessions of a
+    given patient.  Infrastructure implementations should persist and
+    return domain-level ``TranscriptionAnalysis`` objects.
+    """
+
+    @abstractmethod
+    def list_by_patient(self, patient_email: str) -> List[TranscriptionAnalysis]:
+        """
+        List all transcription analysis sessions for a given patient.
+
+        Args:
+            patient_email (str): The unique email of the patient whose
+                sessions are requested.
+
+        Returns:
+            List[TranscriptionAnalysis]: A list of domain objects representing
+                each cognitive analysis session, or an empty list if none exist.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def record_session(self, patient_email: str, metrics: dict[str, float]) -> TranscriptionAnalysis:
+        """
+        Persist a new transcription analysis session for the given patient.
+
+        Args:
+            patient_email (str): Identifier of the patient.
+            metrics (Dict[str, float]): Normalised metrics captured by the transcription pipeline.
+
+        Returns:
+            TranscriptionAnalysis: Domain object representing the stored session.
+        """
+        raise NotImplementedError()
+
 class IScoreRepository(ABC):
     @abstractmethod
     def add(self, score: Score) -> None:
@@ -398,5 +441,28 @@ class IQuestionAnswerRepository(ABC):
         Returns:
             List[QuestionAnswer]: A list of domain objects representing each
                 answered question.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def record_answer(
+        self,
+        patient: Patient,
+        question: Question,
+        answer_text: str,
+        analysis: dict[str, float],
+        answered_at: Optional[datetime] = None,
+    ) -> "QuestionAnswer":
+        """
+        Persist or update the association between a patient and a question with
+        the provided answer analysis.
+
+        Args:
+            patient (Patient): Patient who answered.
+            question (Question): Question that was answered.
+            answer_text (str): Transcribed text of the patient's answer.
+            analysis (dict[str, float]): Metrics computed from the answer.
+            answered_at (datetime, optional): Timestamp of the answer. Defaults
+                to ``datetime.utcnow`` when omitted.
         """
         raise NotImplementedError()

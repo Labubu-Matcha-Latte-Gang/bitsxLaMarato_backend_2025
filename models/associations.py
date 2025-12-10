@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from sqlalchemy.dialects.postgresql import UUID
+
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 import bcrypt
 from db import db
@@ -75,8 +76,15 @@ class QuestionAnsweredAssociation(db.Model):
         primary_key=True,
     )
     answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    answer_text = db.Column(db.Text, nullable=False, default="")
+    analysis = db.Column(JSONB, nullable=False, default=dict)
     question = db.relationship('Question', lazy=True)
     patient = db.relationship('Patient', back_populates='question_answers', lazy=True)
 
     def __repr__(self):
-        return f"<QuestionAnsweredAssociation Patient: {self.patient_email}, Question ID: {self.question_id}, Answered At: {self.answered_at}>"
+        truncated_text = (self.answer_text[:30] + "...") if self.answer_text and len(self.answer_text) > 30 else self.answer_text
+        return (
+            f"<QuestionAnsweredAssociation Patient: {self.patient_email}, "
+            f"Question ID: {self.question_id}, Answered At: {self.answered_at}, "
+            f"Answer: {truncated_text}>"
+        )

@@ -17,11 +17,13 @@ class QuestionAnswer:
 
     Attributes:
         question (Question): The underlying question that was answered.
-        answered_at (datetime): When the answer occurred.  Should be timezone aware.
+        answer_text (str): Transcribed text that the patient provided.
+        answered_at (datetime): When the answer occurred. Should be timezone aware.
         analysis (Dict[str, float]): A flat dictionary of metric names to values.
     """
 
     question: Question
+    answer_text: str
     answered_at: datetime
     analysis: Dict[str, float]
 
@@ -34,6 +36,7 @@ class QuestionAnswer:
         """
         return {
             "question": self.question.to_dict(),
+            "answer_text": self.answer_text,
             "answered_at": self.answered_at.isoformat(),
             "analysis": self.analysis,
         }

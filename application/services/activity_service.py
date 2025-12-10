@@ -7,6 +7,8 @@ from typing import List
 from domain.entities.activity import Activity
 from domain.entities.user import Patient
 from domain.repositories import IActivityRepository
+from domain.repositories.interfaces import IScoreRepository, ITranscriptionAnalysisRepository
+from domain.services.recommendation import ActivityFilterStrategy
 from domain.unit_of_work import IUnitOfWork
 from helpers.exceptions.activity_exceptions import (
     ActivityCreationException,
@@ -16,9 +18,11 @@ from helpers.exceptions.activity_exceptions import (
 
 
 class ActivityService:
-    def __init__(self, activity_repo: IActivityRepository, uow: IUnitOfWork):
+    def __init__(self, activity_repo: IActivityRepository, uow: IUnitOfWork, score_repo: IScoreRepository, transcription_repo: ITranscriptionAnalysisRepository):
         self.activity_repo = activity_repo
         self.uow = uow
+        self.score_repo = score_repo
+        self.transcription_repo = transcription_repo
 
     def create_activities(self, payloads: List[dict]) -> List[Activity]:
         try:
@@ -84,13 +88,21 @@ class ActivityService:
             self.activity_repo.remove(activity)
             self.uow.commit()
 
-    def get_recommended(self, patient: Patient) -> Activity:
-        filters = patient.get_recommended_activity_filters()
+    def get_recommended(self, patient: Patient, strategy: ActivityFilterStrategy | None = None) -> list[Activity]:
+        if not strategy:
+            from domain.services.recommendation import ScoreBasedActivityStrategy
+            strategy = ScoreBasedActivityStrategy()
+        try:
+            filters = patient.get_recommended_activity_filters(
+                strategy=strategy,
+                score_repo=self.score_repo,
+                transcription_repo=self.transcription_repo,
+            )
+        except ValueError:
+            filters = {}
         activities = self.activity_repo.list(filters)
         if not activities:
             activities = self.activity_repo.list({})
         if not activities:
-            raise ActivityNotFoundException(
-                "No hi ha activitats disponibles a la base de dades."
-            )
+            raise ActivityNotFoundException("No hi ha activitats disponibles a la base de dades.")
         return choice(activities)

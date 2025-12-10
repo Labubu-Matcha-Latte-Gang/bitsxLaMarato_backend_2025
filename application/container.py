@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from application.services.pdf_generation_service import PDFGenerationService
+from application.services.qr_service import QRService
 from db import db
 from application.services import (
     ActivityService,
@@ -27,6 +29,7 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyResetCodeRepository,
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
+    SQLAlchemyTranscriptionAnalysisRepository
 )
 from sqlalchemy.orm import Session
 
@@ -116,7 +119,16 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         question_repo = SQLAlchemyQuestionRepository(self.session)
-        return QuestionService(question_repo=question_repo, uow=uow)
+        score_repo = SQLAlchemyScoreRepository(self.session)
+        transcription_repo = SQLAlchemyTranscriptionAnalysisRepository(self.session)
+        question_answer_repo = SQLAlchemyQuestionAnswerRepository(self.session)
+        return QuestionService(
+            question_repo=question_repo,
+            uow=uow,
+            score_repo=score_repo,
+            transcription_repo=transcription_repo,
+            question_answer_repo=question_answer_repo,
+        )
 
     def build_activity_service(self) -> ActivityService:
         """
@@ -126,7 +138,14 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         activity_repo = SQLAlchemyActivityRepository(self.session)
-        return ActivityService(activity_repo=activity_repo, uow=uow)
+        score_repo = SQLAlchemyScoreRepository(self.session)
+        transcription_repo = SQLAlchemyTranscriptionAnalysisRepository(self.session)
+        return ActivityService(
+            activity_repo=activity_repo,
+            uow=uow,
+            score_repo=score_repo,
+            transcription_repo=transcription_repo,
+        )
 
     def build_patient_service(self) -> PatientService:
         """
@@ -214,4 +233,26 @@ class ServiceFactory:
         return ScoreService(
             score_repo=score_repo,
             uow=uow,
+        )
+
+    def build_qr_service(self) -> QRService:
+        """
+        Build a QRService with its dependencies.
+        Returns:
+            QRService: The constructed QRService instance.
+        """
+        adapter_factory = AbstractAdapterFactory.get_instance()
+        return QRService(
+            adapter_factory=adapter_factory,
+        )
+    
+    def build_pdf_generation_service(self) -> PDFGenerationService:
+        """
+        Build a PDFGenerationService with its dependencies.
+        Returns:
+            PDFGenerationService: The constructed PDFGenerationService instance.
+        """
+        adapter_factory = AbstractAdapterFactory.get_instance()
+        return PDFGenerationService(
+            adapter_factory=adapter_factory,
         )

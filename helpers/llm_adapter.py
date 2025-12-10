@@ -1,0 +1,190 @@
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+from openai import AzureOpenAI
+
+import google.generativeai as genai
+from google.generativeai.types import GenerationConfig
+
+from helpers.debugger.logger import AbstractLogger
+
+if TYPE_CHECKING:
+    from application.services.user_service import PatientData
+
+class AbstractLlmAdapter(ABC):
+    """Abstract adapter for LLM services."""
+
+    logger = AbstractLogger.get_instance()
+
+    @classmethod
+    def _patient_data_to_markdown(cls, patient_data: PatientData) -> str:
+        """
+        Convert patient data to a markdown-formatted string optimized for LLM context.
+        FILTERED: Excludes PII (Name, Email), administrative data (Doctors), and raw files (Graphs).
+        """
+        
+        p_info = patient_data.get("patient", {})
+        role_data = p_info.get("role", {})
+        
+        lines = []
+        
+        lines.append("# Perfil Clínic del Pacient")
+        lines.append("> **Nota:** Les dades personals i administratives han estat anonimitzades per privacitat.")
+        lines.append("")
+        
+        lines.append("## Dades Demogràfiques i Condicions")
+        lines.append(f"- **Edat:** {role_data.get('age', 'N/A')}")
+        lines.append(f"- **Gènere:** {role_data.get('gender', 'N/A')}")
+        lines.append(f"- **Alçada:** {role_data.get('height_cm', 'N/A')} cm")
+        lines.append(f"- **Pes:** {role_data.get('weight_kg', 'N/A')} kg")
+        
+        ailments = role_data.get("ailments")
+        treatments = role_data.get("treatments")
+        
+        lines.append(f"- **Malalties/Afeccions:** {ailments if ailments else 'Cap registrada'}")
+        lines.append(f"- **Tractaments:** {treatments if treatments else 'Cap actiu'}")
+        lines.append("")
+
+        scores = patient_data.get("scores", [])
+        if scores:
+            lines.append("## Puntuacions d'Activitat")
+            lines.append("| Data | Activitat | Tipus | Puntuació | Durada (s) |")
+            lines.append("|---|---|---|---|---|")
+            for score in scores:
+                row = (
+                    f"| {score.get('completed_at', 'N/A')} "
+                    f"| {score.get('activity_title', 'N/A')} "
+                    f"| {score.get('activity_type', 'N/A')} "
+                    f"| **{score.get('score', 0)}** "
+                    f"| {score.get('seconds_to_finish', 0)} |"
+                )
+                lines.append(row)
+            lines.append("")
+
+        questions = patient_data.get("questions", [])
+        if questions:
+            lines.append("## Historial de Preguntes i Respostes")
+            for item in questions:
+                q_data = item.get("question", {})
+                lines.append(f"### ID de Pregunta: {q_data.get('id', 'N/A')} (Dificultat: {q_data.get('difficulty', 'N/A')})")
+                lines.append(f"**Text:** {q_data.get('text', '')}")
+                lines.append(f"**Tipus:** {q_data.get('question_type', 'N/A')}")
+                lines.append(f"**Respost el:** {item.get('answered_at', 'N/A')}")
+                answer_text = item.get("answer_text") or "Sense resposta registrada"
+                lines.append(f"**Resposta transcrita:** {answer_text}")
+                lines.append("---")
+        
+        return "\n".join(lines)
+    
+    @abstractmethod
+    def generate_summary(self, patient_data: PatientData, system_prompt: str) -> str:
+        """Generate a summary for the given patient data.
+        
+        Args:
+            patient_data (PatientData): Data of the patient to summarize.
+            system_prompt (str): The system instruction to guide the LLM.
+        Returns:
+            str: The generated summary.
+        """
+        raise NotImplementedError
+    
+class AzureOpenaiAdapter(AbstractLlmAdapter):
+    """Concrete adapter for Azure OpenAI LLM services."""
+    __client: AzureOpenAI = None
+    __model: str = None
+
+    def __init__(self, api_key: str = None, endpoint: str = None, api_version: str = None, model: str = None) -> None:
+        from flask import current_app
+
+        api_key = api_key or current_app.config['AZURE_OPENAI_API_KEY']
+        endpoint = endpoint or current_app.config['AZURE_OPENAI_ENDPOINT']
+        api_version = api_version or current_app.config['AZURE_OPENAI_API_VERSION']
+
+        self.__client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=endpoint)
+        self.__model = model or current_app.config.get('AZURE_OPENAI_LLM_MODEL', 'gpt-5-mini') or 'gpt-5-mini'
+    
+    def generate_summary(self, patient_data: PatientData, system_prompt: str) -> str:
+        context_data = self._patient_data_to_markdown(patient_data)
+
+        try:
+            response = self.__client.chat.completions.create(
+                model=self.__model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Dades del pacient:\n{context_data}"}
+                ],
+                reasoning_effort="low", 
+                
+                extra_body={"verbosity": "low"},
+                max_completion_tokens=300
+            )
+
+            final_summary = response.choices[0].message.content
+
+            if not final_summary:
+                self.logger.error("Empty summary received from AzureOpenAI", module="AzureOpenaiAdapter")
+                return "No s'ha pogut generar un resum del pacient."
+            
+            return final_summary
+
+        except Exception as e:
+            self.logger.error(f"Error generating summary in AzureOpenaiAdapter: {str(e)}", module="AzureOpenaiAdapter", error=e)
+            return "Hi ha hagut un error en generar el resum del pacient."
+        
+class GeminiAdapter(AbstractLlmAdapter):
+    """Concrete adapter for Google Gemini LLM services."""
+    __model_name: str = None
+    
+    def __init__(self, api_key: str = None, model_name: str = None) -> None:
+        """
+        Initialize the Gemini client.
+        Uses GOOGLE_API_KEY from Flask config by default.
+        Args:
+            api_key (str, optional): API key for Google Gemini. Defaults to None.
+            model_name (str, optional): Model name to use. Defaults to `gemini-2.5-flash`.
+        """
+        from flask import current_app
+
+        self.api_key = api_key or current_app.config.get('GOOGLE_API_KEY')
+        
+        if not self.api_key:
+            current_app.logger.warning("GOOGLE_API_KEY not found in configuration.")
+        else:
+            genai.configure(api_key=self.api_key)
+            self.__model_name = model_name or current_app.config.get('GEMINI_MODEL_NAME', 'gemini-2.5-flash')
+
+    def generate_summary(self, patient_data: PatientData, system_prompt: str) -> str:
+        context_data = self._patient_data_to_markdown(patient_data)
+        self.logger.debug("Context data prepared for Gemini", module="GeminiAdapter", metadata={"context_data": context_data})
+        
+        try:
+
+            gen_config = GenerationConfig(
+                temperature=0.2,
+                max_output_tokens=2000,
+                candidate_count=1
+            )
+
+            model = genai.GenerativeModel(
+                model_name=self.__model_name,
+                system_instruction=system_prompt
+            )
+
+            response = model.generate_content(
+                contents=context_data,
+                generation_config=gen_config
+            )
+
+            final_summary = response.text
+
+            if not final_summary:
+                self.logger.error("Empty summary received from Gemini", module="GeminiAdapter")
+                return "No s'ha pogut generar un resum del pacient."
+            
+            self.logger.debug("Generated summary from Gemini", module="GeminiAdapter", metadata={"summary": final_summary})
+            return final_summary
+
+        except Exception as e:
+            self.logger.error(f"Error generating summary in GeminiAdapter: {str(e)}", module="GeminiAdapter", error=e)
+            return "No s'ha pogut generar el resum (Error del servei Gemini)."

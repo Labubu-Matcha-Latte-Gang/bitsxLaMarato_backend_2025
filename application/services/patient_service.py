@@ -71,6 +71,12 @@ class PatientService:
 
         return patient
 
+    def patient_exists(self, email: str) -> bool:
+        """
+        Check if a patient exists by email.
+        """
+        return self.patient_repo.get_by_email(email) is not None
+
     def get_patient(self, email: str) -> Patient:
         """
         Retrieve a patient by email or raise if it does not exist.

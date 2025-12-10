@@ -59,7 +59,11 @@ class Patient(User):
     }
 
     def add_answered_questions(
-        self, questions: set["Question"], answered_at: datetime | None = None
+        self,
+        questions: set["Question"],
+        answered_at: datetime | None = None,
+        answer_text: str = "",
+        analysis: dict | None = None,
     ) -> None:
         for question in questions:
             if question is None:
@@ -71,11 +75,17 @@ class Patient(User):
             if existing:
                 if answered_at:
                     existing.answered_at = answered_at
+                if answer_text:
+                    existing.answer_text = answer_text
+                if analysis is not None:
+                    existing.analysis = analysis
                 continue
             self.question_answers.append(
                 QuestionAnsweredAssociation(
                     question=question,
                     answered_at=answered_at or datetime.now(timezone.utc),
+                    answer_text=answer_text or "",
+                    analysis=analysis or {},
                 )
             )
 

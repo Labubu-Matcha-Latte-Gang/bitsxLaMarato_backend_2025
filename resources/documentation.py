@@ -95,12 +95,14 @@ class SwaggerDocResource(MethodView):
                         schema_label += f", {html.escape(str(schema_format))}"
                     schema_label += ")"
 
+            # Render description separately to avoid nested f-strings within f-strings.
+            description_html = f"<div class=\"muted\">{description}</div>" if description else ""
             items.append(
                 (
                     f"<li><span class=\"param-name\">{name}</span>"
                     f"<span class=\"badge badge-ghost\">{location}{' · obligatori' if required else ''}</span>"
                     f"{schema_label}"
-                    f"{f'<div class=\"muted\">{description}</div>' if description else ''}</li>"
+                    f"{description_html}</li>"
                 )
             )
         return f"<ul class=\"param-list\">{''.join(items)}</ul>"
@@ -123,10 +125,14 @@ class SwaggerDocResource(MethodView):
             else "<p class=\"muted\">Sense cos de petició definit.</p>"
         )
 
+        # Build description HTML separately to avoid nested f-strings
+        description_html = (
+            f"<p class=\"muted\">{description}</p>" if description else ""
+        )
         return (
             "<div class=\"section\">"
             "<h4>Cos de la petició</h4>"
-            f"{f'<p class=\"muted\">{description}</p>' if description else ''}"
+            f"{description_html}"
             f"{content_html}"
             "</div>"
         )
@@ -196,6 +202,13 @@ class SwaggerDocResource(MethodView):
         request_body_html = self._render_request_body(operation.get("requestBody"))
         responses_html = self._render_responses(operation.get("responses") or {})
 
+        # Build summary and description HTML separately to avoid nested f-strings
+        summary_html = (
+            f"<div class=\"summary\">{summary}</div>" if summary else ""
+        )
+        description_html = (
+            f"<p class=\"description\">{description}</p>" if description else ""
+        )
         return (
             f"<div class=\"operation method-{method.lower()}\">"
             "<div class=\"op-header\">"
@@ -203,8 +216,8 @@ class SwaggerDocResource(MethodView):
             f"<span class=\"op-path\">{html.escape(path)}</span>"
             f"{tag_html}"
             "</div>"
-            f"{f'<div class=\"summary\">{summary}</div>' if summary else ''}"
-            f"{f'<p class=\"description\">{description}</p>' if description else ''}"
+            f"{summary_html}"
+            f"{description_html}"
             "<div class=\"section\">"
             "<h4>Paràmetres</h4>"
             f"{self._render_parameters(parameters)}"
@@ -266,7 +279,13 @@ class SwaggerDocResource(MethodView):
                     continue
                 url = html.escape(str(server.get("url", "")))
                 desc = html.escape(str(server.get("description", "") or ""))
-                server_items.append(f"<li><code>{url}</code>{f'<div class=\"muted\">{desc}</div>' if desc else ''}</li>")
+                # Build description HTML separately to avoid nested f-strings
+                server_desc_html = (
+                    f"<div class=\"muted\">{desc}</div>" if desc else ""
+                )
+                server_items.append(
+                    f"<li><code>{url}</code>{server_desc_html}</li>"
+                )
 
         server_html = (
             f"<ul class=\"server-list\">{''.join(server_items)}</ul>"
