@@ -11,11 +11,13 @@ while ($true) {
     Write-Host "3. View live Output (Logs) [Ctrl+C to return]"
     Write-Host "4. Enter container terminal (Bash)"
     Write-Host "5. Run Unit Tests (pytest)"
-    Write-Host "6. Stop containers (Stop)"
-    Write-Host "7. Stop everything and Exit script"
+    Write-Host "6. Generate DB Migration (flask db migrate)"
+    Write-Host "7. Run DB Migrations (flask db upgrade)"
+    Write-Host "8. Stop containers (Stop)"
+    Write-Host "9. Stop everything and Exit script"
     Write-Host "----------------------------------------"
     
-    $selection = Read-Host "Select an option (1-7)"
+    $selection = Read-Host "Select an option (1-9)"
 
     switch ($selection) {
         "1" {
@@ -85,6 +87,50 @@ while ($true) {
             }
         }
         "6" {
+            Write-Host "Generating new migration version..." -ForegroundColor Cyan
+            $migrationMessage = Read-Host "Introduce migration message:"
+            if ([string]::IsNullOrWhiteSpace($migrationMessage)) {
+                $migrationMessage = "auto-generated migration"
+            }
+            $composeFile = "docker-compose.yml"
+            $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
+            $debugRunning = docker ps -q -f "name=bitsXLaMarato_api_debug" 2>$null
+            if ($debugRunning) {
+                $composeFile = "docker-compose.debug.yml"
+                Write-Host "Debug mode detected. Building migration via debug stack..." -ForegroundColor Magenta
+            } elseif ($normalRunning) {
+                Write-Host "Normal mode detected. Building migration via dev stack..." -ForegroundColor Green
+            } else {
+                Write-Host "No running containers detected. Using standard compose file." -ForegroundColor Yellow
+            }
+            try {
+                docker-compose -f $composeFile run --rm api flask db migrate -m "$migrationMessage"
+                Write-Host "Migration created successfully." -ForegroundColor Green
+            } catch {
+                Write-Host "Error generating migration." -ForegroundColor Red
+            }
+        }
+        "7" {
+            Write-Host "Running database migrations..." -ForegroundColor Cyan
+            $composeFile = "docker-compose.yml"
+            $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
+            $debugRunning = docker ps -q -f "name=bitsXLaMarato_api_debug" 2>$null
+            if ($debugRunning) {
+                $composeFile = "docker-compose.debug.yml"
+                Write-Host "Debug mode detected. Applying migrations via debug stack..." -ForegroundColor Magenta
+            } elseif ($normalRunning) {
+                Write-Host "Normal mode detected. Applying migrations via dev stack..." -ForegroundColor Green
+            } else {
+                Write-Host "No running containers detected. Using standard compose file." -ForegroundColor Yellow
+            }
+            try {
+                docker-compose -f $composeFile run --rm api flask db upgrade
+                Write-Host "Migrations executed successfully." -ForegroundColor Green
+            } catch {
+                Write-Host "Error running migrations." -ForegroundColor Red
+            }
+        }
+        "8" {
             Write-Host "Stopping containers..." -ForegroundColor Magenta
             Write-Host "Detecting running containers..." -ForegroundColor Cyan
             $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
@@ -104,7 +150,7 @@ while ($true) {
                 Write-Host "Containers stopped." -ForegroundColor Green
             }
         }
-        "7" {
+        "9" {
             Write-Host "Shutting down and removing containers..." -ForegroundColor Red
             Write-Host "Detecting running containers..." -ForegroundColor Cyan
             $normalRunning = docker ps -q -f "name=bitsXLaMarato_api_dev" 2>$null
