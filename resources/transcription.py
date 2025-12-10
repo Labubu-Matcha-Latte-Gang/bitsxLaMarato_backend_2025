@@ -2,6 +2,7 @@ import os
 import subprocess
 import tempfile
 import json
+import binascii
 from flask import request, current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
@@ -146,7 +147,7 @@ class TranscriptionChunkResource(MethodView):
                     import base64
                     try:
                         header = base64.b64decode(first_chunk.analysis['webm_header'])
-                    except:
+                    except binascii.Error:
                         header = None
                 
                 if header:
