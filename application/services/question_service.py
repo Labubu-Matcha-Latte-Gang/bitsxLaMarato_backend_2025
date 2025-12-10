@@ -6,13 +6,15 @@ from typing import List
 
 from domain.entities.question import Question
 from domain.entities.user import Patient
-from domain.repositories import IQuestionRepository, IScoreRepository, ITranscriptionAnalysisRepository
+from domain.repositories import IQuestionRepository, IScoreRepository, ITranscriptionAnalysisRepository, IQuestionAnswerRepository
 from domain.services.recommendation import DailyQuestionFilterStrategy
 from domain.unit_of_work import IUnitOfWork
+from domain.entities.question_answer import QuestionAnswer
 from helpers.exceptions.question_exceptions import (
     QuestionCreationException,
     QuestionNotFoundException,
     QuestionUpdateException,
+    QuestionAnswerPersistenceException,
 )
 
 
@@ -23,11 +25,13 @@ class QuestionService:
         uow: IUnitOfWork,
         score_repo: IScoreRepository,
         transcription_repo: ITranscriptionAnalysisRepository,
+        question_answer_repo: IQuestionAnswerRepository,
     ) -> None:
         self.question_repo = question_repo
         self.uow = uow
         self.score_repo = score_repo
         self.transcription_repo = transcription_repo
+        self.question_answer_repo = question_answer_repo
 
     def create_questions(self, payloads: List[dict]) -> List[Question]:
         try:
@@ -83,6 +87,45 @@ class QuestionService:
         with self.uow:
             self.question_repo.remove(question)
             self.uow.commit()
+
+    def record_answer(
+        self,
+        patient: Patient,
+        question_id: uuid.UUID,
+        answer_text: str,
+        analysis: dict[str, float] | None = None,
+    ) -> QuestionAnswer:
+        """
+        Persist the patient's answer to a question along with analysed metrics.
+        """
+        question = self.question_repo.get(question_id)
+        if not question:
+            raise QuestionNotFoundException(
+                f"No s'ha trobat cap pregunta amb l'ID {question_id}."
+            )
+
+        if not answer_text or not answer_text.strip():
+            raise QuestionAnswerPersistenceException("La resposta transcrita és buida.")
+
+        metrics = analysis or {}
+        try:
+            with self.uow:
+                answer = self.question_answer_repo.record_answer(
+                    patient=patient,
+                    question=question,
+                    answer_text=answer_text.strip(),
+                    analysis=metrics,
+                )
+                # Guardar també les mètriques agregades perquè les estratègies les puguin reutilitzar.
+                self.transcription_repo.record_session(patient.email, metrics)
+                self.uow.commit()
+            return answer
+        except QuestionNotFoundException:
+            raise
+        except Exception as exc:
+            raise QuestionAnswerPersistenceException(
+                f"No s'ha pogut guardar la resposta del pacient: {str(exc)}"
+            ) from exc
 
     def get_daily_question(self, patient: Patient, strategy: DailyQuestionFilterStrategy | None = None) -> Question:
         if not strategy:
