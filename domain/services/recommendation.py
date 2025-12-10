@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, TYPE_CHECKING
+from helpers.enums.question_types import QuestionType
 
 if TYPE_CHECKING:
     from domain.entities.user import Patient
     from domain.repositories.interfaces import IScoreRepository, ITranscriptionAnalysisRepository
-    from helpers.enums.question_types import QuestionType
 
 class ActivityFilterStrategy(ABC):
     """
