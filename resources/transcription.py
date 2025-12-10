@@ -2,6 +2,8 @@ import os
 import subprocess
 import tempfile
 import json
+import binascii
+import base64
 from flask import request, current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
@@ -143,10 +145,9 @@ class TranscriptionChunkResource(MethodView):
                 header = None
                 if first_chunk and first_chunk.analysis and 'webm_header' in first_chunk.analysis:
                     # El header está guardado como base64 en el análisis del primer chunk
-                    import base64
                     try:
                         header = base64.b64decode(first_chunk.analysis['webm_header'])
-                    except:
+                    except binascii.Error:
                         header = None
                 
                 if header:
@@ -394,7 +395,6 @@ class TranscriptionChunkResource(MethodView):
 
             # Si es el primer chunk y tenemos header WebM guardado, agregarlo al análisis
             if chunk_index == 0 and hasattr(self, '_temp_header_data'):
-                import base64
                 combined_metrics['webm_header'] = base64.b64encode(self._temp_header_data).decode('utf-8')
                 delattr(self, '_temp_header_data')  # Limpiar después de usar
 
