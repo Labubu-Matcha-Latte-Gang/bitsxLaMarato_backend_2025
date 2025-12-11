@@ -376,6 +376,31 @@ class PatientSearchResponseSchema(Schema):
     )
 
 
+class DoctorPatientBulkSchema(Schema):
+    """
+    Cos per afegir o eliminar múltiples pacients associats a un metge.
+    """
+
+    class Meta:
+        description = "Permet indicar una llista de pacients sobre els quals aplicar l'operació."
+        example = {"patients": ["anna@example.com", "jordi@example.com"]}
+
+    patients = fields.List(
+        fields.Email(
+            required=True,
+            metadata={
+                "description": "Correu electrònic del pacient.",
+                "example": "pacient@example.com",
+            },
+        ),
+        required=True,
+        validate=validate.Length(min=1, max=50),
+        metadata={
+            "description": "Llista de pacients sobre els quals aplicar l'operació (entre 1 i 50 elements).",
+        },
+    )
+
+
 class UserUpdateSchema(Schema):
     """
     Esquema per a actualitzacions completes de l'usuari (PUT).
