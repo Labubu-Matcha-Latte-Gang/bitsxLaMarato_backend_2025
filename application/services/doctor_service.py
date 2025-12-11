@@ -211,4 +211,5 @@ class DoctorService:
                 return Gender(value)
             except ValueError:
                 return Gender[value.upper()]
-        raise ValueError("Gènere no vàlid.")
+        accepted_values = ", ".join([g.value for g in Gender])
+        raise ValueError(f"Gènere no vàlid. Valors acceptats: {accepted_values}.")
