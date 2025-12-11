@@ -4,7 +4,7 @@ from pathlib import Path
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import Response, jsonify
+from flask import Response, jsonify, g
 from werkzeug.exceptions import HTTPException
 
 from db import db
@@ -97,10 +97,10 @@ class PatientRegister(MethodView):
             factory = ServiceFactory.get_instance()
             user_service = factory.build_user_service()
             patient = user_service.register_patient(data)
-            access_token = user_service.login(data["email"], data["password"])
+            login_payload = user_service.login(data["email"], data["password"])
 
             patient_payload = patient.to_dict()
-            patient_payload["access_token"] = access_token
+            patient_payload["access_token"] = login_payload["access_token"]
 
             return jsonify(patient_payload), 201
         except KeyError as e:
@@ -179,10 +179,10 @@ class DoctorRegister(MethodView):
             factory = ServiceFactory.get_instance()
             user_service = factory.build_user_service()
             doctor = user_service.register_doctor(data)
-            access_token = user_service.login(data["email"], data["password"])
+            login_payload = user_service.login(data["email"], data["password"])
 
             doctor_payload = doctor.to_dict()
-            doctor_payload["access_token"] = access_token
+            doctor_payload["access_token"] = login_payload["access_token"]
 
             return jsonify(doctor_payload), 201
         except KeyError as e:
@@ -441,8 +441,8 @@ class UserLogin(MethodView):
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
 
             user_service = ServiceFactory.get_instance().build_user_service()
-            access_token = user_service.login(data["email"], data["password"])
-            return {"access_token": access_token}, 200
+            login_payload = user_service.login(data["email"], data["password"])
+            return login_payload, 200
         except UserNotFoundException as e:
             self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
             abort(401, message="Correu o contrassenya no vàlids.")
@@ -487,19 +487,30 @@ class UserLogin(MethodView):
         - 422: El paràmetre de consulta no supera la validació d'esquema.
         - 500: Error inesperat durant l'autenticació.
         """
+        email = get_jwt_identity()
         try:
-            email = get_jwt_identity()
             self.logger.info("User token refresh attempt", module="UserLogin", metadata={"email": email})
 
             user_service = ServiceFactory.get_instance().build_user_service()
+            current_user = getattr(g, "current_user", None)
+            if current_user is None:
+                current_user = user_service.get_user(email)
+
             access_token = user_service.refresh_token(email, query_params.get("hours_validity", None))
-            return {"access_token": access_token}, 200
+            payload = {
+                "access_token": access_token,
+                "already_responded_today": user_service.has_answered_daily_question_today(current_user),
+            }
+            return payload, 200
         except ExpiredTokenException as e:
             self.logger.error("User token refresh failed: Token expired", module="UserLogin", metadata={"email": email}, error=e)
             abort(401, message="El token ha caducat.")
         except InvalidTokenException as e:
             self.logger.error("User token refresh failed: Invalid token", module="UserLogin", metadata={"email": email}, error=e)
             abort(401, message="Token no vàlid.")
+        except UserNotFoundException as e:
+            self.logger.error("User token refresh failed: User not found", module="UserLogin", metadata={"email": email}, error=e)
+            abort(401, message="Token d'autenticació no vàlid.")
         except UserRoleConflictException as e:
             self.logger.error("User token refresh failed: Role conflict", module="UserLogin", metadata={"email": email}, error=e)
             abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
