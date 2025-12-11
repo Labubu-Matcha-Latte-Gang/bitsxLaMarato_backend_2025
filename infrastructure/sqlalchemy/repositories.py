@@ -281,7 +281,7 @@ class SQLAlchemyPatientRepository(IPatientRepository):
         if not normalized:
             return []
 
-        safe_limit = max(1, min(limit, 50))
+        safe_limit = max(1, limit)
         pattern = f"%{normalized.lower()}%"
 
         patients_query = self.session.query(Patient).filter(
