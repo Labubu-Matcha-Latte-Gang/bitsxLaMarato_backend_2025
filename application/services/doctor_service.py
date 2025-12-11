@@ -50,6 +50,7 @@ class DoctorService:
             password_hash=self.hasher.hash(data["password"]),
             name=data["name"],
             surname=data["surname"],
+            gender=data["gender"],
             patients=patients,
         )
 
@@ -81,6 +82,7 @@ class DoctorService:
         doctor = self.get_doctor(email)
 
         patients_list = update_data.get("patients")
+        previous_patients = {}
         if patients_list is not None:
             normalized = patients_list or []
             # Validate referenced patients before mutating the aggregate.
