@@ -488,3 +488,22 @@ class IQuestionAnswerRepository(ABC):
                 to ``datetime.utcnow`` when omitted.
         """
         raise NotImplementedError()
+
+    @abstractmethod
+    def has_answered_today(
+        self,
+        patient_email: str,
+        reference_time: Optional[datetime] = None,
+    ) -> bool:
+        """
+        Check whether the patient has answered any question during the current day.
+
+        Args:
+            patient_email (str): Unique identifier of the patient.
+            reference_time (datetime, optional): Timestamp used to determine the
+                current day. Defaults to ``datetime.now(timezone.utc)`` when omitted.
+
+        Returns:
+            bool: True if the patient has at least one answer registered for the day.
+        """
+        raise NotImplementedError()
