@@ -732,6 +732,27 @@ class UserLoginResponseSchema(Schema):
         },
     )
 
+class UserTokenRefreshSchema(Schema):
+    """
+    Esquema per a les dades de refresc del token d'usuari.
+    """
+
+    class Meta:
+        description = "Paràmetres per refrescar el token JWT d'un usuari."
+        example = {
+            "hours_validity": 2.5
+        }
+
+    hours_validity = fields.Float(
+        required=False,
+        load_default=672,
+        validate=validate.Range(min=1.0),
+        metadata={
+            "description": "Nombre d'hores addicionals de validesa per al nou token JWT. Per defecte, 672 hores (28 dies). Com a mínim, 1 hora.",
+            "example": 672,
+        },
+    )
+
 
 class UserRegisterResponseSchema(UserResponseSchema):
     """
