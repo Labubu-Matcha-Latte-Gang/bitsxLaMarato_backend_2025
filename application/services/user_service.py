@@ -46,6 +46,7 @@ class PatientRolePayload(TypedDict):
 
 class DoctorRolePayload(TypedDict):
     """Doctor role-specific data."""
+    gender: str
     patients: list[str]
 
 class AdminRolePayload(TypedDict):
