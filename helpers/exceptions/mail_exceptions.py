@@ -1,7 +1,9 @@
-class SendEmailException(Exception):
-    """Exception raised for errors in the email sending process."""
-    pass
+from helpers.exceptions.base import ApplicationException
 
-class SMTPCredentialsException(Exception):
+
+class SendEmailException(ApplicationException):
+    """Exception raised for errors in the email sending process."""
+
+
+class SMTPCredentialsException(ApplicationException):
     """Exception raised for SMTP credential related errors."""
-    pass
