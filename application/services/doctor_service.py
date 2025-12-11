@@ -190,5 +190,5 @@ class DoctorService:
             if lowered in seen:
                 continue
             seen.add(lowered)
-            ordered.append(email)
+            ordered.append(lowered)
         return ordered
