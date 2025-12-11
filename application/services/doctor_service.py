@@ -162,7 +162,7 @@ class DoctorService:
         doctor = self.get_doctor(doctor_email)
         normalized = self._normalize_emails(patient_emails)
         if not normalized:
-            return doctor
+            raise UserNotFoundException("No s'ha proporcionat cap correu electrònic de pacient vàlid per eliminar l'associació.")
 
         patients = self.patient_repo.fetch_by_emails(normalized)
 
