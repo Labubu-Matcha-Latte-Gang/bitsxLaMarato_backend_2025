@@ -93,7 +93,14 @@ class GraphFilePayload(TypedDict):
     content: str
 
 class LoginResult(TypedDict):
-    """Payload returned after authenticating a user."""
+    """
+    Payload returned after authenticating a user.
+
+    Fields:
+        access_token: JWT token for the authenticated session.
+        already_responded_today: Indicates whether a patient has answered their daily question today.
+            For non-patient users, this is always False.
+    """
     access_token: str
     already_responded_today: bool
 
