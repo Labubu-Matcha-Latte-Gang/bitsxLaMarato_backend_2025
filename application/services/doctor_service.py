@@ -131,12 +131,14 @@ class DoctorService:
 
     def add_patients(self, doctor_email: str, patient_emails: list[str]) -> Doctor:
         """
-        Associate multiple patients with a doctor, keeping bidirectional links.
+        Associa múltiples pacients a un doctor, mantenint els enllaços bidireccionals.
+
+        Si la llista d'emails de pacients és buida o no conté cap email vàlid, es llança una excepció amb un missatge en català.
         """
         doctor = self.get_doctor(doctor_email)
         normalized = self._normalize_emails(patient_emails)
         if not normalized:
-            return doctor
+            raise UserNotFoundException("No s'ha trobat cap email de pacient vàlid per associar al doctor.")
 
         patients = self.patient_repo.fetch_by_emails(normalized)
 
