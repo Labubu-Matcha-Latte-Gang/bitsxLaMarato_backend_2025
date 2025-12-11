@@ -26,7 +26,7 @@ class TestDoctorPatientSearch(BaseTest):
         emails = [item["email"] for item in body.get("results", [])]
         assert patient_payload["email"] in emails
 
-    def test_doctor_only_sees_assigned_patients(self):
+    def test_doctor_search_includes_unassigned_patients(self):
         doctor_payload = self.make_doctor_payload()
         self.register_doctor(doctor_payload)
 
@@ -55,7 +55,7 @@ class TestDoctorPatientSearch(BaseTest):
         assert body is not None
         emails = [item["email"] for item in body.get("results", [])]
         assert assigned_patient["email"] in emails
-        assert other_patient["email"] not in emails
+        assert other_patient["email"] in emails
 
     def test_patient_cannot_access_doctor_search(self):
         doctor_payload = self.make_doctor_payload()

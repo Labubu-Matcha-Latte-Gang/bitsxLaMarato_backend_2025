@@ -3,7 +3,9 @@ from __future__ import annotations
 from domain.entities.user import Doctor, Patient
 from domain.repositories import IDoctorRepository, IPatientRepository, IUserRepository
 from domain.services.security import PasswordHasher
+from domain.strategies import IGenderParserStrategy
 from domain.unit_of_work import IUnitOfWork
+from helpers.enums.gender import Gender
 from helpers.exceptions.user_exceptions import (
     UserAlreadyExistsException,
     UserNotFoundException,
@@ -25,12 +27,14 @@ class DoctorService:
         patient_repo: IPatientRepository,
         uow: IUnitOfWork,
         hasher: PasswordHasher,
+        gender_parser: IGenderParserStrategy,
     ) -> None:
         self.user_repo = user_repo
         self.doctor_repo = doctor_repo
         self.patient_repo = patient_repo
         self.uow = uow
         self.hasher = hasher
+        self.gender_parser = gender_parser
 
     def register_doctor(self, data: dict) -> Doctor:
         """
@@ -45,11 +49,13 @@ class DoctorService:
         if patient_emails:
             patients = self.patient_repo.fetch_by_emails(patient_emails)
 
+        gender = self.gender_parser.parse(data["gender"])
         doctor = Doctor(
             email=email,
             password_hash=self.hasher.hash(data["password"]),
             name=data["name"],
             surname=data["surname"],
+            gender=gender,
             patients=patients,
         )
 
@@ -80,18 +86,23 @@ class DoctorService:
         """
         doctor = self.get_doctor(email)
 
-        patients_list = update_data.get("patients")
+        sanitized_updates = dict(update_data)
+        patients_list = sanitized_updates.get("patients")
+        previous_patients = {}
         if patients_list is not None:
             normalized = patients_list or []
             # Validate referenced patients before mutating the aggregate.
             patients = self.patient_repo.fetch_by_emails(normalized)
             previous_patients = {p.email: p for p in doctor.patients}
             doctor.replace_patients(patients)
-            update_data = {k: v for k, v in update_data.items() if k != "patients"}
+            sanitized_updates = {k: v for k, v in sanitized_updates.items() if k != "patients"}
         else:
             patients = None
 
-        doctor.set_properties(update_data, self.hasher)
+        if "gender" in sanitized_updates and sanitized_updates["gender"] is not None:
+            sanitized_updates["gender"] = self.gender_parser.parse(sanitized_updates["gender"])
+
+        doctor.set_properties(sanitized_updates, self.hasher)
 
         with self.uow:
             if patients is not None:

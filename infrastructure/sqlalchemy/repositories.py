@@ -129,6 +129,7 @@ class SQLAlchemyUserRepository(IUserRepository):
                 password=user.password_hash,
                 name=user.name,
                 surname=user.surname,
+                gender=user.gender,
                 role=UserRole.DOCTOR,
             )
             model.patients = self._fetch_patients(user.patient_emails)
@@ -160,6 +161,7 @@ class SQLAlchemyUserRepository(IUserRepository):
         elif isinstance(user, DoctorDomain):
             if not isinstance(model, Doctor):
                 raise UserRoleConflictException("El rol d'usuari no correspon amb metge.")
+            model.gender = user.gender
             model.patients = self._fetch_patients(user.patient_emails)
         elif isinstance(user, AdminDomain):
             if not isinstance(model, Admin):
@@ -232,6 +234,7 @@ class SQLAlchemyUserRepository(IUserRepository):
             password_hash=model.password,
             name=model.name,
             surname=model.surname,
+            gender=model.gender,
             patients=patients,  # type: ignore[arg-type]
         )
 

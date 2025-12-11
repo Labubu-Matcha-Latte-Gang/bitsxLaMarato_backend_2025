@@ -46,6 +46,7 @@ class PatientRolePayload(TypedDict):
 
 class DoctorRolePayload(TypedDict):
     """Doctor role-specific data."""
+    gender: str
     patients: list[str]
 
 class AdminRolePayload(TypedDict):
@@ -304,6 +305,15 @@ class UserService:
             raise PermissionError("No tens permís per accedir a les dades d'aquest pacient.")
 
         patient_payload = patient.to_dict()
+        doctor_details = [
+            {
+                "name": doctor.name,
+                "surname": doctor.surname,
+                "gender": doctor.gender.value if doctor.gender else None,
+            }
+            for doctor in patient.doctors
+        ]
+        patient_payload.setdefault("role", {})["doctor_details"] = doctor_details
 
         try:
             score_objects = self.score_repo.list_by_patient(patient.email)

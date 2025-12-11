@@ -73,6 +73,9 @@ class UserResponseSchema(Schema):
                 "height_cm": 168.5,
                 "weight_kg": 64.3,
                 "doctors": ["dr.house@example.com"],
+                "doctor_details": [
+                    {"name": "Gregory", "surname": "House", "gender": "male"}
+                ],
             },
         }
 
@@ -102,7 +105,8 @@ class UserResponseSchema(Schema):
         metadata={
             "description": (
                 "Dades específiques del rol. Per als pacients: ailments, gender, age, treatments, "
-                "height_cm, weight_kg, doctors (correus). Per als metges: patients (correus). "
+                "height_cm, weight_kg, doctors (correus) i doctor_details (nom, cognom, gender) si estan disponibles. "
+                "Per als metges: gender i patients (correus). "
                 "Per als administradors: objecte buit."
             ),
             "example": {
@@ -768,9 +772,20 @@ class DoctorRegisterSchema(UserRegisterSchema):
             "surname": "Font",
             "email": "anna.font@example.com",
             "password": "AnnaMetge1",
+            "gender": "female",
             "patients": ["pacient1@example.com", "pacient2@example.com"],
         }
 
+    gender = fields.Enum(
+        Gender,
+        required=True,
+        by_value=True,
+        metadata={
+            "description": f"Gènere del metge. Valors acceptats: {', '.join(GENDER_VALUES)}.",
+            "enum": GENDER_VALUES,
+            "example": "female",
+        },
+    )
     patients = fields.List(
         fields.Email(),
         required=False,

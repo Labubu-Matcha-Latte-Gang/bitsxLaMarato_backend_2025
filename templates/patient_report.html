@@ -246,8 +246,15 @@
 
     <p><strong>Equip Mèdic Responsable:</strong></p>
     <ul>
-        {% for doctor in data.patient.role.doctors %}
-            <li>Dr./Dra. {{ doctor }}</li>
+        {% for doctor in data.patient.role.doctor_details | default([]) %}
+            {% if doctor.gender == "male" %}
+                {% set prefix = "Dr." %}
+            {% elif doctor.gender == "female" %}
+                {% set prefix = "Dra." %}
+            {% else %}
+                {% set prefix = "Dr./Dra." %}
+            {% endif %}
+            <li>{{ prefix }} {{ doctor.name }} {{ doctor.surname }}</li>
         {% else %}
             <li>No assignat</li>
         {% endfor %}
