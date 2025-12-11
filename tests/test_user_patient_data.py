@@ -64,13 +64,23 @@ class TestUserPatientData(BaseTest):
         assert response.status_code == 200
         body = response.get_json()
         graphs = body.get("graph_files", [])
-        assert len(graphs) == 1  # one per activity type
-        graph_file = graphs[0]
-        assert graph_file["content_type"] == "text/html"
-        decoded = base64.b64decode(graph_file["content"]).decode("utf-8")
-        assert decoded.startswith("<div id=")
-        assert "Plotly.newPlot" in decoded
-        assert "<html" not in decoded.lower()
+        assert len(graphs) >= 4  # score, bar by type, speed, composite progress
+
+        filenames = {graph["filename"] for graph in graphs}
+        expected = {
+            "scores_speed.html",
+            "scores_by_question_type.html",
+            "speed_speed.html",
+            "progress_composite.html",
+        }
+        assert expected.issubset(filenames)
+
+        for graph_file in graphs:
+            assert graph_file["content_type"] == "text/html"
+            decoded = base64.b64decode(graph_file["content"]).decode("utf-8")
+            assert decoded.startswith("<div id=")
+            assert "Plotly.newPlot" in decoded
+            assert "<html" not in decoded.lower()
 
     def test_assigned_doctor_can_get_patient_data(self):
         doctor_user = self.create_doctor_model()
