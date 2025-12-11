@@ -281,7 +281,7 @@ class SQLAlchemyPatientRepository(IPatientRepository):
         if not normalized:
             return []
 
-        safe_limit = max(1, min(limit, 50))
+        safe_limit = max(1, limit)
         # Escape LIKE wildcards to treat them as literal characters
         escaped_query = normalized.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped_query}%"
