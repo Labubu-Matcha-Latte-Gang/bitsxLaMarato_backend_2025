@@ -394,9 +394,9 @@ class DoctorPatientBulkSchema(Schema):
             },
         ),
         required=True,
-        validate=validate.Length(min=1, max=50),
+        validate=validate.Length(min=0, max=50),
         metadata={
-            "description": "Llista de pacients sobre els quals aplicar l'operació (entre 1 i 50 elements).",
+            "description": "Llista de pacients sobre els quals aplicar l'operació (fins a 50 elements).",
         },
     )
 
