@@ -140,11 +140,12 @@ class TestUserTokenRefresh(BaseTest):
             decoded = decode_token(new_token)
             exp_timestamp = decoded["exp"]
             iat_timestamp = decoded["iat"]
-            
+
             # Calculate the difference in hours
             exp_time = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
             iat_time = datetime.fromtimestamp(iat_timestamp, tz=timezone.utc)
             duration_hours = (exp_time - iat_time).total_seconds() / 3600
-            
-            # Allow a small tolerance for timing differences (within 1 minute)
-            assert abs(duration_hours - 672) < 0.017, f"Expected ~672 hours, got {duration_hours}"
+
+            # Allow a small tolerance for timing differences (within 1 minute = 1/60 hour)
+            tolerance_hours = 1 / 60
+            assert abs(duration_hours - 672) < tolerance_hours, f"Expected ~672 hours, got {duration_hours}"
