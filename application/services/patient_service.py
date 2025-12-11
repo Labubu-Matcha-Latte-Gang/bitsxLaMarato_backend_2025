@@ -3,6 +3,7 @@ from __future__ import annotations
 from domain.entities.user import Patient
 from domain.repositories import IDoctorRepository, IPatientRepository, IUserRepository
 from domain.services.security import PasswordHasher
+from domain.strategies import IGenderParserStrategy
 from domain.unit_of_work import IUnitOfWork
 from helpers.enums.gender import Gender
 from helpers.exceptions.user_exceptions import (
@@ -26,12 +27,14 @@ class PatientService:
         doctor_repo: IDoctorRepository,
         uow: IUnitOfWork,
         hasher: PasswordHasher,
+        gender_parser: IGenderParserStrategy,
     ) -> None:
         self.user_repo = user_repo
         self.patient_repo = patient_repo
         self.doctor_repo = doctor_repo
         self.uow = uow
         self.hasher = hasher
+        self.gender_parser = gender_parser
 
     def register_patient(self, data: dict) -> Patient:
         """
@@ -46,7 +49,7 @@ class PatientService:
         if doctor_emails:
             doctors = self.doctor_repo.fetch_by_emails(doctor_emails)
 
-        gender = self._parse_gender(data["gender"])
+        gender = self.gender_parser.parse(data["gender"])
         patient = Patient(
             email=email,
             password_hash=self.hasher.hash(data["password"]),
@@ -107,7 +110,7 @@ class PatientService:
             doctors = None
 
         if "gender" in sanitized_updates and sanitized_updates["gender"] is not None:
-            sanitized_updates["gender"] = self._parse_gender(sanitized_updates["gender"])
+            sanitized_updates["gender"] = self.gender_parser.parse(sanitized_updates["gender"])
 
         patient.set_properties(sanitized_updates, self.hasher)
 
@@ -131,14 +134,3 @@ class PatientService:
             self.uow.commit()
 
         return patient
-
-    @staticmethod
-    def _parse_gender(value: Gender | str) -> Gender:
-        if isinstance(value, Gender):
-            return value
-        if isinstance(value, str):
-            try:
-                return Gender(value)
-            except ValueError:
-                return Gender[value.upper()]
-        raise ValueError("Gènere no vàlid.")

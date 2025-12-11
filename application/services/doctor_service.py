@@ -3,6 +3,7 @@ from __future__ import annotations
 from domain.entities.user import Doctor, Patient
 from domain.repositories import IDoctorRepository, IPatientRepository, IUserRepository
 from domain.services.security import PasswordHasher
+from domain.strategies import IGenderParserStrategy
 from domain.unit_of_work import IUnitOfWork
 from helpers.enums.gender import Gender
 from helpers.exceptions.user_exceptions import (
@@ -26,12 +27,14 @@ class DoctorService:
         patient_repo: IPatientRepository,
         uow: IUnitOfWork,
         hasher: PasswordHasher,
+        gender_parser: IGenderParserStrategy,
     ) -> None:
         self.user_repo = user_repo
         self.doctor_repo = doctor_repo
         self.patient_repo = patient_repo
         self.uow = uow
         self.hasher = hasher
+        self.gender_parser = gender_parser
 
     def register_doctor(self, data: dict) -> Doctor:
         """
@@ -46,7 +49,7 @@ class DoctorService:
         if patient_emails:
             patients = self.patient_repo.fetch_by_emails(patient_emails)
 
-        gender = self._parse_gender(data["gender"])
+        gender = self.gender_parser.parse(data["gender"])
         doctor = Doctor(
             email=email,
             password_hash=self.hasher.hash(data["password"]),
@@ -97,7 +100,7 @@ class DoctorService:
             patients = None
 
         if "gender" in sanitized_updates and sanitized_updates["gender"] is not None:
-            sanitized_updates["gender"] = self._parse_gender(sanitized_updates["gender"])
+            sanitized_updates["gender"] = self.gender_parser.parse(sanitized_updates["gender"])
 
         doctor.set_properties(sanitized_updates, self.hasher)
 
@@ -201,15 +204,3 @@ class DoctorService:
             seen.add(lowered)
             ordered.append(lowered)
         return ordered
-
-    @staticmethod
-    def _parse_gender(value: Gender | str) -> Gender:
-        if isinstance(value, Gender):
-            return value
-        if isinstance(value, str):
-            try:
-                return Gender(value)
-            except ValueError:
-                return Gender[value.upper()]
-        accepted_values = ", ".join([g.value for g in Gender])
-        raise ValueError(f"Gènere no vàlid. Valors acceptats: {accepted_values}.")
