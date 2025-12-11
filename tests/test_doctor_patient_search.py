@@ -175,7 +175,7 @@ class TestDoctorPatientSearch(BaseTest):
         token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
         response = self.client.post(
             f"{self.api_prefix}/user/doctor/patients/assign",
-            json={"patients": [patient_payload["email"], patient_payload["email"], patient_payload["email"]]},
+            json={"patients": [patient_payload["email"]] * 3},
             headers=self.auth_headers(token),
         )
 
