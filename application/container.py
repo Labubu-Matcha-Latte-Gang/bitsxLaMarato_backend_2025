@@ -44,6 +44,8 @@ class ServiceFactory:
 
     def __init__(self, session: Optional[Session] = None):
         self.session: Session = session or db.session
+        # Shared stateless strategies
+        self.gender_parser = GenderParserStrategy()
 
     @classmethod
     def get_instance(cls, session: Optional[Session] = None, refresh: bool = False) -> 'ServiceFactory':
@@ -70,7 +72,6 @@ class ServiceFactory:
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
         token_service = TokenService()
-        gender_parser = GenderParserStrategy()
 
         user_repo = SQLAlchemyUserRepository(self.session)
         # Build subordinate services
@@ -80,7 +81,7 @@ class ServiceFactory:
             doctor_repo=SQLAlchemyDoctorRepository(self.session),
             uow=SQLAlchemyUnitOfWork(self.session),
             hasher=hasher,
-            gender_parser=gender_parser,
+            gender_parser=self.gender_parser,
         )
         doctor_service = DoctorService(
             user_repo=user_repo,
@@ -88,7 +89,7 @@ class ServiceFactory:
             patient_repo=SQLAlchemyPatientRepository(self.session),
             uow=SQLAlchemyUnitOfWork(self.session),
             hasher=hasher,
-            gender_parser=gender_parser,
+            gender_parser=self.gender_parser,
         )
         admin_service = AdminService(
             user_repo=user_repo,
@@ -159,7 +160,6 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
-        gender_parser = GenderParserStrategy()
         user_repo = SQLAlchemyUserRepository(self.session)
         patient_repo = SQLAlchemyPatientRepository(self.session)
         doctor_repo = SQLAlchemyDoctorRepository(self.session)
@@ -169,7 +169,7 @@ class ServiceFactory:
             doctor_repo=doctor_repo,
             uow=uow,
             hasher=hasher,
-            gender_parser=gender_parser,
+            gender_parser=self.gender_parser,
         )
 
     def build_doctor_service(self) -> DoctorService:
@@ -180,7 +180,6 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
-        gender_parser = GenderParserStrategy()
         user_repo = SQLAlchemyUserRepository(self.session)
         doctor_repo = SQLAlchemyDoctorRepository(self.session)
         patient_repo = SQLAlchemyPatientRepository(self.session)
@@ -190,7 +189,7 @@ class ServiceFactory:
             patient_repo=patient_repo,
             uow=uow,
             hasher=hasher,
-            gender_parser=gender_parser,
+            gender_parser=self.gender_parser,
         )
 
     def build_admin_service(self) -> AdminService:
