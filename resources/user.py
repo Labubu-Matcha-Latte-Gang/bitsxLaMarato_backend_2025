@@ -45,6 +45,8 @@ from schemas import (
     UserPartialUpdateSchema,
     UserForgotPasswordSchema,
     PatientDataResponseSchema,
+    PatientSearchQuerySchema,
+    PatientSearchResponseSchema,
 )
 
 blp = Blueprint('user', __name__, description="Operacions relacionades amb els usuaris")
@@ -213,6 +215,74 @@ class DoctorRegister(MethodView):
             db.session.rollback()
             self.logger.error("Doctor register failed", module="DoctorRegister", error=e)
             abort(500, message=f"S'ha produït un error inesperat en registrar el metge: {str(e)}")
+
+@blp.route('/doctor/patients/search')
+class DoctorPatientSearch(MethodView):
+    """
+    Endpoint perquè els metges cerquin pacients assignats per nom/cognom parcial.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.DOCTOR])
+    @blp.arguments(PatientSearchQuerySchema, location='query')
+    @blp.doc(
+        summary="Cercar pacients assignats",
+        description="Permet als metges recuperar la llista de pacients assignats filtrant per un fragment del nom o del cognom.",
+    )
+    @blp.response(200, schema=PatientSearchResponseSchema, description="Resultats de la cerca retornats correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no té rol de metge.")
+    @blp.response(404, description="Metge no trobat.")
+    @blp.response(422, description="Els paràmetres de consulta no han superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en cercar pacients.")
+    def get(self, query_params: dict) -> Response:
+        """
+        Retorna la llista de pacients assignats que coincideixen parcialment amb el fragment subministrat.
+        """
+        query_fragment = query_params["q"]
+        limit = query_params["limit"]
+        doctor_email = get_jwt_identity()
+
+        try:
+            factory = ServiceFactory.get_instance()
+            user_service = factory.build_user_service()
+            try:
+                user_service.get_user(doctor_email)
+            except UserNotFoundException:
+                abort(401, message="Token d'autenticació no vàlid.")
+
+            self.logger.info(
+                "Searching patients by name",
+                module="DoctorPatientSearch",
+                metadata={"doctor_email": doctor_email, "query": query_fragment, "limit": limit},
+            )
+
+            doctor_service = factory.build_doctor_service()
+            patients = doctor_service.search_patients(doctor_email, query_fragment, limit)
+            payload = {
+                "query": query_fragment,
+                "results": [patient.to_dict() for patient in patients],
+            }
+            return jsonify(payload), 200
+        except UserNotFoundException as e:
+            self.logger.error(
+                "Doctor not found when searching patients",
+                module="DoctorPatientSearch",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error during patient search",
+                module="DoctorPatientSearch",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error inesperat en cercar pacients: {str(e)}")
 
 @blp.route('/login')
 class UserLogin(MethodView):
