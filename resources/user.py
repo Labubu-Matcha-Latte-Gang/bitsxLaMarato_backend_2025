@@ -281,7 +281,6 @@ class UserLogin(MethodView):
         description="Autentica un JWT i emet un altre token JWT.",
     )
     @blp.response(200, schema=UserLoginResponseSchema, description="Token JWT emès amb credencials vàlides.")
-    @blp.response(400, description="Nombre d'hores de validesa no vàlid.")
     @blp.response(401, description="Token no vàlid o caducat.")
     @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari durant l'inici de sessió.")
     @blp.response(422, description="El paràmetre de consulta no ha superat la validació.")
@@ -295,7 +294,6 @@ class UserLogin(MethodView):
 
         Codis d'estat:
         - 200: Token refrescat; retorna el nou token JWT.
-        - 400: Paràmetre d'hores de validesa no vàlid.
         - 401: Credencials no vàlides.
         - 409: Estat de rol inconsistent.
         - 422: El paràmetre de consulta no supera la validació d'esquema.
