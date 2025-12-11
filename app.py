@@ -289,6 +289,11 @@ def create_app(settings_module: str = 'globals') -> Flask:
         logger = AbstractLogger.get_instance()
         
         error_description = getattr(error, 'description', str(error))
+        error_data = getattr(error, 'data', None)
+        if isinstance(error_data, dict):
+            data_message = error_data.get("message")
+            if data_message:
+                error_description = str(data_message)
         logger.error(f"App-level 400 error: {error_description}", module="App")
         
         # Specific handling for the problematic frontend WebM parsing error
