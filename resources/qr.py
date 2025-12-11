@@ -4,6 +4,7 @@ from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import IntegrityError
 from zoneinfo import ZoneInfo
+from werkzeug.exceptions import HTTPException
 
 from application.services.qr_service import QRPayload
 from db import db
@@ -131,6 +132,9 @@ class QRResource(MethodView):
             db.session.rollback()
             self.logger.error("Error en la generació del PDF per al codi QR", module="QRResource", error=e)
             abort(500, message=str(e))
+        except HTTPException:
+            # Re-raise HTTP errors triggered by abort without converting them to 500s
+            raise
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en generar codi QR", module="QRResource", error=e)
