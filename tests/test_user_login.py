@@ -158,6 +158,9 @@ class TestUserTokenRefresh(BaseTest):
         admin_user = self.create_admin()
         original_token = self.login_and_get_token(admin_user.email, self.default_password)
 
+        from datetime import datetime, timezone
+        from flask_jwt_extended import decode_token
+
         response = self.client.get(
             f"{self.api_prefix}/user/login?hours_validity=2.5",
             headers=self.auth_headers(original_token),
@@ -173,7 +176,7 @@ class TestUserTokenRefresh(BaseTest):
         assert isinstance(new_token, str)
         assert new_token != original_token
 
-        # Verify the token has the default expiration of 672 hours (28 days)
+        # Verify the token has the requested expiration window in hours
         with self.app.app_context():
             decoded = decode_token(new_token)
             exp_timestamp = decoded["exp"]
@@ -186,4 +189,5 @@ class TestUserTokenRefresh(BaseTest):
 
             # Allow a small tolerance for timing differences (within 1 minute = 1/60 hour)
             tolerance_hours = 1 / 60
-            assert abs(duration_hours - 672) < tolerance_hours, f"Expected ~672 hours, got {duration_hours}"
+            expected_hours = 2.5
+            assert abs(duration_hours - expected_hours) < tolerance_hours, f"Expected ~{expected_hours} hours, got {duration_hours}"
