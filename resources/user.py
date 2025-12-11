@@ -9,13 +9,11 @@ from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
-from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES, RESET_PASSWORD_FRONTEND_PATH
+from globals import RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
-from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
 from helpers.exceptions.user_exceptions import (
     ExpiredTokenException,
-    InvalidResetCodeException,
     InvalidTokenException,
     UserAlreadyExistsException,
     InvalidCredentialsException,
@@ -24,14 +22,14 @@ from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
 )
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
-from infrastructure.sqlalchemy.unit_of_work import map_integrity_error, SQLAlchemyUnitOfWork
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 
 from helpers.enums.user_role import UserRole
 from application.container import ServiceFactory
-from helpers.email_service.adapter import AbstractEmailAdapter
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
+    DoctorPatientBulkSchema,
     UserForgotPasswordResponseSchema,
     UserLoginSchema,
     UserLoginResponseSchema,
@@ -283,6 +281,126 @@ class DoctorPatientSearch(MethodView):
                 error=e,
             )
             abort(500, message=f"S'ha produït un error inesperat en cercar pacients: {str(e)}")
+
+@blp.route('/doctor/patients/assign')
+class DoctorPatientAssign(MethodView):
+    """
+    Endpoint perquè els metges afegeixin pacients existents al seu panel.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.DOCTOR])
+    @blp.arguments(DoctorPatientBulkSchema, location='json')
+    @blp.doc(
+        summary="Afegir pacients al metge autenticat",
+        description="Rep una llista de correus de pacients i els associa al metge autenticat mantenint la relació bidireccional.",
+    )
+    @blp.response(200, schema=UserResponseSchema, description="Metge actualitzat amb els nous pacients associats.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no té rol de metge.")
+    @blp.response(404, description="Metge o pacients no trobats.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat en afegir pacients al metge.")
+    def post(self, payload: dict) -> Response:
+        doctor_email = get_jwt_identity()
+        patient_emails = payload["patients"]
+        try:
+            self.logger.info(
+                "Adding patients to doctor",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email, "patient_count": len(patient_emails)},
+            )
+
+            doctor_service = ServiceFactory.get_instance().build_doctor_service()
+            doctor = doctor_service.add_patients(doctor_email, patient_emails)
+            return jsonify(doctor.to_dict()), 200
+        except RelatedUserNotFoundException as e:
+            self.logger.error(
+                "Assign patients failed: Patient not found",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error(
+                "Assign patients failed: Doctor not found",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error while assigning patients",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error inesperat en afegir pacients: {str(e)}")
+
+@blp.route('/doctor/patients/unassign')
+class DoctorPatientUnassign(MethodView):
+    """
+    Endpoint perquè els metges eliminin pacients associats.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.DOCTOR])
+    @blp.arguments(DoctorPatientBulkSchema, location='json')
+    @blp.doc(
+        summary="Eliminar pacients del metge autenticat",
+        description="Rep una llista de correus de pacients i elimina la relació amb el metge autenticat.",
+    )
+    @blp.response(200, schema=UserResponseSchema, description="Metge actualitzat sense els pacients indicats.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no té rol de metge.")
+    @blp.response(404, description="Metge o pacients no trobats.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat en eliminar pacients del metge.")
+    def post(self, payload: dict) -> Response:
+        doctor_email = get_jwt_identity()
+        patient_emails = payload["patients"]
+        try:
+            self.logger.info(
+                "Removing patients from doctor",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email, "patient_count": len(patient_emails)},
+            )
+
+            doctor_service = ServiceFactory.get_instance().build_doctor_service()
+            doctor = doctor_service.remove_patients(doctor_email, patient_emails)
+            return jsonify(doctor.to_dict()), 200
+        except RelatedUserNotFoundException as e:
+            self.logger.error(
+                "Unassign patients failed: Patient not found",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error(
+                "Unassign patients failed: Doctor not found",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error while unassigning patients",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error inesperat en eliminar pacients: {str(e)}")
 
 @blp.route('/login')
 class UserLogin(MethodView):
