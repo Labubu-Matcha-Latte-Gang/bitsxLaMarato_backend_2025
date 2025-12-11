@@ -180,6 +180,22 @@ class UserService:
         user: User,
         reference_time: Optional[datetime] = None,
     ) -> bool:
+        """
+        Check whether a patient has answered any daily question today.
+
+        Parameters:
+            user (User): The user to check. If the user is not a Patient, returns False.
+            reference_time (Optional[datetime]): Reference time for testing purposes. If None, uses current time.
+
+        Returns:
+            bool: True if the patient has answered a daily question today, False otherwise or if not a patient.
+
+        Side-effects:
+            None.
+
+        Exceptions raised:
+            None directly. Returns False for non-patient users.
+        """
         if not isinstance(user, Patient):
             return False
         return self.question_answer_repo.has_answered_today(user.email, reference_time)
