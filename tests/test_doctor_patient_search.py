@@ -1,3 +1,4 @@
+from application.container import ServiceFactory
 from tests.base_test import BaseTest
 
 
@@ -70,3 +71,72 @@ class TestDoctorPatientSearch(BaseTest):
         )
 
         assert response.status_code == 403
+
+    def test_doctor_can_assign_multiple_patients(self):
+        doctor_payload = self.make_doctor_payload()
+        self.register_doctor(doctor_payload)
+
+        patient_one = self.make_patient_payload(name="Alice", surname="Nova")
+        patient_two = self.make_patient_payload(name="Albert", surname="Nova")
+        self.register_patient(patient_one)
+        self.register_patient(patient_two)
+
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+        response = self.client.post(
+            f"{self.api_prefix}/user/doctor/patients/assign",
+            json={"patients": [patient_one["email"], patient_two["email"]]},
+            headers=self.auth_headers(token),
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload is not None
+        patients = payload.get("role", {}).get("patients", [])
+        assert patient_one["email"] in patients
+        assert patient_two["email"] in patients
+
+        factory = ServiceFactory.get_instance(refresh=True)
+        patient_service = factory.build_patient_service()
+        stored_patient = patient_service.get_patient(patient_one["email"])
+        assert doctor_payload["email"] in stored_patient.doctor_emails
+
+    def test_doctor_can_remove_multiple_patients(self):
+        patient_one = self.make_patient_payload()
+        patient_two = self.make_patient_payload()
+        doctor_payload = self.make_doctor_payload(patients=[patient_one["email"], patient_two["email"]])
+
+        self.register_patient(patient_one)
+        self.register_patient(patient_two)
+        self.register_doctor(doctor_payload)
+
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+        response = self.client.post(
+            f"{self.api_prefix}/user/doctor/patients/unassign",
+            json={"patients": [patient_one["email"], patient_two["email"]]},
+            headers=self.auth_headers(token),
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload is not None
+        patients = payload.get("role", {}).get("patients", [])
+        assert patient_one["email"] not in patients
+        assert patient_two["email"] not in patients
+
+        factory = ServiceFactory.get_instance(refresh=True)
+        patient_service = factory.build_patient_service()
+        refreshed_patient = patient_service.get_patient(patient_one["email"])
+        assert doctor_payload["email"] not in refreshed_patient.doctor_emails
+
+    def test_assigning_nonexistent_patient_returns_404(self):
+        doctor_payload = self.make_doctor_payload()
+        self.register_doctor(doctor_payload)
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+
+        response = self.client.post(
+            f"{self.api_prefix}/user/doctor/patients/assign",
+            json={"patients": ["ghost@example.com"]},
+            headers=self.auth_headers(token),
+        )
+
+        assert response.status_code == 404
