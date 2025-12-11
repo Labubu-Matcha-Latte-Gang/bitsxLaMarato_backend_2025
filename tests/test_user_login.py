@@ -121,6 +121,19 @@ class TestUserTokenRefresh(BaseTest):
 
         response = self.client.get(
             f"{self.api_prefix}/user/login?hours_validity=2.5",
+            headers=self.auth_headers(original_token),
+        )
+
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body is not None
+        assert "access_token" in body
+        assert isinstance(body["access_token"], str)
+        assert body["access_token"] != original_token
+        new_token = body["access_token"]
+        assert isinstance(new_token, str)
+        assert new_token != original_token
+
     def test_refresh_token_without_hours_validity_uses_default(self):
         from datetime import datetime, timezone
         from flask_jwt_extended import decode_token
