@@ -105,6 +105,28 @@ class IPatientRepository(ABC):
         """
         raise NotImplementedError()
 
+    @abstractmethod
+    def search_by_name(
+        self,
+        query: str,
+        *,
+        doctor_email: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[Patient]:
+        """
+        Search patients by partial matches on name or surname.
+
+        Args:
+            query (str): Fragment used to filter by patient name or surname.
+            doctor_email (Optional[str]): If provided, restricts results to patients
+                linked to the given doctor.
+            limit (int): Maximum number of results to return.
+
+        Returns:
+            List[Patient]: Matching patients sorted by name and surname.
+        """
+        raise NotImplementedError()
+
 
 class IDoctorRepository(ABC):
     @abstractmethod
@@ -464,5 +486,24 @@ class IQuestionAnswerRepository(ABC):
             analysis (dict[str, float]): Metrics computed from the answer.
             answered_at (datetime, optional): Timestamp of the answer. Defaults
                 to ``datetime.utcnow`` when omitted.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def has_answered_today(
+        self,
+        patient_email: str,
+        reference_time: Optional[datetime] = None,
+    ) -> bool:
+        """
+        Check whether the patient has answered any question during the current day.
+
+        Args:
+            patient_email (str): Unique identifier of the patient.
+            reference_time (datetime, optional): Timestamp used to determine the
+                current day. Defaults to ``datetime.now(timezone.utc)`` when omitted.
+
+        Returns:
+            bool: True if the patient has at least one answer registered for the day.
         """
         raise NotImplementedError()

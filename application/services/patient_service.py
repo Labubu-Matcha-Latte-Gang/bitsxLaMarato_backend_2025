@@ -3,7 +3,9 @@ from __future__ import annotations
 from domain.entities.user import Patient
 from domain.repositories import IDoctorRepository, IPatientRepository, IUserRepository
 from domain.services.security import PasswordHasher
+from domain.strategies import IGenderParserStrategy
 from domain.unit_of_work import IUnitOfWork
+from helpers.enums.gender import Gender
 from helpers.exceptions.user_exceptions import (
     UserAlreadyExistsException,
     UserNotFoundException,
@@ -25,12 +27,14 @@ class PatientService:
         doctor_repo: IDoctorRepository,
         uow: IUnitOfWork,
         hasher: PasswordHasher,
+        gender_parser: IGenderParserStrategy,
     ) -> None:
         self.user_repo = user_repo
         self.patient_repo = patient_repo
         self.doctor_repo = doctor_repo
         self.uow = uow
         self.hasher = hasher
+        self.gender_parser = gender_parser
 
     def register_patient(self, data: dict) -> Patient:
         """
@@ -45,13 +49,14 @@ class PatientService:
         if doctor_emails:
             doctors = self.doctor_repo.fetch_by_emails(doctor_emails)
 
+        gender = self.gender_parser.parse(data["gender"])
         patient = Patient(
             email=email,
             password_hash=self.hasher.hash(data["password"]),
             name=data["name"],
             surname=data["surname"],
             ailments=data.get("ailments"),
-            gender=data["gender"],
+            gender=gender,
             age=data["age"],
             treatments=data.get("treatments"),
             height_cm=data["height_cm"],
@@ -92,18 +97,22 @@ class PatientService:
         """
         patient = self.get_patient(email)
 
-        doctors_list = update_data.get("doctors")
+        sanitized_updates = dict(update_data)
+        doctors_list = sanitized_updates.get("doctors")
         if doctors_list is not None:
             normalized = doctors_list or []
             # Validate referenced doctors before mutating the aggregate.
             doctors = self.doctor_repo.fetch_by_emails(normalized)
             previous_doctors = {doc.email: doc for doc in patient.doctors}
             patient.replace_doctors(doctors)
-            update_data = {k: v for k, v in update_data.items() if k != "doctors"}
+            sanitized_updates = {k: v for k, v in sanitized_updates.items() if k != "doctors"}
         else:
             doctors = None
 
-        patient.set_properties(update_data, self.hasher)
+        if "gender" in sanitized_updates and sanitized_updates["gender"] is not None:
+            sanitized_updates["gender"] = self.gender_parser.parse(sanitized_updates["gender"])
+
+        patient.set_properties(sanitized_updates, self.hasher)
 
         with self.uow:
             if doctors is not None:

@@ -49,6 +49,7 @@ class TestUserRoles(BaseTest):
         self.db.execute(
             Doctor.__table__.insert().values(
                 email=email,
+                gender=Gender.MALE,
             )
         )
         self.db.commit()
@@ -108,6 +109,7 @@ class TestUserRoles(BaseTest):
         self.db.execute(
             Doctor.__table__.insert().values(
                 email=email,
+                gender=Gender.MALE,
             )
         )
         self.db.commit()

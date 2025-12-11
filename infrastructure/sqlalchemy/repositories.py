@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Iterable, List, Optional, Dict
 import uuid
 
 from db import db
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
@@ -38,7 +38,7 @@ from helpers.exceptions.question_exceptions import QuestionNotFoundException
 from helpers.exceptions.activity_exceptions import ActivityNotFoundException
 from models.activity import Activity
 from models.admin import Admin
-from models.associations import UserCodeAssociation
+from models.associations import DoctorPatientAssociation, UserCodeAssociation
 from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
@@ -129,6 +129,7 @@ class SQLAlchemyUserRepository(IUserRepository):
                 password=user.password_hash,
                 name=user.name,
                 surname=user.surname,
+                gender=user.gender,
                 role=UserRole.DOCTOR,
             )
             model.patients = self._fetch_patients(user.patient_emails)
@@ -160,6 +161,7 @@ class SQLAlchemyUserRepository(IUserRepository):
         elif isinstance(user, DoctorDomain):
             if not isinstance(model, Doctor):
                 raise UserRoleConflictException("El rol d'usuari no correspon amb metge.")
+            model.gender = user.gender
             model.patients = self._fetch_patients(user.patient_emails)
         elif isinstance(user, AdminDomain):
             if not isinstance(model, Admin):
@@ -232,6 +234,7 @@ class SQLAlchemyUserRepository(IUserRepository):
             password_hash=model.password,
             name=model.name,
             surname=model.surname,
+            gender=model.gender,
             patients=patients,  # type: ignore[arg-type]
         )
 
@@ -269,6 +272,43 @@ class SQLAlchemyPatientRepository(IPatientRepository):
                 f"No s'ha trobat cap pacient amb el correu: {', '.join(missing)}"
             )
         return [self.user_repo._to_domain(patient) for patient in patients]  # type: ignore[list-item]
+
+    def search_by_name(
+        self,
+        query: str,
+        *,
+        doctor_email: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[PatientDomain]:
+        normalized = (query or "").strip()
+        if not normalized:
+            return []
+
+        safe_limit = max(1, limit)
+        # Escape LIKE wildcards to treat them as literal characters
+        escaped_query = normalized.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped_query}%"
+
+        patients_query = self.session.query(Patient).filter(
+            or_(
+                func.lower(Patient.name).like(pattern, escape="\\"),
+                func.lower(Patient.surname).like(pattern, escape="\\"),
+            )
+        )
+
+        if doctor_email:
+            patients_query = patients_query.join(
+                DoctorPatientAssociation,
+                DoctorPatientAssociation.patient_email == Patient.email,
+            ).filter(DoctorPatientAssociation.doctor_email == doctor_email)
+
+        patients = (
+            patients_query.order_by(func.lower(Patient.name), func.lower(Patient.surname))
+            .limit(safe_limit)
+            .all()
+        )
+
+        return [self.user_repo._to_domain(patient) for patient in patients]
 
 
 class SQLAlchemyDoctorRepository(IDoctorRepository):
@@ -612,6 +652,37 @@ class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
                 )
             )
         return answered
+
+    def has_answered_today(
+        self,
+        patient_email: str,
+        reference_time: Optional[datetime] = None,
+    ) -> bool:
+        """
+        Returns True if the patient has answered a question today (UTC).
+        If reference_time is provided and is a naive datetime, it is assumed to be in UTC.
+        """
+        from models.associations import QuestionAnsweredAssociation  # late import
+
+        current = reference_time or datetime.now(timezone.utc)
+        # If current is naive, assume UTC
+        if current.tzinfo is None or current.tzinfo.utcoffset(current) is None:
+            current_utc = current.replace(tzinfo=timezone.utc)
+        else:
+            current_utc = current.astimezone(timezone.utc)
+        start_of_day = current_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day + timedelta(days=1)
+
+        existing = (
+            self.session.query(QuestionAnsweredAssociation.patient_email)
+            .filter(
+                QuestionAnsweredAssociation.patient_email == patient_email,
+                QuestionAnsweredAssociation.answered_at >= start_of_day,
+                QuestionAnsweredAssociation.answered_at < end_of_day,
+            )
+            .first()
+        )
+        return existing is not None
 
     def record_answer(
         self,

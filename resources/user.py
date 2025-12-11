@@ -4,17 +4,17 @@ from pathlib import Path
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import Response, jsonify
+from flask import Response, jsonify, g
 from werkzeug.exceptions import HTTPException
 
 from db import db
 from sqlalchemy.exc import IntegrityError
-from globals import APPLICATION_EMAIL, RESET_CODE_VALIDITY_MINUTES, RESET_PASSWORD_FRONTEND_PATH
+from globals import RESET_CODE_VALIDITY_MINUTES
 from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
-from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
 from helpers.exceptions.user_exceptions import (
-    InvalidResetCodeException,
+    ExpiredTokenException,
+    InvalidTokenException,
     UserAlreadyExistsException,
     InvalidCredentialsException,
     UserNotFoundException,
@@ -22,14 +22,14 @@ from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
 )
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
-from infrastructure.sqlalchemy.unit_of_work import map_integrity_error, SQLAlchemyUnitOfWork
+from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 
 from helpers.enums.user_role import UserRole
 from application.container import ServiceFactory
-from helpers.email_service.adapter import AbstractEmailAdapter
 from schemas import (
     PatientRegisterSchema,
     DoctorRegisterSchema,
+    DoctorPatientBulkSchema,
     UserForgotPasswordResponseSchema,
     UserLoginSchema,
     UserLoginResponseSchema,
@@ -38,10 +38,13 @@ from schemas import (
     UserResetPasswordSchema,
     UserResponseSchema,
     UserRegisterResponseSchema,
+    UserTokenRefreshSchema,
     UserUpdateSchema,
     UserPartialUpdateSchema,
     UserForgotPasswordSchema,
     PatientDataResponseSchema,
+    PatientSearchQuerySchema,
+    PatientSearchResponseSchema,
 )
 
 blp = Blueprint('user', __name__, description="Operacions relacionades amb els usuaris")
@@ -94,10 +97,11 @@ class PatientRegister(MethodView):
             factory = ServiceFactory.get_instance()
             user_service = factory.build_user_service()
             patient = user_service.register_patient(data)
-            access_token = user_service.login(data["email"], data["password"])
+            login_payload = user_service.login(data["email"], data["password"])
 
             patient_payload = patient.to_dict()
-            patient_payload["access_token"] = access_token
+            patient_payload["access_token"] = login_payload["access_token"]
+            patient_payload["already_responded_today"] = False
 
             return jsonify(patient_payload), 201
         except KeyError as e:
@@ -176,10 +180,11 @@ class DoctorRegister(MethodView):
             factory = ServiceFactory.get_instance()
             user_service = factory.build_user_service()
             doctor = user_service.register_doctor(data)
-            access_token = user_service.login(data["email"], data["password"])
+            login_payload = user_service.login(data["email"], data["password"])
 
             doctor_payload = doctor.to_dict()
-            doctor_payload["access_token"] = access_token
+            doctor_payload["access_token"] = login_payload["access_token"]
+            doctor_payload["already_responded_today"] = False
 
             return jsonify(doctor_payload), 201
         except KeyError as e:
@@ -210,6 +215,194 @@ class DoctorRegister(MethodView):
             db.session.rollback()
             self.logger.error("Doctor register failed", module="DoctorRegister", error=e)
             abort(500, message=f"S'ha produït un error inesperat en registrar el metge: {str(e)}")
+
+@blp.route('/doctor/patients/search')
+class DoctorPatientSearch(MethodView):
+    """
+    Endpoint perquè els metges cerquin qualsevol pacient per nom/cognom parcial.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.DOCTOR])
+    @blp.arguments(PatientSearchQuerySchema, location='query')
+    @blp.doc(
+        summary="Cercar pacients",
+        description="Permet als metges recuperar la llista de pacients de la base de dades filtrant per un fragment del nom o del cognom.",
+    )
+    @blp.response(200, schema=PatientSearchResponseSchema, description="Resultats de la cerca retornats correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no té rol de metge.")
+    @blp.response(404, description="Metge no trobat.")
+    @blp.response(422, description="Els paràmetres de consulta no han superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor en cercar pacients.")
+    def get(self, query_params: dict) -> Response:
+        """
+        Retorna la llista de pacients que coincideixen parcialment amb el fragment subministrat.
+        """
+        query_fragment = query_params["q"]
+        limit = query_params["limit"]
+        doctor_email = get_jwt_identity()
+
+        try:
+            factory = ServiceFactory.get_instance()
+            user_service = factory.build_user_service()
+
+            self.logger.info(
+                "Searching patients by name",
+                module="DoctorPatientSearch",
+                metadata={"doctor_email": doctor_email, "query": query_fragment, "limit": limit},
+            )
+
+            doctor_service = factory.build_doctor_service()
+            patients = doctor_service.search_patients(doctor_email, query_fragment, limit)
+            payload = {
+                "query": query_fragment,
+                "results": [patient.to_dict() for patient in patients],
+            }
+            return jsonify(payload), 200
+        except UserNotFoundException as e:
+            self.logger.error(
+                "Doctor not found when searching patients",
+                module="DoctorPatientSearch",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error during patient search",
+                module="DoctorPatientSearch",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error inesperat en cercar pacients: {str(e)}")
+
+@blp.route('/doctor/patients/assign')
+class DoctorPatientAssign(MethodView):
+    """
+    Endpoint perquè els metges afegeixin pacients existents al seu panel.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.DOCTOR])
+    @blp.arguments(DoctorPatientBulkSchema, location='json')
+    @blp.doc(
+        summary="Afegir pacients al metge autenticat",
+        description="Rep una llista de correus de pacients i els associa al metge autenticat mantenint la relació bidireccional.",
+    )
+    @blp.response(200, schema=UserResponseSchema, description="Metge actualitzat amb els nous pacients associats.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no té rol de metge.")
+    @blp.response(404, description="Metge o pacients no trobats.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat en afegir pacients al metge.")
+    def post(self, payload: dict) -> Response:
+        doctor_email = get_jwt_identity()
+        patient_emails = payload["patients"]
+        if not patient_emails:
+            abort(404, message="Cal indicar almenys un pacient per assignar.")
+        try:
+            self.logger.info(
+                "Adding patients to doctor",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email, "patient_count": len(patient_emails)},
+            )
+
+            doctor_service = ServiceFactory.get_instance().build_doctor_service()
+            doctor = doctor_service.add_patients(doctor_email, patient_emails)
+            return jsonify(doctor.to_dict()), 200
+        except RelatedUserNotFoundException as e:
+            self.logger.error(
+                "Assign patients failed: Patient not found",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error(
+                "Assign patients failed: Doctor not found",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error while assigning patients",
+                module="DoctorPatientAssign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error inesperat en afegir pacients: {str(e)}")
+
+@blp.route('/doctor/patients/unassign')
+class DoctorPatientUnassign(MethodView):
+    """
+    Endpoint perquè els metges eliminin pacients associats.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.DOCTOR])
+    @blp.arguments(DoctorPatientBulkSchema, location='json')
+    @blp.doc(
+        summary="Eliminar pacients del metge autenticat",
+        description="Rep una llista de correus de pacients i elimina la relació amb el metge autenticat.",
+    )
+    @blp.response(200, schema=UserResponseSchema, description="Metge actualitzat sense els pacients indicats.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no té rol de metge.")
+    @blp.response(404, description="Metge o pacients no trobats.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat en eliminar pacients del metge.")
+    def post(self, payload: dict) -> Response:
+        doctor_email = get_jwt_identity()
+        patient_emails = payload["patients"]
+        if not patient_emails:
+            abort(404, message="Cal indicar almenys un pacient per eliminar l'associació.")
+        try:
+            self.logger.info(
+                "Removing patients from doctor",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email, "patient_count": len(patient_emails)},
+            )
+
+            doctor_service = ServiceFactory.get_instance().build_doctor_service()
+            doctor = doctor_service.remove_patients(doctor_email, patient_emails)
+            return jsonify(doctor.to_dict()), 200
+        except RelatedUserNotFoundException as e:
+            self.logger.error(
+                "Unassign patients failed: Patient not found",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except UserNotFoundException as e:
+            self.logger.error(
+                "Unassign patients failed: Doctor not found",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error while unassigning patients",
+                module="DoctorPatientUnassign",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error inesperat en eliminar pacients: {str(e)}")
 
 @blp.route('/login')
 class UserLogin(MethodView):
@@ -250,8 +443,8 @@ class UserLogin(MethodView):
             self.logger.info("User login attempt", module="UserLogin", metadata={"email": data['email']})
 
             user_service = ServiceFactory.get_instance().build_user_service()
-            access_token = user_service.login(data["email"], data["password"])
-            return {"access_token": access_token}, 200
+            login_payload = user_service.login(data["email"], data["password"])
+            return login_payload, 200
         except UserNotFoundException as e:
             self.logger.error("User login failed: User not found", module="UserLogin", metadata={"email": data['email']}, error=e)
             abort(401, message="Correu o contrassenya no vàlids.")
@@ -270,6 +463,62 @@ class UserLogin(MethodView):
         except Exception as e:
             self.logger.error("User login failed", module="UserLogin", error=e)
             abort(500, message=f"S'ha produït un error inesperat en iniciar sessió: {str(e)}")
+
+    @roles_required([UserRole.ADMIN, UserRole.DOCTOR, UserRole.PATIENT])
+    @blp.arguments(UserTokenRefreshSchema, location='query')
+    @blp.doc(
+        summary="Refrescar sessió",
+        description="Autentica un JWT i emet un altre token JWT.",
+    )
+    @blp.response(200, schema=UserLoginResponseSchema, description="Token JWT emès amb credencials vàlides.")
+    @blp.response(401, description="Token no vàlid o caducat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari durant l'inici de sessió.")
+    @blp.response(422, description="El paràmetre de consulta no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor durant l'autenticació.")
+    def get(self, query_params: dict) -> Response:
+        """
+        Refresca un token d'accés JWT.
+
+        Requereix un JWT vàlid. Retorna un nou token d'accés per usar als endpoints autenticats.
+        S'espera un paràmetre opcional `hours_validity` per definir la durada del nou token.
+
+        Codis d'estat:
+        - 200: Token refrescat; retorna el nou token JWT.
+        - 401: Credencials no vàlides.
+        - 409: Estat de rol inconsistent.
+        - 422: El paràmetre de consulta no supera la validació d'esquema.
+        - 500: Error inesperat durant l'autenticació.
+        """
+        email = get_jwt_identity()
+        try:
+            self.logger.info("User token refresh attempt", module="UserLogin", metadata={"email": email})
+
+            user_service = ServiceFactory.get_instance().build_user_service()
+            current_user = getattr(g, "current_user", None)
+            if current_user is None:
+                current_user = user_service.get_user(email)
+
+            access_token = user_service.refresh_token(email, query_params.get("hours_validity", None))
+            payload = {
+                "access_token": access_token,
+                "already_responded_today": user_service.has_answered_daily_question_today(current_user),
+            }
+            return payload, 200
+        except ExpiredTokenException as e:
+            self.logger.error("User token refresh failed: Token expired", module="UserLogin", metadata={"email": email}, error=e)
+            abort(401, message="El token ha caducat.")
+        except InvalidTokenException as e:
+            self.logger.error("User token refresh failed: Invalid token", module="UserLogin", metadata={"email": email}, error=e)
+            abort(401, message="Token no vàlid.")
+        except UserNotFoundException as e:
+            self.logger.error("User token refresh failed: User not found", module="UserLogin", metadata={"email": email}, error=e)
+            abort(401, message="Token d'autenticació no vàlid.")
+        except UserRoleConflictException as e:
+            self.logger.error("User token refresh failed: Role conflict", module="UserLogin", metadata={"email": email}, error=e)
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
+        except Exception as e:
+            self.logger.error("User token refresh failed", module="UserLogin", error=e)
+            abort(500, message=f"S'ha produït un error inesperat en refrescar el token: {str(e)}")
 
 @blp.route('')
 class UserCRUD(MethodView):

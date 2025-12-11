@@ -1,4 +1,4 @@
-from flask import send_file
+from flask import request, send_file
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import IntegrityError
@@ -33,7 +33,8 @@ class ReportResource(MethodView):
         summary="Obtenir l'informe mèdic d'un pacient.",
         description=(
             "Els administradors poden obtenir qualsevol pacient; els metges només si hi estan assignats; "
-            "els pacients poden obtenir el seu propi informe."
+            "els pacients poden obtenir el seu propi informe. Pots autenticar-te amb un header Authorization "
+            "Bearer com a la resta d'endpoints; si no el proporciones, cal un `access_token` per query string."
         ),
         security=[]
     )
@@ -57,10 +58,10 @@ class ReportResource(MethodView):
             patient_email: str = path_args["email"]
             patient = patient_service.get_patient(patient_email)
 
-            token = query_params.get("access_token")
+            token = self._extract_token(query_params)
             if not token:
                 raise InvalidTokenException("Cal un token vàlid per accedir a l'informe.")
-            
+
             current_user = user_service.get_user_by_token(token)
 
             patient_data = user_service.get_patient_data(current_user, patient, graph_format="png")
@@ -111,3 +112,15 @@ class ReportResource(MethodView):
             db.session.rollback()
             self.logger.error("Error inesperat en generar informe mèdic", module="ReportResource", error=e)
             abort(500, message=f"S'ha produït un error inesperat en generar l'informe: {str(e)}")
+
+    def _extract_token(self, query_params: dict):
+        """
+        Prioritza el token del header Authorization i fa un fallback als query params.
+        """
+        auth_header = request.headers.get("Authorization", "").strip()
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) != 2 or parts[0].lower() != "bearer":
+                raise InvalidTokenException("El header Authorization ha de tenir el format 'Bearer <token>'.")
+            return parts[1]
+        return query_params.get("access_token")

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from domain.entities.user import Doctor
+from domain.entities.user import Doctor, Patient
 from domain.repositories import IDoctorRepository, IPatientRepository, IUserRepository
 from domain.services.security import PasswordHasher
+from domain.strategies import IGenderParserStrategy
 from domain.unit_of_work import IUnitOfWork
+from helpers.enums.gender import Gender
 from helpers.exceptions.user_exceptions import (
     UserAlreadyExistsException,
     UserNotFoundException,
@@ -25,12 +27,14 @@ class DoctorService:
         patient_repo: IPatientRepository,
         uow: IUnitOfWork,
         hasher: PasswordHasher,
+        gender_parser: IGenderParserStrategy,
     ) -> None:
         self.user_repo = user_repo
         self.doctor_repo = doctor_repo
         self.patient_repo = patient_repo
         self.uow = uow
         self.hasher = hasher
+        self.gender_parser = gender_parser
 
     def register_doctor(self, data: dict) -> Doctor:
         """
@@ -45,11 +49,13 @@ class DoctorService:
         if patient_emails:
             patients = self.patient_repo.fetch_by_emails(patient_emails)
 
+        gender = self.gender_parser.parse(data["gender"])
         doctor = Doctor(
             email=email,
             password_hash=self.hasher.hash(data["password"]),
             name=data["name"],
             surname=data["surname"],
+            gender=gender,
             patients=patients,
         )
 
@@ -80,18 +86,23 @@ class DoctorService:
         """
         doctor = self.get_doctor(email)
 
-        patients_list = update_data.get("patients")
+        sanitized_updates = dict(update_data)
+        patients_list = sanitized_updates.get("patients")
+        previous_patients = {}
         if patients_list is not None:
             normalized = patients_list or []
             # Validate referenced patients before mutating the aggregate.
             patients = self.patient_repo.fetch_by_emails(normalized)
             previous_patients = {p.email: p for p in doctor.patients}
             doctor.replace_patients(patients)
-            update_data = {k: v for k, v in update_data.items() if k != "patients"}
+            sanitized_updates = {k: v for k, v in sanitized_updates.items() if k != "patients"}
         else:
             patients = None
 
-        doctor.set_properties(update_data, self.hasher)
+        if "gender" in sanitized_updates and sanitized_updates["gender"] is not None:
+            sanitized_updates["gender"] = self.gender_parser.parse(sanitized_updates["gender"])
+
+        doctor.set_properties(sanitized_updates, self.hasher)
 
         with self.uow:
             if patients is not None:
@@ -112,6 +123,14 @@ class DoctorService:
 
         return doctor
 
+    def search_patients(self, doctor_email: str, query: str, limit: int = 20) -> list[Patient]:
+        """
+        Allow a doctor to search any patient by partial name or surname.
+        """
+        # Still validate the doctor exists before running the search
+        self.get_doctor(doctor_email)
+        return self.patient_repo.search_by_name(query, limit=limit)
+
     def delete_doctor(self, email: str) -> None:
         """
         Remove a doctor and its associations.
@@ -121,3 +140,67 @@ class DoctorService:
         with self.uow:
             self.doctor_repo.remove(doctor)
             self.uow.commit()
+
+    def add_patients(self, doctor_email: str, patient_emails: list[str]) -> Doctor:
+        """
+        Associa múltiples pacients a un doctor, mantenint els enllaços bidireccionals.
+
+        Si la llista d'emails de pacients és buida o no conté cap email vàlid, es llança una excepció amb un missatge en català.
+        """
+        doctor = self.get_doctor(doctor_email)
+        normalized = self._normalize_emails(patient_emails)
+        if not normalized:
+            raise UserNotFoundException("No s'ha trobat cap email de pacient vàlid per associar al doctor.")
+
+        patients = self.patient_repo.fetch_by_emails(normalized)
+
+        with self.uow:
+            doctor.add_patients(patients)
+            self.doctor_repo.update(doctor)
+
+            for patient in patients:
+                if doctor.email not in patient.doctor_emails:
+                    patient.add_doctors([doctor])
+                self.patient_repo.update(patient)
+
+            self.uow.commit()
+
+        return doctor
+
+    def remove_patients(self, doctor_email: str, patient_emails: list[str]) -> Doctor:
+        """
+        Remove associations between a doctor and multiple patients.
+        """
+        doctor = self.get_doctor(doctor_email)
+        normalized = self._normalize_emails(patient_emails)
+        if not normalized:
+            raise UserNotFoundException("No s'ha proporcionat cap correu electrònic de pacient vàlid per eliminar l'associació.")
+
+        patients = self.patient_repo.fetch_by_emails(normalized)
+
+        with self.uow:
+            for patient in patients:
+                doctor.remove_patient(patient.email)
+                patient.remove_doctor(doctor.email)
+                self.patient_repo.update(patient)
+
+            self.doctor_repo.update(doctor)
+            self.uow.commit()
+
+        return doctor
+
+    @staticmethod
+    def _normalize_emails(emails: list[str] | None) -> list[str]:
+        if not emails:
+            return []
+        seen = set()
+        ordered: list[str] = []
+        for email in emails:
+            if not email:
+                continue
+            lowered = email.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            ordered.append(lowered)
+        return ordered

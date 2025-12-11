@@ -73,6 +73,9 @@ class UserResponseSchema(Schema):
                 "height_cm": 168.5,
                 "weight_kg": 64.3,
                 "doctors": ["dr.house@example.com"],
+                "doctor_details": [
+                    {"name": "Gregory", "surname": "House", "gender": "male"}
+                ],
             },
         }
 
@@ -102,7 +105,8 @@ class UserResponseSchema(Schema):
         metadata={
             "description": (
                 "Dades específiques del rol. Per als pacients: ailments, gender, age, treatments, "
-                "height_cm, weight_kg, doctors (correus). Per als metges: patients (correus). "
+                "height_cm, weight_kg, doctors (correus) i doctor_details (nom, cognom, gender) si estan disponibles. "
+                "Per als metges: gender i patients (correus). "
                 "Per als administradors: objecte buit."
             ),
             "example": {
@@ -302,6 +306,101 @@ class PatientDataResponseSchema(Schema):
         required=True,
         metadata={
             "description": "Fragments HTML (div + script) dels gràfics codificats en base64 (pot ser buit).",
+        },
+    )
+
+
+class PatientSearchQuerySchema(Schema):
+    """
+    Paràmetres de consulta per cercar pacients per nom o cognom parcial.
+    """
+
+    class Meta:
+        description = "Permet als metges filtrar els pacients introduint un fragment del nom o del cognom."
+        example = {"q": "garc", "limit": 10}
+
+    q = fields.String(
+        required=True,
+        validate=validate.Length(min=2),
+        metadata={
+            "description": "Fragment del nom o del cognom sobre el qual es farà la cerca (mínim 2 caràcters).",
+            "example": "mart",
+        },
+    )
+    limit = fields.Integer(
+        load_default=20,
+        validate=validate.Range(min=1, max=100),
+        metadata={
+            "description": "Nombre màxim de coincidències retornades (1-100). Per defecte 20.",
+            "example": 5,
+        },
+    )
+
+
+class PatientSearchResponseSchema(Schema):
+    """
+    Resultat de la cerca de pacients.
+    """
+
+    class Meta:
+        description = "Retorna el fragment consultat i la llista de pacients que hi coincideixen."
+        example = {
+            "query": "mart",
+            "results": [
+                {
+                    "email": "anna.martinez@example.com",
+                    "name": "Anna",
+                    "surname": "Martínez",
+                    "role": {
+                        "ailments": "Hipertensió",
+                        "gender": "female",
+                        "age": 55,
+                        "treatments": "Dieta",
+                        "height_cm": 165,
+                        "weight_kg": 62,
+                        "doctors": ["dr.house@example.com"],
+                    },
+                }
+            ],
+        }
+
+    query = fields.String(
+        required=True,
+        metadata={
+            "description": "Fragment utilitzat en la cerca.",
+            "example": "mart",
+        },
+    )
+    results = fields.List(
+        fields.Nested(UserResponseSchema),
+        required=True,
+        metadata={
+            "description": "Llista de pacients que coincideixen amb el fragment buscat (pot estar buida).",
+        },
+    )
+
+
+class DoctorPatientBulkSchema(Schema):
+    """
+    Cos per afegir o eliminar múltiples pacients associats a un metge.
+    """
+
+    class Meta:
+        description = "Permet indicar una llista de pacients sobre els quals aplicar l'operació."
+        example = {"patients": ["anna@example.com", "jordi@example.com"]}
+
+    patients = fields.List(
+        fields.Email(
+            required=True,
+            metadata={
+                "description": "Correu electrònic del pacient.",
+                "example": "pacient@example.com",
+            },
+        ),
+        required=True,
+        validate=validate.Length(min=0, max=50),
+        metadata={
+            "description": "Llista de pacients sobre els quals aplicar l'operació (fins a 50 elements).",
         },
     )
 
@@ -673,9 +772,20 @@ class DoctorRegisterSchema(UserRegisterSchema):
             "surname": "Font",
             "email": "anna.font@example.com",
             "password": "AnnaMetge1",
+            "gender": "female",
             "patients": ["pacient1@example.com", "pacient2@example.com"],
         }
 
+    gender = fields.Enum(
+        Gender,
+        required=True,
+        by_value=True,
+        metadata={
+            "description": f"Gènere del metge. Valors acceptats: {', '.join(GENDER_VALUES)}.",
+            "enum": GENDER_VALUES,
+            "example": "female",
+        },
+    )
     patients = fields.List(
         fields.Email(),
         required=False,
@@ -722,13 +832,46 @@ class UserLoginResponseSchema(Schema):
 
     class Meta:
         description = "Resposta d'autenticació amb el token JWT."
-        example = {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
+        example = {
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "already_responded_today": False,
+        }
 
     access_token = fields.String(
         required=True,
         metadata={
             "description": "Token d'autenticació per a l'usuari.",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        },
+    )
+
+    already_responded_today = fields.Boolean(
+        required=True,
+        dump_default=False,
+        metadata={
+            "description": "Indica si el pacient ja ha respost la pregunta diària avui.",
+            "example": False,
+        },
+    )
+
+class UserTokenRefreshSchema(Schema):
+    """
+    Esquema per a les dades de refresc del token d'usuari.
+    """
+
+    class Meta:
+        description = "Paràmetres per refrescar el token JWT d'un usuari."
+        example = {
+            "hours_validity": 2.5
+        }
+
+    hours_validity = fields.Float(
+        required=False,
+        load_default=672,
+        validate=validate.Range(min=1.0),
+        metadata={
+            "description": "Nombre d'hores addicionals de validesa per al nou token JWT. Per defecte, 672 hores (28 dies). Com a mínim, 1 hora.",
+            "example": 672,
         },
     )
 
@@ -1614,6 +1757,17 @@ class QRGenerateSchema(Schema):
         metadata={
             "description": "Zona horària del metge que sol·licita el codi QR en format `Area/Location`.",
             "example": "Europe/Madrid",
+        },
+    )
+
+    patient_email = fields.Email(
+        required=False,
+        metadata={
+            "description": (
+                "Correu electrònic del pacient per al qual es genera el codi. "
+                "Obligatori per a metges; els pacients sempre generen el seu propi."
+            ),
+            "example": "pacient@example.com",
         },
     )
 

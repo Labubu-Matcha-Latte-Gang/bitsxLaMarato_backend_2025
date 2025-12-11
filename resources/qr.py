@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
-from flask import send_file
+from flask import send_file, g, request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import IntegrityError
-from flask_jwt_extended import get_jwt_identity
 from zoneinfo import ZoneInfo
+from werkzeug.exceptions import HTTPException
 
 from application.services.qr_service import QRPayload
 from db import db
@@ -15,12 +15,12 @@ from helpers.exceptions.pdf_exceptions import InvalidZoneInfoException, PDFGener
 from helpers.exceptions.qr_exceptions import QRGenerationException
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
-from flask import request
 from helpers.exceptions.user_exceptions import UserNotFoundException
 from urllib.parse import urlencode
 from schemas import (
     QRGenerateSchema,
 )
+from domain.entities.user import Doctor, Patient
 
 blp = Blueprint('qr', __name__, description="Generació de codi QR per obtenir informes de pacients.")
 
@@ -33,7 +33,7 @@ class QRResource(MethodView):
 
     logger = AbstractLogger.get_instance()
 
-    @roles_required([UserRole.PATIENT])
+    @roles_required([UserRole.PATIENT, UserRole.DOCTOR])
     @blp.arguments(QRGenerateSchema, location='json')
     @blp.doc(
         summary="Obtenir un codi QR per a l'informe mèdic.",
@@ -41,7 +41,7 @@ class QRResource(MethodView):
     )
     @blp.response(200, description="Codi QR generat correctament.", content_type=["image/png", "image/svg+xml"])
     @blp.response(401, description="Falta o és invàlid el JWT.")
-    @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
+    @blp.response(403, description="No tens permís per generar aquest codi QR.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat del servidor en generar el codi QR.")
     def post(self, data: dict):
@@ -56,7 +56,22 @@ class QRResource(MethodView):
             user_service = service_factory.build_user_service()
             patient_service = service_factory.build_patient_service()
 
-            patient_email: str = get_jwt_identity()
+            requester = g.current_user
+            target_email = data.get("patient_email")
+
+            if isinstance(requester, Patient):
+                patient_email: str = requester.email
+                if target_email and target_email != patient_email:
+                    abort(403, message="Un pacient només pot generar un codi QR per a ell mateix.")
+            elif isinstance(requester, Doctor):
+                if not target_email:
+                    abort(422, message="Cal indicar el correu electrònic del pacient.")
+                patient_email = target_email
+                if patient_email not in requester.patient_emails:
+                    abort(403, message="Només pots generar codis QR dels teus pacients.")
+            else:
+                abort(403, message="No tens permís per generar codis QR.")
+
             patient_exists = patient_service.patient_exists(patient_email)
 
             if not patient_exists:
@@ -117,6 +132,9 @@ class QRResource(MethodView):
             db.session.rollback()
             self.logger.error("Error en la generació del PDF per al codi QR", module="QRResource", error=e)
             abort(500, message=str(e))
+        except HTTPException:
+            # Re-raise HTTP errors triggered by abort without converting them to 500s
+            raise
         except Exception as e:
             db.session.rollback()
             self.logger.error("Error inesperat en generar codi QR", module="QRResource", error=e)

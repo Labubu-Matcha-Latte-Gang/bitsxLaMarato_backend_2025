@@ -54,14 +54,29 @@ class TestQRResource(BaseTest):
         body = response.get_json()
         assert "zona horària" in (body or {}).get("message", "").lower()
 
-    def test_access_requires_patient_role(self):
+    def test_doctor_can_generate_qr_for_assigned_patient(self):
+        patient = self.create_patient_model()
+        doctor = self.create_doctor_model(patients=[patient.email])
+        token = self.login_and_get_token(doctor.email, self.default_password)
+
+        response = self.client.post(
+            self._qr_url(),
+            headers=self.auth_headers(token),
+            json={"patient_email": patient.email},
+        )
+
+        assert response.status_code == 200
+        assert response.mimetype in {"image/png", "image/svg+xml"}
+
+    def test_doctor_cannot_generate_qr_for_unassigned_patient(self):
+        patient = self.create_patient_model()
         doctor = self.create_doctor_model()
         token = self.login_and_get_token(doctor.email, self.default_password)
 
         response = self.client.post(
             self._qr_url(),
             headers=self.auth_headers(token),
-            json={},
+            json={"patient_email": patient.email},
         )
 
         assert response.status_code == 403

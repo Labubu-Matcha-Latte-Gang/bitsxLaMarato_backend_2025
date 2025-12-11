@@ -67,6 +67,7 @@ class BaseTest(ABC):
             "password": overrides.get("password", self.default_password),
             "name": overrides.get("name", "Doc"),
             "surname": overrides.get("surname", "Tor"),
+            "gender": overrides.get("gender", Gender.MALE.value),
             "patients": overrides.get("patients", []),
         }
         return payload
@@ -131,6 +132,7 @@ class BaseTest(ABC):
         password: str | None = None,
         name: str = "Doc",
         surname: str = "Tor",
+        gender: Gender = Gender.MALE,
         patients: list[str] | None = None,
     ) -> User:
         email = email or self.unique_email("doctor")
@@ -144,6 +146,7 @@ class BaseTest(ABC):
                 "password": password,
                 "name": name,
                 "surname": surname,
+                "gender": gender,
                 "patients": patients,
             }
         )
