@@ -31,6 +31,7 @@ from infrastructure.sqlalchemy import (
     SQLAlchemyUserRepository,
     SQLAlchemyTranscriptionAnalysisRepository
 )
+from infrastructure.sqlalchemy.gender_parser_strategy import GenderParserStrategy
 from sqlalchemy.orm import Session
 
 
@@ -69,6 +70,7 @@ class ServiceFactory:
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
         token_service = TokenService()
+        gender_parser = GenderParserStrategy()
 
         user_repo = SQLAlchemyUserRepository(self.session)
         # Build subordinate services
@@ -78,6 +80,7 @@ class ServiceFactory:
             doctor_repo=SQLAlchemyDoctorRepository(self.session),
             uow=SQLAlchemyUnitOfWork(self.session),
             hasher=hasher,
+            gender_parser=gender_parser,
         )
         doctor_service = DoctorService(
             user_repo=user_repo,
@@ -85,6 +88,7 @@ class ServiceFactory:
             patient_repo=SQLAlchemyPatientRepository(self.session),
             uow=SQLAlchemyUnitOfWork(self.session),
             hasher=hasher,
+            gender_parser=gender_parser,
         )
         admin_service = AdminService(
             user_repo=user_repo,
@@ -155,6 +159,7 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
+        gender_parser = GenderParserStrategy()
         user_repo = SQLAlchemyUserRepository(self.session)
         patient_repo = SQLAlchemyPatientRepository(self.session)
         doctor_repo = SQLAlchemyDoctorRepository(self.session)
@@ -164,6 +169,7 @@ class ServiceFactory:
             doctor_repo=doctor_repo,
             uow=uow,
             hasher=hasher,
+            gender_parser=gender_parser,
         )
 
     def build_doctor_service(self) -> DoctorService:
@@ -174,6 +180,7 @@ class ServiceFactory:
         """
         uow = SQLAlchemyUnitOfWork(self.session)
         hasher = PasswordHasher()
+        gender_parser = GenderParserStrategy()
         user_repo = SQLAlchemyUserRepository(self.session)
         doctor_repo = SQLAlchemyDoctorRepository(self.session)
         patient_repo = SQLAlchemyPatientRepository(self.session)
@@ -183,6 +190,7 @@ class ServiceFactory:
             patient_repo=patient_repo,
             uow=uow,
             hasher=hasher,
+            gender_parser=gender_parser,
         )
 
     def build_admin_service(self) -> AdminService:
