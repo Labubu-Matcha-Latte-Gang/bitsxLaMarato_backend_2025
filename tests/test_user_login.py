@@ -1,4 +1,25 @@
+from uuid import uuid4
+
+from application.container import ServiceFactory
+from helpers.enums.question_types import QuestionType
 from tests.base_test import BaseTest
+
+
+def _answer_question_for_patient(email: str) -> None:
+    factory = ServiceFactory.get_instance(refresh=True)
+    question_service = factory.build_question_service()
+    created = question_service.create_questions(
+        [
+            {
+                "text": f"Pregunta login {uuid4().hex[:8]}",
+                "question_type": QuestionType.CONCENTRATION,
+                "difficulty": 1.0,
+            }
+        ]
+    )
+    user_service = factory.build_user_service()
+    patient = user_service.get_user(email)
+    question_service.record_answer(patient, created[0].id, "Resposta", {"focus": 0.5})
 
 
 class TestUserLogin(BaseTest):
@@ -14,6 +35,19 @@ class TestUserLogin(BaseTest):
         assert "access_token" in response_data
         assert isinstance(response_data["access_token"], str)
         assert len(response_data["access_token"]) > 0
+        assert "already_responded_today" in response_data
+        assert response_data["already_responded_today"] is False
+
+    def test_login_marks_patient_as_responded_when_answer_exists_today(self):
+        payload = self.make_patient_payload()
+        self.register_patient(payload)
+        _answer_question_for_patient(payload["email"])
+
+        response = self.login(payload["email"], payload["password"])
+
+        assert response.status_code == 200
+        data = response.get_json() or {}
+        assert data.get("already_responded_today") is True
 
     def test_login_with_wrong_password_returns_401(self):
         payload = self.make_patient_payload()
@@ -69,6 +103,23 @@ class TestUserTokenRefresh(BaseTest):
         assert "access_token" in body
         assert isinstance(body["access_token"], str)
         assert body["access_token"] != original_token
+        assert "already_responded_today" in body
+        assert body["already_responded_today"] is False
+
+    def test_refresh_token_reflects_patient_answer_state(self):
+        patient_payload = self.make_patient_payload()
+        self.register_patient(patient_payload)
+        _answer_question_for_patient(patient_payload["email"])
+        original_token = self.login_and_get_token(patient_payload["email"], patient_payload["password"])
+
+        response = self.client.get(
+            f"{self.api_prefix}/user/login",
+            headers=self.auth_headers(original_token),
+        )
+
+        assert response.status_code == 200
+        body = response.get_json() or {}
+        assert body.get("already_responded_today") is True
 
     def test_refresh_token_without_auth_header_returns_401(self):
         response = self.client.get(f"{self.api_prefix}/user/login")
@@ -133,6 +184,7 @@ class TestUserTokenRefresh(BaseTest):
         new_token = body["access_token"]
         assert isinstance(new_token, str)
         assert new_token != original_token
+        assert body.get("already_responded_today") is False
 
     def test_refresh_token_without_hours_validity_uses_default(self):
         from datetime import datetime, timezone
@@ -153,6 +205,7 @@ class TestUserTokenRefresh(BaseTest):
         assert "access_token" in body
         assert isinstance(body["access_token"], str)
         assert body["access_token"] != original_token
+        assert body.get("already_responded_today") is False
 
     def test_refresh_token_with_admin_returns_new_token(self):
         admin_user = self.create_admin()
@@ -175,6 +228,7 @@ class TestUserTokenRefresh(BaseTest):
         new_token = body["access_token"]
         assert isinstance(new_token, str)
         assert new_token != original_token
+        assert body.get("already_responded_today") is False
 
         # Verify the token has the requested expiration window in hours
         with self.app.app_context():

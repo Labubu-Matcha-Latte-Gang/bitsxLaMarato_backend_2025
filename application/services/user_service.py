@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-from datetime import timedelta
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import plotly.io as pio
@@ -92,6 +92,18 @@ class GraphFilePayload(TypedDict):
     content_type: str
     content: str
 
+class LoginResult(TypedDict):
+    """
+    Payload returned after authenticating a user.
+
+    Fields:
+        access_token: JWT token for the authenticated session.
+        already_responded_today: Indicates whether a patient has answered their daily question today.
+            For non-patient users, this is always False.
+    """
+    access_token: str
+    already_responded_today: bool
+
 class PatientData(TypedDict):
     """Complete patient data including demographics, scores, questions and graphs."""
     patient: PatientPayload
@@ -145,17 +157,48 @@ class UserService:
     def create_access_token(self, email: str, expiration: Optional[timedelta] = None) -> str:
         return self.token_service.generate(email, expiration)
 
-    def login(self, email: str, password: str) -> str:
+    def login(self, email: str, password: str) -> LoginResult:
         user = self.user_repo.get_by_email(email)
         if user is None:
             raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
         if not user.check_password(password, self.hasher):
             raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
-        return self.create_access_token(user.email)
-    
+
+        access_token = self.create_access_token(user.email)
+        already_responded_today = self.has_answered_daily_question_today(user)
+        return {
+            "access_token": access_token,
+            "already_responded_today": already_responded_today,
+        }
+
     def refresh_token(self, email: str, expiration: Optional[float] = None) -> str:
         time_delta = timedelta(hours=expiration) if expiration is not None else None
         return self.create_access_token(email, time_delta)
+
+    def has_answered_daily_question_today(
+        self,
+        user: User,
+        reference_time: Optional[datetime] = None,
+    ) -> bool:
+        """
+        Check whether a patient has answered any daily question today.
+
+        Parameters:
+            user (User): The user to check. If the user is not a Patient, returns False.
+            reference_time (Optional[datetime]): Reference time for testing purposes. If None, uses current time.
+
+        Returns:
+            bool: True if the patient has answered a daily question today, False otherwise or if not a patient.
+
+        Side-effects:
+            None.
+
+        Exceptions raised:
+            None directly. Returns False for non-patient users.
+        """
+        if not isinstance(user, Patient):
+            return False
+        return self.question_answer_repo.has_answered_today(user.email, reference_time)
 
     def get_user(self, email: str) -> User:
         user = self.user_repo.get_by_email(email)

@@ -817,13 +817,25 @@ class UserLoginResponseSchema(Schema):
 
     class Meta:
         description = "Resposta d'autenticació amb el token JWT."
-        example = {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
+        example = {
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "already_responded_today": False,
+        }
 
     access_token = fields.String(
         required=True,
         metadata={
             "description": "Token d'autenticació per a l'usuari.",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        },
+    )
+
+    already_responded_today = fields.Boolean(
+        required=True,
+        dump_default=False,
+        metadata={
+            "description": "Indica si el pacient ja ha respost la pregunta diària avui.",
+            "example": False,
         },
     )
 
