@@ -140,3 +140,100 @@ class TestDoctorPatientSearch(BaseTest):
         )
 
         assert response.status_code == 404
+
+    def test_assigning_empty_patient_list_returns_404(self):
+        """
+        Edge case: assigning an empty patient list should return 404
+        with an appropriate error message.
+        """
+        doctor_payload = self.make_doctor_payload()
+        self.register_doctor(doctor_payload)
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+
+        response = self.client.post(
+            f"{self.api_prefix}/user/doctor/patients/assign",
+            json={"patients": []},
+            headers=self.auth_headers(token),
+        )
+
+        assert response.status_code == 404
+        body = response.get_json()
+        assert body is not None
+        assert "message" in body
+
+    def test_assigning_duplicate_patient_emails_deduplicates(self):
+        """
+        Edge case: assigning duplicate patient emails in the same request
+        should automatically deduplicate and assign the patient only once.
+        """
+        doctor_payload = self.make_doctor_payload()
+        self.register_doctor(doctor_payload)
+
+        patient_payload = self.make_patient_payload(name="Elena", surname="Rius")
+        self.register_patient(patient_payload)
+
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+        response = self.client.post(
+            f"{self.api_prefix}/user/doctor/patients/assign",
+            json={"patients": [patient_payload["email"], patient_payload["email"], patient_payload["email"]]},
+            headers=self.auth_headers(token),
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload is not None
+        patients = payload.get("role", {}).get("patients", [])
+        # Patient should appear only once despite being in the list three times
+        assert patients.count(patient_payload["email"]) == 1
+
+    def test_assigning_already_assigned_patient_is_idempotent(self):
+        """
+        Edge case: attempting to assign a patient that is already assigned
+        should succeed without error (idempotent operation).
+        """
+        patient_payload = self.make_patient_payload(name="Marc", surname="Puig")
+        self.register_patient(patient_payload)
+
+        doctor_payload = self.make_doctor_payload(patients=[patient_payload["email"]])
+        self.register_doctor(doctor_payload)
+
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+        # Try to assign the same patient again
+        response = self.client.post(
+            f"{self.api_prefix}/user/doctor/patients/assign",
+            json={"patients": [patient_payload["email"]]},
+            headers=self.auth_headers(token),
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload is not None
+        patients = payload.get("role", {}).get("patients", [])
+        # Patient should still appear only once
+        assert patients.count(patient_payload["email"]) == 1
+
+    def test_removing_unassigned_patient_succeeds_silently(self):
+        """
+        Edge case: removing a patient that is not currently assigned
+        should succeed without error (graceful handling).
+        """
+        doctor_payload = self.make_doctor_payload()
+        self.register_doctor(doctor_payload)
+
+        # Create a patient but don't assign them to the doctor
+        patient_payload = self.make_patient_payload(name="Laura", surname="Vila")
+        self.register_patient(patient_payload)
+
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+        response = self.client.post(
+            f"{self.api_prefix}/user/doctor/patients/unassign",
+            json={"patients": [patient_payload["email"]]},
+            headers=self.auth_headers(token),
+        )
+
+        # Should succeed even though patient was never assigned
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload is not None
+        patients = payload.get("role", {}).get("patients", [])
+        assert patient_payload["email"] not in patients
