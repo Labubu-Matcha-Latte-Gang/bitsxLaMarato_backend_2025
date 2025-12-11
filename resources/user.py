@@ -184,6 +184,7 @@ class DoctorRegister(MethodView):
 
             doctor_payload = doctor.to_dict()
             doctor_payload["access_token"] = login_payload["access_token"]
+            doctor_payload["already_responded_today"] = False
 
             return jsonify(doctor_payload), 201
         except KeyError as e:
