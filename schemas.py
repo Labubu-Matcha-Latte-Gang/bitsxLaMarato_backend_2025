@@ -1745,6 +1745,17 @@ class QRGenerateSchema(Schema):
         },
     )
 
+    patient_email = fields.Email(
+        required=False,
+        metadata={
+            "description": (
+                "Correu electrònic del pacient per al qual es genera el codi. "
+                "Obligatori per a metges; els pacients sempre generen el seu propi."
+            ),
+            "example": "pacient@example.com",
+        },
+    )
+
     format = fields.Enum(
         QRCodeFormat,
         required=False,
