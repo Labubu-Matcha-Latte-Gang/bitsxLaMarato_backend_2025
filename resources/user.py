@@ -301,6 +301,8 @@ class DoctorPatientAssign(MethodView):
     def post(self, payload: dict) -> Response:
         doctor_email = get_jwt_identity()
         patient_emails = payload["patients"]
+        if not patient_emails:
+            abort(404, message="Cal indicar almenys un pacient per assignar.")
         try:
             self.logger.info(
                 "Adding patients to doctor",
@@ -361,6 +363,8 @@ class DoctorPatientUnassign(MethodView):
     def post(self, payload: dict) -> Response:
         doctor_email = get_jwt_identity()
         patient_emails = payload["patients"]
+        if not patient_emails:
+            abort(404, message="Cal indicar almenys un pacient per eliminar l'associació.")
         try:
             self.logger.info(
                 "Removing patients from doctor",
