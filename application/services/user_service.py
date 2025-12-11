@@ -152,6 +152,10 @@ class UserService:
         if not user.check_password(password, self.hasher):
             raise InvalidCredentialsException("Correu o contrassenya no vàlids.")
         return self.create_access_token(user.email)
+    
+    def refresh_token(self, email: str, expiration: Optional[float] = None) -> str:
+        time_delta = timedelta(hours=expiration) if expiration is not None else None
+        return self.create_access_token(email, time_delta)
 
     def get_user(self, email: str) -> User:
         user = self.user_repo.get_by_email(email)
