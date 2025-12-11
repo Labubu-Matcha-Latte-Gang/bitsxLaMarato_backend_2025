@@ -245,10 +245,6 @@ class DoctorPatientSearch(MethodView):
         try:
             factory = ServiceFactory.get_instance()
             user_service = factory.build_user_service()
-            try:
-                user_service.get_user(doctor_email)
-            except UserNotFoundException:
-                abort(401, message="Token d'autenticació no vàlid.")
 
             self.logger.info(
                 "Searching patients by name",
