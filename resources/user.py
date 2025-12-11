@@ -306,9 +306,6 @@ class UserLogin(MethodView):
             user_service = ServiceFactory.get_instance().build_user_service()
             access_token = user_service.refresh_token(email, query_params.get("hours_validity", None))
             return {"access_token": access_token}, 200
-        except UserNotFoundException as e:
-            self.logger.error("User token refresh failed: User not found", module="UserLogin", metadata={"email": email}, error=e)
-            abort(401, message="Token no vàlid.")
         except ExpiredTokenException as e:
             self.logger.error("User token refresh failed: Token expired", module="UserLogin", metadata={"email": email}, error=e)
             abort(401, message="El token ha caducat.")
