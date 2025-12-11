@@ -655,10 +655,18 @@ class SQLAlchemyQuestionAnswerRepository(IQuestionAnswerRepository):
         patient_email: str,
         reference_time: Optional[datetime] = None,
     ) -> bool:
+        """
+        Returns True if the patient has answered a question today (UTC).
+        If reference_time is provided and is a naive datetime, it is assumed to be in UTC.
+        """
         from models.associations import QuestionAnsweredAssociation  # late import
 
         current = reference_time or datetime.now(timezone.utc)
-        current_utc = current.astimezone(timezone.utc)
+        # If current is naive, assume UTC
+        if current.tzinfo is None or current.tzinfo.utcoffset(current) is None:
+            current_utc = current.replace(tzinfo=timezone.utc)
+        else:
+            current_utc = current.astimezone(timezone.utc)
         start_of_day = current_utc.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_day = start_of_day + timedelta(days=1)
 
