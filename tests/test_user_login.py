@@ -50,3 +50,66 @@ class TestUserLogin(BaseTest):
         })
         
         assert response.status_code == 422
+
+
+class TestUserTokenRefresh(BaseTest):
+    def test_refresh_token_returns_new_token(self):
+        patient_payload = self.make_patient_payload()
+        self.register_patient(patient_payload)
+        original_token = self.login_and_get_token(patient_payload["email"], patient_payload["password"])
+
+        response = self.client.get(
+            f"{self.api_prefix}/user/login?hours_validity=2.5",
+            headers=self.auth_headers(original_token),
+        )
+
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body is not None
+        assert "access_token" in body
+        assert isinstance(body["access_token"], str)
+        assert body["access_token"] != original_token
+
+    def test_refresh_token_without_auth_header_returns_401(self):
+        response = self.client.get(f"{self.api_prefix}/user/login")
+
+        assert response.status_code == 401
+        body = response.get_json()
+        assert body is not None
+        assert "msg" in body
+
+    def test_refresh_token_with_invalid_token_returns_422(self):
+        response = self.client.get(
+            f"{self.api_prefix}/user/login",
+            headers={"Authorization": "Bearer malformed.token.value"},
+        )
+
+        assert response.status_code == 422
+        body = response.get_json()
+        assert body is not None
+        assert "msg" in body
+
+    def test_refresh_token_with_nonexistent_user_returns_401(self):
+        fake_token = self.generate_token("ghost@example.com")
+
+        response = self.client.get(
+            f"{self.api_prefix}/user/login",
+            headers=self.auth_headers(fake_token),
+        )
+
+        assert response.status_code == 401
+        body = response.get_json()
+        assert body is not None
+        assert body.get("message") == "Token d'autenticació no vàlid."
+
+    def test_refresh_token_with_invalid_hours_validity_returns_422(self):
+        patient_payload = self.make_patient_payload()
+        self.register_patient(patient_payload)
+        token = self.login_and_get_token(patient_payload["email"], patient_payload["password"])
+
+        response = self.client.get(
+            f"{self.api_prefix}/user/login?hours_validity=0.5",
+            headers=self.auth_headers(token),
+        )
+
+        assert response.status_code == 422
