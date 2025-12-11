@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from domain.entities.score import Score
 from domain.entities.question_answer import QuestionAnswer
@@ -82,9 +82,9 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 and other descriptive names containing Plotly figure definitions.
         """
         # Organise scores by activity type and activity id
-        groups: Dict[str, Dict[str, Dict[str, object]]] = {}
+        groups: Dict[str, Dict[str, Dict[str, Any]]] = {}
         type_scores: Dict[str, List[float]] = {}
-        speed_groups: Dict[str, Dict[str, Dict[str, object]]] = {}
+        speed_groups: Dict[str, Dict[str, Dict[str, Any]]] = {}
         for s in scores:
             activity_type = s.activity.activity_type.value if s.activity.activity_type else "unknown"
             activity_id = str(s.activity.id)
