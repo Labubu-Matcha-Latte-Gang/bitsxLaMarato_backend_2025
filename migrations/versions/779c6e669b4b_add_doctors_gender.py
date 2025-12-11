@@ -19,13 +19,13 @@ depends_on = None
 
 
 def upgrade():
-    gender_enum = postgresql.ENUM("MALE", "FEMALE", "OTHERS", name="gender")
+    gender_enum = postgresql.ENUM("male", "female", "others", name="gender")
     gender_enum.create(op.get_bind(), checkfirst=True)
     op.add_column(
         "doctors",
-        sa.Column("gender", gender_enum, nullable=True, server_default=sa.text("'MALE'::gender")),
+        sa.Column("gender", gender_enum, nullable=True, server_default=sa.text("'male'::gender")),
     )
-    op.execute("UPDATE doctors SET gender = 'MALE' WHERE gender IS NULL")
+    op.execute("UPDATE doctors SET gender = 'male' WHERE gender IS NULL")
     op.alter_column("doctors", "gender", nullable=False, server_default=None)
 
 
