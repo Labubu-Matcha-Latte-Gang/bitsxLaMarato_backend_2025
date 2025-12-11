@@ -101,6 +101,7 @@ class PatientRegister(MethodView):
 
             patient_payload = patient.to_dict()
             patient_payload["access_token"] = login_payload["access_token"]
+            patient_payload["already_responded_today"] = False
 
             return jsonify(patient_payload), 201
         except KeyError as e:
