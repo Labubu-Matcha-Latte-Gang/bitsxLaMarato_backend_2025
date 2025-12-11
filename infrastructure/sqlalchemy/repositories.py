@@ -282,12 +282,14 @@ class SQLAlchemyPatientRepository(IPatientRepository):
             return []
 
         safe_limit = max(1, min(limit, 50))
-        pattern = f"%{normalized.lower()}%"
+        # Escape LIKE wildcards to treat them as literal characters
+        escaped_query = normalized.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped_query}%"
 
         patients_query = self.session.query(Patient).filter(
             or_(
-                func.lower(Patient.name).like(pattern),
-                func.lower(Patient.surname).like(pattern),
+                func.lower(Patient.name).like(pattern, escape="\\"),
+                func.lower(Patient.surname).like(pattern, escape="\\"),
             )
         )
 
