@@ -140,3 +140,60 @@ class TestDoctorPatientSearch(BaseTest):
         )
 
         assert response.status_code == 404
+
+    def test_search_escapes_like_wildcards(self):
+        """Test that % and _ characters in search queries are treated as literal characters, not wildcards."""
+        doctor_payload = self.make_doctor_payload()
+        self.register_doctor(doctor_payload)
+
+        # Create a patient with % in the name
+        patient_with_percent = self.make_patient_payload(
+            name="Test%Name",
+            surname="Smith",
+            doctors=[doctor_payload["email"]],
+        )
+        self.register_patient(patient_with_percent)
+
+        # Create a patient with _ in the name
+        patient_with_underscore = self.make_patient_payload(
+            name="Test_Name",
+            surname="Jones",
+            doctors=[doctor_payload["email"]],
+        )
+        self.register_patient(patient_with_underscore)
+
+        # Create a patient without special characters
+        normal_patient = self.make_patient_payload(
+            name="TestName",
+            surname="Brown",
+            doctors=[doctor_payload["email"]],
+        )
+        self.register_patient(normal_patient)
+
+        token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+
+        # Search for the % character - should only match the patient with % in the name
+        response = self.client.get(
+            f"{self.api_prefix}/user/doctor/patients/search?q=Test%25Name",
+            headers=self.auth_headers(token),
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body is not None
+        emails = [item["email"] for item in body.get("results", [])]
+        assert patient_with_percent["email"] in emails
+        assert patient_with_underscore["email"] not in emails
+        assert normal_patient["email"] not in emails
+
+        # Search for the _ character - should only match the patient with _ in the name
+        response = self.client.get(
+            f"{self.api_prefix}/user/doctor/patients/search?q=Test_Name",
+            headers=self.auth_headers(token),
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body is not None
+        emails = [item["email"] for item in body.get("results", [])]
+        assert patient_with_underscore["email"] in emails
+        assert patient_with_percent["email"] not in emails
+        assert normal_patient["email"] not in emails
