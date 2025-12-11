@@ -14,7 +14,9 @@ from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
 from helpers.exceptions.mail_exceptions import SMTPCredentialsException, SendEmailException
 from helpers.exceptions.user_exceptions import (
+    ExpiredTokenException,
     InvalidResetCodeException,
+    InvalidTokenException,
     UserAlreadyExistsException,
     InvalidCredentialsException,
     UserNotFoundException,
@@ -38,6 +40,7 @@ from schemas import (
     UserResetPasswordSchema,
     UserResponseSchema,
     UserRegisterResponseSchema,
+    UserTokenRefreshSchema,
     UserUpdateSchema,
     UserPartialUpdateSchema,
     UserForgotPasswordSchema,
@@ -270,6 +273,56 @@ class UserLogin(MethodView):
         except Exception as e:
             self.logger.error("User login failed", module="UserLogin", error=e)
             abort(500, message=f"S'ha produït un error inesperat en iniciar sessió: {str(e)}")
+
+    @roles_required([UserRole.ADMIN, UserRole.DOCTOR, UserRole.PATIENT])
+    @blp.arguments(UserTokenRefreshSchema, location='query')
+    @blp.doc(
+        summary="Refrescar sessió",
+        description="Autentica un JWT i emet un altre token JWT.",
+    )
+    @blp.response(200, schema=UserLoginResponseSchema, description="Token JWT emès amb credencials vàlides.")
+    @blp.response(400, description="Nombre d'hores de validesa no vàlid.")
+    @blp.response(401, description="Token no vàlid o caducat.")
+    @blp.response(409, description="S'ha detectat un conflicte de rol d'usuari durant l'inici de sessió.")
+    @blp.response(422, description="El paràmetre de consulta no ha superat la validació.")
+    @blp.response(500, description="Error inesperat del servidor durant l'autenticació.")
+    def get(self, query_params: dict) -> Response:
+        """
+        Refresca un token d'accés JWT.
+
+        Requereix un JWT vàlid. Retorna un nou token d'accés per usar als endpoints autenticats.
+        S'espera un paràmetre opcional `hours_validity` per definir la durada del nou token.
+
+        Codis d'estat:
+        - 200: Token refrescat; retorna el nou token JWT.
+        - 400: Paràmetre d'hores de validesa no vàlid.
+        - 401: Credencials no vàlides.
+        - 409: Estat de rol inconsistent.
+        - 422: El paràmetre de consulta no supera la validació d'esquema.
+        - 500: Error inesperat durant l'autenticació.
+        """
+        try:
+            email = get_jwt_identity()
+            self.logger.info("User token refresh attempt", module="UserLogin", metadata={"email": email})
+
+            user_service = ServiceFactory.get_instance().build_user_service()
+            access_token = user_service.refresh_token(email, query_params.get("hours_validity", None))
+            return {"access_token": access_token}, 200
+        except UserNotFoundException as e:
+            self.logger.error("User token refresh failed: User not found", module="UserLogin", metadata={"email": email}, error=e)
+            abort(401, message="Token no vàlid.")
+        except ExpiredTokenException as e:
+            self.logger.error("User token refresh failed: Token expired", module="UserLogin", metadata={"email": email}, error=e)
+            abort(401, message="El token ha caducat.")
+        except InvalidTokenException as e:
+            self.logger.error("User token refresh failed: Invalid token", module="UserLogin", metadata={"email": email}, error=e)
+            abort(401, message="Token no vàlid.")
+        except UserRoleConflictException as e:
+            self.logger.error("User token refresh failed: Role conflict", module="UserLogin", metadata={"email": email}, error=e)
+            abort(409, message=f"Conflicte de rol d'usuari: {str(e)}")
+        except Exception as e:
+            self.logger.error("User token refresh failed", module="UserLogin", error=e)
+            abort(500, message=f"S'ha produït un error inesperat en refrescar el token: {str(e)}")
 
 @blp.route('')
 class UserCRUD(MethodView):
