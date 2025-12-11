@@ -219,7 +219,7 @@ class DoctorRegister(MethodView):
 @blp.route('/doctor/patients/search')
 class DoctorPatientSearch(MethodView):
     """
-    Endpoint perquè els metges cerquin pacients assignats per nom/cognom parcial.
+    Endpoint perquè els metges cerquin qualsevol pacient per nom/cognom parcial.
     """
 
     logger = AbstractLogger.get_instance()
@@ -227,8 +227,8 @@ class DoctorPatientSearch(MethodView):
     @roles_required([UserRole.DOCTOR])
     @blp.arguments(PatientSearchQuerySchema, location='query')
     @blp.doc(
-        summary="Cercar pacients assignats",
-        description="Permet als metges recuperar la llista de pacients assignats filtrant per un fragment del nom o del cognom.",
+        summary="Cercar pacients",
+        description="Permet als metges recuperar la llista de pacients de la base de dades filtrant per un fragment del nom o del cognom.",
     )
     @blp.response(200, schema=PatientSearchResponseSchema, description="Resultats de la cerca retornats correctament.")
     @blp.response(401, description="Falta o és invàlid el JWT.")
@@ -238,7 +238,7 @@ class DoctorPatientSearch(MethodView):
     @blp.response(500, description="Error inesperat del servidor en cercar pacients.")
     def get(self, query_params: dict) -> Response:
         """
-        Retorna la llista de pacients assignats que coincideixen parcialment amb el fragment subministrat.
+        Retorna la llista de pacients que coincideixen parcialment amb el fragment subministrat.
         """
         query_fragment = query_params["q"]
         limit = query_params["limit"]

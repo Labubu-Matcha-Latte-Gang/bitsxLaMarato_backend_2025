@@ -114,10 +114,11 @@ class DoctorService:
 
     def search_patients(self, doctor_email: str, query: str, limit: int = 20) -> list[Patient]:
         """
-        Allow a doctor to search their patients by partial name or surname.
+        Allow a doctor to search any patient by partial name or surname.
         """
-        doctor = self.get_doctor(doctor_email)
-        return self.patient_repo.search_by_name(query, doctor_email=doctor.email, limit=limit)
+        # Still validate the doctor exists before running the search
+        self.get_doctor(doctor_email)
+        return self.patient_repo.search_by_name(query, limit=limit)
 
     def delete_doctor(self, email: str) -> None:
         """
