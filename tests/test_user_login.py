@@ -114,6 +114,13 @@ class TestUserTokenRefresh(BaseTest):
 
         assert response.status_code == 422
 
+    def test_refresh_token_with_doctor_returns_new_token(self):
+        doctor_payload = self.make_doctor_payload()
+        self.register_doctor(doctor_payload)
+        original_token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
+
+        response = self.client.get(
+            f"{self.api_prefix}/user/login?hours_validity=2.5",
     def test_refresh_token_without_hours_validity_uses_default(self):
         from datetime import datetime, timezone
         from flask_jwt_extended import decode_token
@@ -131,6 +138,24 @@ class TestUserTokenRefresh(BaseTest):
         body = response.get_json()
         assert body is not None
         assert "access_token" in body
+        assert isinstance(body["access_token"], str)
+        assert body["access_token"] != original_token
+
+    def test_refresh_token_with_admin_returns_new_token(self):
+        admin_user = self.create_admin()
+        original_token = self.login_and_get_token(admin_user.email, self.default_password)
+
+        response = self.client.get(
+            f"{self.api_prefix}/user/login?hours_validity=2.5",
+            headers=self.auth_headers(original_token),
+        )
+
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body is not None
+        assert "access_token" in body
+        assert isinstance(body["access_token"], str)
+        assert body["access_token"] != original_token
         new_token = body["access_token"]
         assert isinstance(new_token, str)
         assert new_token != original_token
