@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from domain.entities.user import Doctor
+from domain.entities.user import Doctor, Patient
 from domain.repositories import IDoctorRepository, IPatientRepository, IUserRepository
 from domain.services.security import PasswordHasher
 from domain.unit_of_work import IUnitOfWork
@@ -111,6 +111,13 @@ class DoctorService:
             self.uow.commit()
 
         return doctor
+
+    def search_patients(self, doctor_email: str, query: str, limit: int = 20) -> list[Patient]:
+        """
+        Allow a doctor to search their patients by partial name or surname.
+        """
+        doctor = self.get_doctor(doctor_email)
+        return self.patient_repo.search_by_name(query, doctor_email=doctor.email, limit=limit)
 
     def delete_doctor(self, email: str) -> None:
         """
