@@ -128,3 +128,65 @@ class DoctorService:
         with self.uow:
             self.doctor_repo.remove(doctor)
             self.uow.commit()
+
+    def add_patients(self, doctor_email: str, patient_emails: list[str]) -> Doctor:
+        """
+        Associate multiple patients with a doctor, keeping bidirectional links.
+        """
+        doctor = self.get_doctor(doctor_email)
+        normalized = self._normalize_emails(patient_emails)
+        if not normalized:
+            return doctor
+
+        patients = self.patient_repo.fetch_by_emails(normalized)
+
+        with self.uow:
+            doctor.add_patients(patients)
+            self.doctor_repo.update(doctor)
+
+            for patient in patients:
+                if doctor.email not in patient.doctor_emails:
+                    patient.add_doctors([doctor])
+                self.patient_repo.update(patient)
+
+            self.uow.commit()
+
+        return doctor
+
+    def remove_patients(self, doctor_email: str, patient_emails: list[str]) -> Doctor:
+        """
+        Remove associations between a doctor and multiple patients.
+        """
+        doctor = self.get_doctor(doctor_email)
+        normalized = self._normalize_emails(patient_emails)
+        if not normalized:
+            return doctor
+
+        patients = self.patient_repo.fetch_by_emails(normalized)
+
+        with self.uow:
+            for patient in patients:
+                doctor.remove_patient(patient.email)
+                patient.remove_doctor(doctor.email)
+                self.patient_repo.update(patient)
+
+            self.doctor_repo.update(doctor)
+            self.uow.commit()
+
+        return doctor
+
+    @staticmethod
+    def _normalize_emails(emails: list[str] | None) -> list[str]:
+        if not emails:
+            return []
+        seen = set()
+        ordered: list[str] = []
+        for email in emails:
+            if not email:
+                continue
+            lowered = email.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            ordered.append(email)
+        return ordered
