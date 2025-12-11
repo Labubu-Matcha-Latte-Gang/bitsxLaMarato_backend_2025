@@ -234,7 +234,7 @@ class SQLAlchemyUserRepository(IUserRepository):
             password_hash=model.password,
             name=model.name,
             surname=model.surname,
-             gender=model.gender,
+            gender=model.gender,
             patients=patients,  # type: ignore[arg-type]
         )
 
