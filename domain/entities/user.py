@@ -238,6 +238,7 @@ class Patient(User):
 
 @dataclass
 class Doctor(User):
+    gender: Gender
     patients: List[Patient] = field(default_factory=list)
 
     @property
@@ -246,6 +247,7 @@ class Doctor(User):
 
     def role_payload(self) -> dict:
         return {
+            "gender": self.gender.value if self.gender else None,
             "patients": [patient.email for patient in self.patients],
         }
 
@@ -257,6 +259,8 @@ class Doctor(User):
 
     def set_properties(self, data: dict, hasher: PasswordHasher) -> None:
         super().set_properties(data, hasher)
+        if "gender" in data and data["gender"] is not None:
+            self.gender = data["gender"]
 
     @property
     def patient_emails(self) -> List[str]:
