@@ -5,7 +5,7 @@ from typing import Iterable, List, Optional, Dict
 import uuid
 
 from db import db
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from domain.entities.activity import Activity as ActivityDomain
 from domain.entities.question import Question as QuestionDomain
@@ -38,7 +38,7 @@ from helpers.exceptions.question_exceptions import QuestionNotFoundException
 from helpers.exceptions.activity_exceptions import ActivityNotFoundException
 from models.activity import Activity
 from models.admin import Admin
-from models.associations import UserCodeAssociation
+from models.associations import DoctorPatientAssociation, UserCodeAssociation
 from models.doctor import Doctor
 from models.patient import Patient
 from models.question import Question
@@ -269,6 +269,43 @@ class SQLAlchemyPatientRepository(IPatientRepository):
                 f"No s'ha trobat cap pacient amb el correu: {', '.join(missing)}"
             )
         return [self.user_repo._to_domain(patient) for patient in patients]  # type: ignore[list-item]
+
+    def search_by_name(
+        self,
+        query: str,
+        *,
+        doctor_email: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[PatientDomain]:
+        normalized = (query or "").strip()
+        if not normalized:
+            return []
+
+        safe_limit = max(1, limit)
+        # Escape LIKE wildcards to treat them as literal characters
+        escaped_query = normalized.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped_query}%"
+
+        patients_query = self.session.query(Patient).filter(
+            or_(
+                func.lower(Patient.name).like(pattern, escape="\\"),
+                func.lower(Patient.surname).like(pattern, escape="\\"),
+            )
+        )
+
+        if doctor_email:
+            patients_query = patients_query.join(
+                DoctorPatientAssociation,
+                DoctorPatientAssociation.patient_email == Patient.email,
+            ).filter(DoctorPatientAssociation.doctor_email == doctor_email)
+
+        patients = (
+            patients_query.order_by(func.lower(Patient.name), func.lower(Patient.surname))
+            .limit(safe_limit)
+            .all()
+        )
+
+        return [self.user_repo._to_domain(patient) for patient in patients]
 
 
 class SQLAlchemyDoctorRepository(IDoctorRepository):

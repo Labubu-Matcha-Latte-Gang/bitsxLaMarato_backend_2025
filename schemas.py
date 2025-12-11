@@ -306,6 +306,101 @@ class PatientDataResponseSchema(Schema):
     )
 
 
+class PatientSearchQuerySchema(Schema):
+    """
+    Paràmetres de consulta per cercar pacients per nom o cognom parcial.
+    """
+
+    class Meta:
+        description = "Permet als metges filtrar els pacients introduint un fragment del nom o del cognom."
+        example = {"q": "garc", "limit": 10}
+
+    q = fields.String(
+        required=True,
+        validate=validate.Length(min=2),
+        metadata={
+            "description": "Fragment del nom o del cognom sobre el qual es farà la cerca (mínim 2 caràcters).",
+            "example": "mart",
+        },
+    )
+    limit = fields.Integer(
+        load_default=20,
+        validate=validate.Range(min=1, max=100),
+        metadata={
+            "description": "Nombre màxim de coincidències retornades (1-100). Per defecte 20.",
+            "example": 5,
+        },
+    )
+
+
+class PatientSearchResponseSchema(Schema):
+    """
+    Resultat de la cerca de pacients.
+    """
+
+    class Meta:
+        description = "Retorna el fragment consultat i la llista de pacients que hi coincideixen."
+        example = {
+            "query": "mart",
+            "results": [
+                {
+                    "email": "anna.martinez@example.com",
+                    "name": "Anna",
+                    "surname": "Martínez",
+                    "role": {
+                        "ailments": "Hipertensió",
+                        "gender": "female",
+                        "age": 55,
+                        "treatments": "Dieta",
+                        "height_cm": 165,
+                        "weight_kg": 62,
+                        "doctors": ["dr.house@example.com"],
+                    },
+                }
+            ],
+        }
+
+    query = fields.String(
+        required=True,
+        metadata={
+            "description": "Fragment utilitzat en la cerca.",
+            "example": "mart",
+        },
+    )
+    results = fields.List(
+        fields.Nested(UserResponseSchema),
+        required=True,
+        metadata={
+            "description": "Llista de pacients que coincideixen amb el fragment buscat (pot estar buida).",
+        },
+    )
+
+
+class DoctorPatientBulkSchema(Schema):
+    """
+    Cos per afegir o eliminar múltiples pacients associats a un metge.
+    """
+
+    class Meta:
+        description = "Permet indicar una llista de pacients sobre els quals aplicar l'operació."
+        example = {"patients": ["anna@example.com", "jordi@example.com"]}
+
+    patients = fields.List(
+        fields.Email(
+            required=True,
+            metadata={
+                "description": "Correu electrònic del pacient.",
+                "example": "pacient@example.com",
+            },
+        ),
+        required=True,
+        validate=validate.Length(min=0, max=50),
+        metadata={
+            "description": "Llista de pacients sobre els quals aplicar l'operació (fins a 50 elements).",
+        },
+    )
+
+
 class UserUpdateSchema(Schema):
     """
     Esquema per a actualitzacions completes de l'usuari (PUT).
