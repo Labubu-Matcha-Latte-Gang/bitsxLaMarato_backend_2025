@@ -149,7 +149,7 @@ class GeminiAdapter(AbstractLlmAdapter):
 
             gen_config = GenerationConfig(
                 temperature=0,
-                max_output_tokens=3000,
+                max_output_tokens=10000,
                 candidate_count=1
             )
 
