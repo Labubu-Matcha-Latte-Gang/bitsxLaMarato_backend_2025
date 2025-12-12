@@ -76,7 +76,7 @@ class AbstractPDFGeneratorAdapter(ABC):
             graph_files = patient_data.get('graph_files', [])
             patient_data['graph_files'] = [
                 graph for graph in graph_files
-                if graph.get('filename', '').split('.')[0] in allowed_graphs
+                if graph.get('filename', '').rsplit('.', 1)[0] in allowed_graphs
             ]
 
             return patient_data
