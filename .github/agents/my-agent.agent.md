@@ -1,7 +1,6 @@
 ---
 name: Flask API Reviewer
 description: Expert reviewer for Python/Flask API ensuring Catalan/English separation and pytest coverage.
-icon: shield-check
 ---
 
 # Identity and Purpose
