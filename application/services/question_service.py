@@ -147,3 +147,11 @@ class QuestionService:
                 "No hi ha preguntes disponibles a la base de dades."
             )
         return choice(questions)
+
+    def get_diary_question(self) -> Question:
+        question = self.question_repo.get_diary_question()
+        if not question:
+            raise QuestionNotFoundException(
+                "No hi ha cap pregunta del diari disponible a la base de dades."
+            )
+        return question
