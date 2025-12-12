@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from time import time
 from typing import TYPE_CHECKING
 
 from openai import AzureOpenAI
@@ -147,10 +148,13 @@ class GeminiAdapter(AbstractLlmAdapter):
         
         try:
 
+            init_time = time()
             gen_config = GenerationConfig(
                 temperature=0,
-                max_output_tokens=10000,
-                candidate_count=1
+                max_output_tokens=6000,
+                candidate_count=1,
+                top_p=0.6,
+                top_k=25
             )
 
             model = genai.GenerativeModel(
@@ -169,7 +173,9 @@ class GeminiAdapter(AbstractLlmAdapter):
                 self.logger.error("Empty summary received from Gemini", module="GeminiAdapter")
                 return "No s'ha pogut generar un resum del pacient."
             
-            self.logger.debug("Generated summary from Gemini", module="GeminiAdapter", metadata={"summary": final_summary})
+            final_time = time() - init_time
+            self.logger.info(f"Gemini summary generated in {final_time:.2f} seconds", module="GeminiAdapter", metadata={"duration_seconds": final_time, "summary": final_summary})
+            
             return final_summary
 
         except Exception as e:
