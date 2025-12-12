@@ -58,3 +58,5 @@ SMTP_USERNAME = os.getenv('SMTP_USERNAME')
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 SMTP_USE_TLS = str(os.getenv('SMTP_USE_TLS', 'true')).lower() in ('t', 'true', '1', 'y', 'yes')
 SMTP_USE_SSL = str(os.getenv('SMTP_USE_SSL', 'false')).lower() in ('t', 'true', '1', 'y', 'yes')
+
+DIARY_QUESTION_ID = "c51fd74b-8940-4bb2-9668-a498e98ffc92"
