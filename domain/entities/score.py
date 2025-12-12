@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from domain.entities.activity import Activity
-from domain.entities.user import Patient
+if TYPE_CHECKING:
+    from domain.entities.activity import Activity
+    from domain.entities.user import Patient
 
 
 @dataclass
