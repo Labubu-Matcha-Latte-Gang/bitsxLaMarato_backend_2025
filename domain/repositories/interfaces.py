@@ -247,6 +247,15 @@ class IQuestionRepository(ABC):
             List[Question]: Questions satisfying the filters.
         """
         raise NotImplementedError()
+    
+    @abstractmethod
+    def get_diary_question(self) -> Question:
+        """
+        Retrieve the diary question.
+        Returns:
+            Question: The diary question.
+        """
+        raise NotImplementedError()
 
     @abstractmethod
     def add_many(self, questions: Iterable[Question]) -> None:

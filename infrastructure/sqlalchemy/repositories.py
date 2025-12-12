@@ -28,6 +28,7 @@ from domain.repositories import (
     IUserRepository,
     ITranscriptionAnalysisRepository,
 )
+from globals import DIARY_QUESTION_ID
 from helpers.enums.user_role import UserRole
 from helpers.exceptions.user_exceptions import (
     RelatedUserNotFoundException,
@@ -404,6 +405,10 @@ class SQLAlchemyQuestionRepository(IQuestionRepository):
             query = query.filter(Question.question_type == question_type)
 
         return [self._to_domain(model) for model in query.all()]
+    
+    def get_diary_question(self) -> Optional[QuestionDomain]:
+        diary_question_id = uuid.UUID(DIARY_QUESTION_ID)
+        return self.get(diary_question_id)
 
     def add_many(self, questions: Iterable[QuestionDomain]) -> None:
         for question in questions:
