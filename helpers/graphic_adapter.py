@@ -143,7 +143,7 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 ],
                 "layout": {
                     "title": "Puntuació mitjana per àmbit",
-                    "xaxis": {"title": "Tipus de pregunta (QuestionType)"},
+                    "xaxis": {"title": "Tipus de pregunta"},
                     "yaxis": {"title": "Puntuació mitjana", "range": [0, 10]},
                 },
             }
