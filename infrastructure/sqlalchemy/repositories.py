@@ -578,6 +578,7 @@ class SQLAlchemyScoreRepository(IScoreRepository):
         score_rows: List[Score] = (
             self.session.query(Score)
             .filter(Score.patient_email == patient_email)
+            .order_by(Score.completed_at.desc())
             .all()
         )
         patient_model: Patient | None = self.session.get(Patient, patient_email)
