@@ -10,7 +10,10 @@ import pytest
 
 from domain.entities.activity import Activity
 from domain.entities.score import Score
-from domain.services.progress import InverseEfficiencyProgressStrategy
+from domain.services.progress import (
+    CompositeProgressStrategy,
+    InverseEfficiencyProgressStrategy,
+)
 from helpers.enums.question_types import QuestionType
 
 
@@ -392,10 +395,16 @@ class TestInverseEfficiencyProgressStrategy:
 
     def test_strategy_implements_interface(self):
         """Test that InverseEfficiencyProgressStrategy implements CompositeProgressStrategy."""
-        from domain.services.progress import CompositeProgressStrategy
         assert isinstance(self.strategy, CompositeProgressStrategy)
 
     def test_constants_have_expected_values(self):
-        """Test that strategy constants are set to expected values."""
+        """
+        Test that strategy constants are set to documented values.
+        
+        These specific values (MIN_ACCURACY=0.05, SMOOTHING_ALPHA=0.35) are validated
+        to ensure the algorithm's behavior remains consistent with the documented approach:
+        - MIN_ACCURACY prevents division by zero and keeps denominator meaningful
+        - SMOOTHING_ALPHA balances between recency and stability in exponential smoothing
+        """
         assert self.strategy.MIN_ACCURACY == 0.05
         assert self.strategy.SMOOTHING_ALPHA == 0.35
