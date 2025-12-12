@@ -6,3 +6,4 @@ class QuestionType(Enum):
     WORDS = "words"
     SORTING = "sorting"
     MULTITASKING = "multitasking"
+    DIARY = "diary"
