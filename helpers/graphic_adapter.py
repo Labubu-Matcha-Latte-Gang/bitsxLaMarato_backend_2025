@@ -187,7 +187,7 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     }
                 ],
                 "layout": {
-                    "title": "Progrés global (eficiència combinada)",
+                    "title": "Progrés global (Inverse Efficiency Score - Townsend & Ashby, 1983)",
                     "xaxis": {"title": "Data"},
                     "yaxis": {"title": "Eficiència (0-1, més alt és millor)", "range": [0, 1]},
                 },
