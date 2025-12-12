@@ -61,19 +61,6 @@ class AbstractLlmAdapter(ABC):
                 )
                 lines.append(row)
             lines.append("")
-
-        questions = patient_data.get("questions", [])
-        if questions:
-            lines.append("## Historial de Preguntes i Respostes")
-            for item in questions:
-                q_data = item.get("question", {})
-                lines.append(f"### ID de Pregunta: {q_data.get('id', 'N/A')} (Dificultat: {q_data.get('difficulty', 'N/A')})")
-                lines.append(f"**Text:** {q_data.get('text', '')}")
-                lines.append(f"**Tipus:** {q_data.get('question_type', 'N/A')}")
-                lines.append(f"**Respost el:** {item.get('answered_at', 'N/A')}")
-                answer_text = item.get("answer_text") or "Sense resposta registrada"
-                lines.append(f"**Resposta transcrita:** {answer_text}")
-                lines.append("---")
         
         return "\n".join(lines)
     
@@ -161,8 +148,8 @@ class GeminiAdapter(AbstractLlmAdapter):
         try:
 
             gen_config = GenerationConfig(
-                temperature=0.2,
-                max_output_tokens=2000,
+                temperature=0,
+                max_output_tokens=3000,
                 candidate_count=1
             )
 
