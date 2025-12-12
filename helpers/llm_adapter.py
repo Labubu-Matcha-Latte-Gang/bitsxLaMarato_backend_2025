@@ -174,7 +174,10 @@ class GeminiAdapter(AbstractLlmAdapter):
                 return "No s'ha pogut generar un resum del pacient."
             
             final_time = time() - init_time
-            self.logger.info(f"Gemini summary generated in {final_time:.2f} seconds", module="GeminiAdapter", metadata={"duration_seconds": final_time, "summary": final_summary})
+            # Do not log the full summary at info level to avoid exposing sensitive patient data
+            self.logger.info(f"Gemini summary generated in {final_time:.2f} seconds", module="GeminiAdapter", metadata={"duration_seconds": final_time})
+            # If needed for debugging, log the summary at debug level (ensure this is disabled in production)
+            # self.logger.debug("Gemini summary content", module="GeminiAdapter", metadata={"summary": final_summary})
             
             return final_summary
 
