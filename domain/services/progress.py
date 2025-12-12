@@ -52,7 +52,9 @@ class InverseEfficiencyProgressStrategy(CompositeProgressStrategy):
 
             accuracy = max(self.MIN_ACCURACY, min(score.score / 10.0, 1.0))
             normalised_time = max(0.0, score.seconds_to_finish) / max_seconds
+            # Classic IES from Townsend & Ashby (1983): higher values indicate worse performance
             ies = normalised_time / accuracy
+            # Transform to normalized efficiency metric [0, 1] where higher values indicate better performance
             efficiency = 1.0 / (1.0 + ies)
 
             previous = per_type_state.get(type_key)
