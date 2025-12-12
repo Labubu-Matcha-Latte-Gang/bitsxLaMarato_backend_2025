@@ -70,6 +70,12 @@ class AbstractPDFGeneratorAdapter(ABC):
                 score['completed_at'] = cls.__transform_date(score['completed_at'])
             for question in patient_data.get('questions', []):
                 question['answered_at'] = cls.__transform_date(question['answered_at'])
+            allowed_graphs = {"progress_composite", "question_metrics"}
+            graph_files = patient_data.get('graph_files', [])
+            patient_data['graph_files'] = [
+                graph for graph in graph_files
+                if graph.get('filename', '').split('.')[0] in allowed_graphs
+            ]
 
             return patient_data
         except KeyError as e:
