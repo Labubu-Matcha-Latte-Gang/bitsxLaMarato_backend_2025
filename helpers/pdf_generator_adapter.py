@@ -66,6 +66,9 @@ class AbstractPDFGeneratorAdapter(ABC):
         """
         try:
             patient_data['patient']['role']['gender'] = cls.__transform_gender(patient_data['patient']['role']['gender'])
+            patient_data['scores'] = patient_data.get('scores', [])[:10]
+            recent_questions = patient_data.get('questions', [])[:7]
+            patient_data['questions'] = recent_questions
             for score in patient_data['scores']:
                 score['completed_at'] = cls.__transform_date(score['completed_at'])
             for question in patient_data.get('questions', []):
