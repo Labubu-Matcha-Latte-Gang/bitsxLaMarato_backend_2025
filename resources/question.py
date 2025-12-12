@@ -348,3 +348,49 @@ class DailyQuestionResource(MethodView):
         except Exception as e:
             self.logger.error("Error inesperat en recuperar preguntes", module="DailyQuestionResource", error=e)
             abort(500, message=f"S'ha produït un error inesperat en recuperar la pregunta diària: {str(e)}")
+
+@blp.route('/diary')
+class DiaryQuestionResource(MethodView):
+    """
+    Endpoints per a la pregunta del diari.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @roles_required([UserRole.PATIENT])
+    @blp.doc(
+        summary="Obtenir pregunta del diari.",
+        description=(
+            "Obté la pregunta del diari per al pacient."
+        ),
+    )
+    @blp.response(200, schema=QuestionResponseSchema, description="Pregunta del diari recuperada correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="Cal ser pacient per accedir a aquest recurs.")
+    @blp.response(404, description="No s'ha trobat la pregunta indicada.")
+    @blp.response(500, description="Error inesperat del servidor en consultar les preguntes.")
+    def get(self):
+        """
+        Obtenir la pregunta del diari.
+        """
+        try:
+            self.logger.info(
+                "Recuperant pregunta del diari",
+                module="DiaryQuestionResource",
+            )
+
+            factory = ServiceFactory.get_instance()
+            question_service = factory.build_question_service()
+            question = question_service.get_diary_question()
+
+            return jsonify(question.to_dict()), 200
+        except QuestionNotFoundException as e:
+            self.logger.error(
+                "Pregunta no trobada",
+                module="DiaryQuestionResource",
+                error=e,
+            )
+            abort(404, message=str(e))
+        except Exception as e:
+            self.logger.error("Error inesperat en recuperar preguntes", module="DiaryQuestionResource", error=e)
+            abort(500, message=f"S'ha produït un error inesperat en recuperar la pregunta del diari: {str(e)}")
