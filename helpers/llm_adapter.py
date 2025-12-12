@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from time import time
 from typing import TYPE_CHECKING
 
 from openai import AzureOpenAI
@@ -61,19 +62,6 @@ class AbstractLlmAdapter(ABC):
                 )
                 lines.append(row)
             lines.append("")
-
-        questions = patient_data.get("questions", [])
-        if questions:
-            lines.append("## Historial de Preguntes i Respostes")
-            for item in questions:
-                q_data = item.get("question", {})
-                lines.append(f"### ID de Pregunta: {q_data.get('id', 'N/A')} (Dificultat: {q_data.get('difficulty', 'N/A')})")
-                lines.append(f"**Text:** {q_data.get('text', '')}")
-                lines.append(f"**Tipus:** {q_data.get('question_type', 'N/A')}")
-                lines.append(f"**Respost el:** {item.get('answered_at', 'N/A')}")
-                answer_text = item.get("answer_text") or "Sense resposta registrada"
-                lines.append(f"**Resposta transcrita:** {answer_text}")
-                lines.append("---")
         
         return "\n".join(lines)
     
@@ -160,10 +148,13 @@ class GeminiAdapter(AbstractLlmAdapter):
         
         try:
 
+            init_time = time()
             gen_config = GenerationConfig(
-                temperature=0.2,
-                max_output_tokens=2000,
-                candidate_count=1
+                temperature=0,
+                max_output_tokens=6000,
+                candidate_count=1,
+                top_p=0.6,
+                top_k=25
             )
 
             model = genai.GenerativeModel(
@@ -182,7 +173,12 @@ class GeminiAdapter(AbstractLlmAdapter):
                 self.logger.error("Empty summary received from Gemini", module="GeminiAdapter")
                 return "No s'ha pogut generar un resum del pacient."
             
-            self.logger.debug("Generated summary from Gemini", module="GeminiAdapter", metadata={"summary": final_summary})
+            final_time = time() - init_time
+            # Do not log the full summary at info level to avoid exposing sensitive patient data
+            self.logger.info(f"Gemini summary generated in {final_time:.2f} seconds", module="GeminiAdapter", metadata={"duration_seconds": final_time})
+            # If needed for debugging, log the summary at debug level (ensure this is disabled in production)
+            # self.logger.debug("Gemini summary content", module="GeminiAdapter", metadata={"summary": final_summary})
+            
             return final_summary
 
         except Exception as e:
