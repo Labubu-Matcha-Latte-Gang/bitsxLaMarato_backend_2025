@@ -382,7 +382,7 @@ class UserService:
             for name, figure in graphs.items():
                 sanitized_name = name.replace(" ", "_")
                 
-                fig_str = json.dumps(figure.to_dict(), sort_keys=True)
+                fig_str = json.dumps(figure, sort_keys=True)
                 unique_identifier = f"{fig_str}_{fmt}_scale2"
                 file_hash = hashlib.md5(unique_identifier.encode('utf-8')).hexdigest()
                 
