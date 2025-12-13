@@ -259,7 +259,7 @@ class GeminiAdapter(AbstractLlmAdapter):
                 },
             }
             gen_config = GenerationConfig(
-                temperature=0.6,
+                temperature=0.8,
                 candidate_count=1,
                 response_mime_type="application/json",
                 response_schema=schema
