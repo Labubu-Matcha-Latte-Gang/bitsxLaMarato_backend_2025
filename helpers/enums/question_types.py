@@ -7,3 +7,9 @@ class QuestionType(Enum):
     SORTING = "sorting"
     MULTITASKING = "multitasking"
     DIARY = "diary"
+
+class CognitiveArea(Enum):
+    ATTENTION = "attention"
+    MEMORY = "memory"
+    ALTERNATING_FLUENCY = "alternating_fluency"
+    SPEED = "speed"

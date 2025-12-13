@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+import json
 from time import time
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,7 @@ import google.generativeai as genai
 from google.generativeai.types import GenerationConfig
 
 from helpers.debugger.logger import AbstractLogger
+from helpers.enums.question_types import CognitiveArea
 
 if TYPE_CHECKING:
     from application.services.user_service import PatientData
@@ -65,6 +67,32 @@ class AbstractLlmAdapter(ABC):
         
         return "\n".join(lines)
     
+    @classmethod
+    def _normalize_percentages(cls, areas: dict) -> dict:
+        """
+        Adjusts the percentages so they sum exactly to 100.0 by modifying only the area with the highest weight.
+        """
+        if not areas:
+            return areas
+
+        total = sum(a["percentage"] for a in areas)
+        delta = 100.0 - total
+
+        if abs(delta) < 1e-6:
+            return areas
+
+        target = max(areas, key=lambda a: a["percentage"])
+
+        target["percentage"] += delta
+
+        target["percentage"] = max(
+            0.0,
+            min(100.0, target["percentage"])
+        )
+
+        return areas
+
+    
     @abstractmethod
     def generate_summary(self, patient_data: PatientData, system_prompt: str) -> str:
         """Generate a summary for the given patient data.
@@ -76,6 +104,17 @@ class AbstractLlmAdapter(ABC):
             str: The generated summary.
         """
         raise NotImplementedError
+    
+    @abstractmethod
+    def generate_recommendation(self, patient_data: PatientData, system_prompt: str) -> dict:
+        """Generate a recommendation for the given patient data.
+        
+        Args:
+            patient_data (PatientData): Data of the patient to recommend for.
+            system_prompt (str): The system instruction to guide the LLM.
+        Returns:
+            dict: The generated recommendation.
+        """
     
 class AzureOpenaiAdapter(AbstractLlmAdapter):
     """Concrete adapter for Azure OpenAI LLM services."""
@@ -119,6 +158,9 @@ class AzureOpenaiAdapter(AbstractLlmAdapter):
         except Exception as e:
             self.logger.error(f"Error generating summary in AzureOpenaiAdapter: {str(e)}", module="AzureOpenaiAdapter", error=e)
             return "Hi ha hagut un error en generar el resum del pacient."
+        
+    def generate_recommendation(self, patient_data: PatientData, system_prompt: str) -> dict:
+        raise NotImplementedError("AzureOpenaiAdapter does not implement generate_recommendation yet.")
         
 class GeminiAdapter(AbstractLlmAdapter):
     """Concrete adapter for Google Gemini LLM services."""
@@ -184,3 +226,57 @@ class GeminiAdapter(AbstractLlmAdapter):
         except Exception as e:
             self.logger.error(f"Error generating summary in GeminiAdapter: {str(e)}", module="GeminiAdapter", error=e)
             return "No s'ha pogut generar el resum (Error del servei Gemini)."
+
+    def generate_recommendation(self, patient_data: PatientData, system_prompt: str) -> dict:
+        context_data = self._patient_data_to_markdown(patient_data)
+        self.logger.debug("Context data prepared for Gemini", module="GeminiAdapter", metadata={"context_data": context_data})
+
+        try:
+            enum_array = [area.value for area in CognitiveArea]
+            schema = {
+                "type": "object",
+                "required": ["recommendation", "reason", "areas"],
+                "properties": {
+                    "recommendation": {"type": "string"},
+                    "reason": {"type": "string"},
+                    "areas": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["area", "percentage"],
+                            "properties": {
+                                "area": {
+                                    "type": "string",
+                                    "enum": enum_array
+                                },
+                                "percentage": {
+                                    "type": "number"
+                                }
+                            }
+                        }
+                    }
+                },
+            }
+            gen_config = GenerationConfig(
+                temperature=0.8,
+                candidate_count=1,
+                response_mime_type="application/json",
+                response_schema=schema
+            )
+
+            model = genai.GenerativeModel(
+                "gemini-2.5-flash",
+                system_instruction=system_prompt
+            )
+
+            response = model.generate_content(context_data, generation_config=gen_config)
+
+            output = json.loads(response.text)
+
+            output["areas"] = self._normalize_percentages(output["areas"])
+
+            self.logger.info("Gemini recommendation generated successfully", module="GeminiAdapter", metadata={"recommendation": output})
+            return output
+        except Exception as e:
+            self.logger.error(f"Error generating recommendation in GeminiAdapter: {str(e)}", module="GeminiAdapter", error=e)
+            return {"error": "No s'ha pogut generar la recomanació (Error del servei Gemini)."}
