@@ -75,7 +75,7 @@ class QuestionAnsweredAssociation(db.Model):
         db.ForeignKey('questions.id', onupdate='CASCADE', ondelete='CASCADE'),
         primary_key=True,
     )
-    answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    answered_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), primary_key=True)
     answer_text = db.Column(db.Text, nullable=False, default="")
     analysis = db.Column(JSONB, nullable=False, default=dict)
     question = db.relationship('Question', lazy=True)
