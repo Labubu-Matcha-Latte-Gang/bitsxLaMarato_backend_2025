@@ -75,16 +75,15 @@ class QuestionAnsweredAssociation(db.Model):
         db.ForeignKey('questions.id', onupdate='CASCADE', ondelete='CASCADE'),
         primary_key=True,
     )
-    answered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    answered_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), primary_key=True)
     answer_text = db.Column(db.Text, nullable=False, default="")
     analysis = db.Column(JSONB, nullable=False, default=dict)
     question = db.relationship('Question', lazy=True)
     patient = db.relationship('Patient', back_populates='question_answers', lazy=True)
 
     def __repr__(self):
-        truncated_text = (self.answer_text[:30] + "...") if self.answer_text and len(self.answer_text) > 30 else self.answer_text
         return (
             f"<QuestionAnsweredAssociation Patient: {self.patient_email}, "
             f"Question ID: {self.question_id}, Answered At: {self.answered_at}, "
-            f"Answer: {truncated_text}>"
+            f"Answer: {self.answer_text or ''}>"
         )

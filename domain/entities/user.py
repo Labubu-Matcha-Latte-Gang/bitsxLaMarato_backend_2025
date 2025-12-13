@@ -3,7 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, TYPE_CHECKING
+from uuid import UUID
 
+from globals import DIARY_QUESTION_ID
 from helpers.enums.gender import Gender
 from helpers.enums.question_types import QuestionType
 from helpers.enums.user_role import UserRole
@@ -180,7 +182,9 @@ class Patient(User):
             from domain.services.recommendation import ScoreBasedQuestionStrategy
             strategy = ScoreBasedQuestionStrategy()
 
-        return strategy.get_filters(self, score_repo, transcription_repo)
+        filters = strategy.get_filters(self, score_repo, transcription_repo)
+        filters['different_id'] = UUID(DIARY_QUESTION_ID)
+        return filters
 
     def get_recommended_activity_filters(
         self,

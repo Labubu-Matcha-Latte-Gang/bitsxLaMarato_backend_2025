@@ -4,6 +4,7 @@ from typing import Optional
 
 from application.services.pdf_generation_service import PDFGenerationService
 from application.services.qr_service import QRService
+from application.services.recommendation_service import RecommendationService
 from db import db
 from application.services import (
     ActivityService,
@@ -261,5 +262,16 @@ class ServiceFactory:
         """
         adapter_factory = AbstractAdapterFactory.get_instance()
         return PDFGenerationService(
+            adapter_factory=adapter_factory,
+        )
+
+    def build_recommendation_service(self) -> RecommendationService:
+        """
+        Build a RecommendationService with its dependencies.
+        Returns:
+            RecommendationService: The constructed RecommendationService instance.
+        """
+        adapter_factory = AbstractAdapterFactory.get_instance()
+        return RecommendationService(
             adapter_factory=adapter_factory,
         )
