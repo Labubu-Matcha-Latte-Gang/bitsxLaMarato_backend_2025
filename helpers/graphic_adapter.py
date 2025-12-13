@@ -9,6 +9,7 @@ from domain.services.progress import (
     CompositeProgressStrategy,
     InverseEfficiencyProgressStrategy,
 )
+from helpers.debugger.logger import AbstractLogger
 from helpers.enums.question_types import QuestionType
 
 
@@ -18,6 +19,8 @@ class AbstractGraphicAdapter(ABC):
     Implementations must provide methods that take domain objects and
     return dictionaries suitable for consumption by graphic libraries.
     """
+
+    logger = AbstractLogger.get_instance()
 
     @abstractmethod
     def create_score_graphs(self, scores: List[Score]) -> Dict[str, dict]:
@@ -106,18 +109,17 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 points = sorted(info["points"], key=lambda x: x[0])
                 x_vals = [p[0].isoformat() for p in points]
                 y_vals = [p[1] for p in points]
-                # Label includes activity title; if there are multiple activities of the
-                # same type, append a short identifier to differentiate them.
-                name = info["title"] if len(activities) == 1 else f"{info['title']} ({activity_id[:8]})"
+
+                name = info["title"]
+                self.logger.debug(f"Creating trace for activity '{name}' with {len(points)} points", module="SimplePlotlyAdapter")
                 traces.append({
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": name,
+                    "name": name.replace('TEST - ', '').replace('ACTIVITAT - ', ''),
                     "x": x_vals,
                     "y": y_vals,
                 })
             layout = {
-                "title": f"Progressió de puntuacions - {activity_type}",
                 "xaxis": {"title": "Data de finalització"},
                 "yaxis": {"title": "Puntuació"},
             }
@@ -149,24 +151,28 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
             }
 
         # Speed evolution per activity type (seconds to finish)
+        self.logger.debug("Creating speed evolution graphs", module="SimplePlotlyAdapter", metadata={"speed_groups_keys": list(speed_groups.keys())})
         for activity_type, activities in speed_groups.items():
             traces = []
             for activity_id, info in activities.items():
                 points = sorted(info["points"], key=lambda x: x[0])
                 x_vals = [p[0].isoformat() for p in points]
                 y_vals = [p[1] for p in points]
-                name = info["title"] if len(activities) == 1 else f"{info['title']} ({activity_id[:8]})"
+                name = info["title"]
                 traces.append({
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": name,
+                    "name": name.replace('TEST - ', '').replace('ACTIVITAT - ', ''),
                     "x": x_vals,
                     "y": y_vals,
                 })
             layout = {
                 "title": f"Evolució de velocitat - {activity_type}",
                 "xaxis": {"title": "Data de finalització"},
-                "yaxis": {"title": "Segons per completar (menys és millor)"},
+                "yaxis": {"title": {
+                    "text": "Segons per completar<br><span style='font-size: 10px; font-weight: normal'><i>(menys és millor)</i></span>",
+                    "font": {"size": 16, "color": "black"}
+                }},
             }
             figures[f"speed_{activity_type}"] = {"data": traces, "layout": layout}
 
@@ -187,7 +193,6 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     }
                 ],
                 "layout": {
-                    "title": "Progrés global (Inverse Efficiency Score - Townsend & Ashby, 1983)",
                     "xaxis": {"title": "Data"},
                     "yaxis": {"title": "Eficiència (0-1, més alt és millor)", "range": [0, 1]},
                 },
@@ -210,6 +215,17 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 ``question_metrics`` containing the figure definition, or
                 an empty dictionary if no metrics were present.
         """
+        metric_name_map = {
+            "topic_adherence": "Adherència al Tema",
+            "global_coherence": "Coherència Global",
+            "semantic_drift": "Desviació Semàntica",
+            "idea_density": "Densitat d'Idees",
+            "avg_sentence_length": "Longitud Mitjana de Frase",
+            "sentence_count": "Nombre de Frases",
+            "noun_count": "Frequència de Substantius",
+            "pronoun_count": "Frequència de Pronoms",
+            "pronoun_noun_ratio": "Ràtio Pronom/Substantiu"
+        }
         metrics_map: Dict[str, List[tuple]] = {}
         for answer in answers:
             for metric, value in answer.analysis.items():
@@ -221,18 +237,18 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
             return figures
         traces = []
         for metric, points in metrics_map.items():
+            self.logger.debug(f"Building trace for metric '{metric}' with {len(points)} points", module="SimplePlotlyAdapter")
             pts_sorted = sorted(points, key=lambda x: x[0])
             x_vals = [p[0].isoformat() for p in pts_sorted]
             y_vals = [p[1] for p in pts_sorted]
             traces.append({
                 "type": "scatter",
                 "mode": "lines+markers",
-                "name": metric,
+                "name": metric_name_map.get(metric, metric),
                 "x": x_vals,
                 "y": y_vals,
             })
         layout = {
-            "title": "Evolució de mètriques de preguntes",
             "xaxis": {"title": "Data de resposta"},
             "yaxis": {"title": "Valor de la mètrica"},
         }
