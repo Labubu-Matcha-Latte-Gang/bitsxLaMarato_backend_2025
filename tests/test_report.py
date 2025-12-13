@@ -10,6 +10,7 @@ from helpers.graphic_adapter import AbstractGraphicAdapter
 from helpers.llm_adapter import AbstractLlmAdapter
 from helpers.pdf_generator_adapter import AbstractPDFGeneratorAdapter
 from helpers.qr_adapter import QRAdapter
+from models import Patient, Score
 from tests.base_test import BaseTest
 
 
@@ -32,6 +33,9 @@ class _StubPDFAdapter(AbstractPDFGeneratorAdapter):
 class _StubLLMAdapter(AbstractLlmAdapter):
     def generate_summary(self, patient_data, system_prompt):
         return "Resum integrat per a proves."
+
+    def generate_recommendation(self, score: Score, patient: Patient) -> str:
+        return "stub recommendation"
 
 
 class _StubAdapterFactory(AbstractAdapterFactory):
