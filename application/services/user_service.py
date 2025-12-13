@@ -270,7 +270,7 @@ class UserService:
                 self.user_repo.remove(user)
             self.uow.commit()
 
-    def get_patient_data(self, requester: User, patient: Patient, graph_format: str = 'html') -> PatientData:
+    def get_patient_data(self, requester: User, patient: Patient, graph_format: str = 'png') -> PatientData:
         """
         Assemble a comprehensive payload for the given patient including basic
         demographics, activity scores, answered questions and generated graph

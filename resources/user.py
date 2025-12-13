@@ -834,7 +834,7 @@ class PatientData(MethodView):
             patient_service = factory.build_patient_service()
             patient = patient_service.get_patient(patient_email)
 
-            patient_payload = user_service.get_patient_data(current_user, patient)
+            patient_payload = user_service.get_patient_data(current_user, patient, 'png')
             return jsonify(patient_payload), 200
         except UserRoleConflictException as e:
             self.logger.error("User role conflict", module="PatientData", metadata={"patient_email": patient_email}, error=e)

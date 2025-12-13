@@ -1,12 +1,12 @@
 import os
 from dotenv import load_dotenv
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 
 DEFAULT_VERSION_ENDPOINT = '/api/version'
 
 DEFAULT_API_PREFIX = '/api/v1'
-DEFAULT_API_TITLE = 'Labubu API'
+DEFAULT_API_TITLE = 'LMLG NeuroSight API'
 DEFAULT_SWAGGER_URL = '/api-docs'
 DEFAULT_DEBUG = False
 DEFAULT_PORT = 5000

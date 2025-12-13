@@ -9,6 +9,7 @@ from domain.services.progress import (
     CompositeProgressStrategy,
     InverseEfficiencyProgressStrategy,
 )
+from helpers.debugger.logger import AbstractLogger
 from helpers.enums.question_types import QuestionType
 
 
@@ -18,6 +19,8 @@ class AbstractGraphicAdapter(ABC):
     Implementations must provide methods that take domain objects and
     return dictionaries suitable for consumption by graphic libraries.
     """
+
+    logger = AbstractLogger.get_instance()
 
     @abstractmethod
     def create_score_graphs(self, scores: List[Score]) -> Dict[str, dict]:
@@ -56,6 +59,14 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
     trace per metric across time, allowing users to track how
     linguistic and executive function metrics evolve.
     """
+    LEGEND_BELOW = {
+        "orientation": "h",
+        "x": 0.5,
+        "xanchor": "center",
+        "y": -0.35,
+        "yanchor": "top",
+        "traceorder": "normal",
+    }
 
     def __init__(self, progress_strategy: CompositeProgressStrategy | None = None) -> None:
         self.progress_strategy = progress_strategy or InverseEfficiencyProgressStrategy()
@@ -106,26 +117,38 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 points = sorted(info["points"], key=lambda x: x[0])
                 x_vals = [p[0].isoformat() for p in points]
                 y_vals = [p[1] for p in points]
-                # Label includes activity title; if there are multiple activities of the
-                # same type, append a short identifier to differentiate them.
-                name = info["title"] if len(activities) == 1 else f"{info['title']} ({activity_id[:8]})"
+
+                name = info["title"]
                 traces.append({
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": name,
+                    "name": name.replace('TEST - ', '').replace('ACTIVITAT - ', ''),
                     "x": x_vals,
                     "y": y_vals,
                 })
             layout = {
-                "title": f"Progressió de puntuacions - {activity_type}",
-                "xaxis": {"title": "Data de finalització"},
-                "yaxis": {"title": "Puntuació"},
+                "xaxis": {"title": "Data de finalització", "automargin": True},
+                "yaxis": {"title": "Puntuació", "automargin": True},
+                "legend": self.LEGEND_BELOW,
+                "margin": {
+                    "l": 100,
+                    "r": 70,
+                    "t": 60,
+                    "b": 120,
+                },
             }
             figures[f"scores_{activity_type}"] = {"data": traces, "layout": layout}
 
         # Average score per question type (bar chart)
+        labels_map = {
+            "concentration": "Concentració",
+            "speed": "Velocitat de Processament",
+            "words": "Fluïdesa de Paraules",
+            "sorting": "Capacitat d'Ordenament"
+        }
         if type_scores:
             ordered_labels = [qt.value for qt in QuestionType if qt.value in type_scores]
+            self.logger.debug("Ordered question type labels for score graph", metadata={"ordered_labels": ordered_labels})
             # Preserve any unknowns at the end
             for label in type_scores.keys():
                 if label not in ordered_labels:
@@ -142,9 +165,15 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     }
                 ],
                 "layout": {
-                    "title": "Puntuació mitjana per àmbit",
-                    "xaxis": {"title": "Tipus de pregunta"},
-                    "yaxis": {"title": "Puntuació mitjana", "range": [0, 10]},
+                    "xaxis": {"title": "Tipus de pregunta", "automargin": True},
+                    "yaxis": {"title": "Puntuació mitjana", "range": [0, 10], "automargin": True},
+                    "legend": self.LEGEND_BELOW,
+                    "margin": {
+                        "l": 100,
+                        "r": 70,
+                        "t": 80,
+                        "b": 80,
+                    }
                 },
             }
 
@@ -155,18 +184,27 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 points = sorted(info["points"], key=lambda x: x[0])
                 x_vals = [p[0].isoformat() for p in points]
                 y_vals = [p[1] for p in points]
-                name = info["title"] if len(activities) == 1 else f"{info['title']} ({activity_id[:8]})"
+                name = info["title"]
                 traces.append({
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": name,
+                    "name": name.replace('TEST - ', '').replace('ACTIVITAT - ', ''),
                     "x": x_vals,
                     "y": y_vals,
                 })
             layout = {
-                "title": f"Evolució de velocitat - {activity_type}",
-                "xaxis": {"title": "Data de finalització"},
-                "yaxis": {"title": "Segons per completar (menys és millor)"},
+                "xaxis": {"title": "Data de finalització", "automargin": True},
+                "yaxis": {"title": {
+                    "text": "Segons per completar<br><span style='font-size: 10px; font-weight: normal'><i>(menys és millor)</i></span>",
+                    "font": {"size": 16, "color": "black"}
+                }, "automargin": True},
+                "legend": self.LEGEND_BELOW,
+                "margin": {
+                    "l": 130,
+                    "r": 70,
+                    "t": 80,
+                    "b": 80,
+                },
             }
             figures[f"speed_{activity_type}"] = {"data": traces, "layout": layout}
 
@@ -187,9 +225,15 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     }
                 ],
                 "layout": {
-                    "title": "Progrés global (Inverse Efficiency Score - Townsend & Ashby, 1983)",
-                    "xaxis": {"title": "Data"},
-                    "yaxis": {"title": "Eficiència (0-1, més alt és millor)", "range": [0, 1]},
+                    "xaxis": {"title": "Data", "automargin": True},
+                    "yaxis": {"title": "Eficiència<br><span style='font-size: 10px; font-weight: normal'><i>(més alt és millor)</i></span>", "range": [0, 1], "automargin": True},
+                    "legend": self.LEGEND_BELOW,
+                    "margin": {
+                        "l": 130,
+                        "r": 70,
+                        "t": 60,
+                        "b": 70,
+                    },
                 },
             }
         return figures
@@ -210,6 +254,17 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 ``question_metrics`` containing the figure definition, or
                 an empty dictionary if no metrics were present.
         """
+        metric_name_map = {
+            "topic_adherence": "Adherència al Tema",
+            "global_coherence": "Coherència Global",
+            "semantic_drift": "Desviació Semàntica",
+            "idea_density": "Densitat d'Idees",
+            "avg_sentence_length": "Longitud Mitjana de Frase",
+            "sentence_count": "Nombre de Frases",
+            "noun_count": "Frequència de Substantius",
+            "pronoun_count": "Frequència de Pronoms",
+            "pronoun_noun_ratio": "Ràtio Pronom/Substantiu"
+        }
         metrics_map: Dict[str, List[tuple]] = {}
         for answer in answers:
             for metric, value in answer.analysis.items():
@@ -227,14 +282,20 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
             traces.append({
                 "type": "scatter",
                 "mode": "lines+markers",
-                "name": metric,
+                "name": metric_name_map.get(metric, metric),
                 "x": x_vals,
                 "y": y_vals,
             })
         layout = {
-            "title": "Evolució de mètriques de preguntes",
-            "xaxis": {"title": "Data de resposta"},
-            "yaxis": {"title": "Valor de la mètrica"},
+            "xaxis": {"title": "Data de resposta", "automargin": True},
+            "yaxis": {"title": "Valor de la mètrica", "automargin": True},
+            "legend": self.LEGEND_BELOW,
+            "margin": {
+                "l": 100,
+                "r": 70,
+                "t": 60,
+                "b": 150,
+            },
         }
         figures["question_metrics"] = {"data": traces, "layout": layout}
         return figures
