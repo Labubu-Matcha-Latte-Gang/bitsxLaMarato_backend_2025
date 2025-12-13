@@ -1,7 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import json
-import math
 from time import time
 from typing import TYPE_CHECKING
 
