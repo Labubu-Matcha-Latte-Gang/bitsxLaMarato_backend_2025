@@ -59,6 +59,14 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
     trace per metric across time, allowing users to track how
     linguistic and executive function metrics evolve.
     """
+    LEGEND_BELOW = {
+        "orientation": "h",
+        "x": 0.5,
+        "xanchor": "center",
+        "y": -0.35,
+        "yanchor": "top",
+        "traceorder": "normal",
+    }
 
     def __init__(self, progress_strategy: CompositeProgressStrategy | None = None) -> None:
         self.progress_strategy = progress_strategy or InverseEfficiencyProgressStrategy()
@@ -111,7 +119,6 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 y_vals = [p[1] for p in points]
 
                 name = info["title"]
-                self.logger.debug(f"Creating trace for activity '{name}' with {len(points)} points", module="SimplePlotlyAdapter")
                 traces.append({
                     "type": "scatter",
                     "mode": "lines+markers",
@@ -120,14 +127,28 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     "y": y_vals,
                 })
             layout = {
-                "xaxis": {"title": "Data de finalització"},
-                "yaxis": {"title": "Puntuació"},
+                "xaxis": {"title": "Data de finalització", "automargin": True},
+                "yaxis": {"title": "Puntuació", "automargin": True},
+                "legend": self.LEGEND_BELOW,
+                "margin": {
+                    "l": 100,
+                    "r": 70,
+                    "t": 60,
+                    "b": 120,
+                },
             }
             figures[f"scores_{activity_type}"] = {"data": traces, "layout": layout}
 
         # Average score per question type (bar chart)
+        labels_map = {
+            "concentration": "Concentració",
+            "speed": "Velocitat de Processament",
+            "words": "Fluïdesa de Paraules",
+            "sorting": "Capacitat d'Ordenament"
+        }
         if type_scores:
             ordered_labels = [qt.value for qt in QuestionType if qt.value in type_scores]
+            self.logger.debug("Ordered question type labels for score graph", metadata={"ordered_labels": ordered_labels})
             # Preserve any unknowns at the end
             for label in type_scores.keys():
                 if label not in ordered_labels:
@@ -144,14 +165,19 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     }
                 ],
                 "layout": {
-                    "title": "Puntuació mitjana per àmbit",
-                    "xaxis": {"title": "Tipus de pregunta"},
-                    "yaxis": {"title": "Puntuació mitjana", "range": [0, 10]},
+                    "xaxis": {"title": "Tipus de pregunta", "automargin": True},
+                    "yaxis": {"title": "Puntuació mitjana", "range": [0, 10], "automargin": True},
+                    "legend": self.LEGEND_BELOW,
+                    "margin": {
+                        "l": 100,
+                        "r": 70,
+                        "t": 80,
+                        "b": 80,
+                    }
                 },
             }
 
         # Speed evolution per activity type (seconds to finish)
-        self.logger.debug("Creating speed evolution graphs", module="SimplePlotlyAdapter", metadata={"speed_groups_keys": list(speed_groups.keys())})
         for activity_type, activities in speed_groups.items():
             traces = []
             for activity_id, info in activities.items():
@@ -167,12 +193,18 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     "y": y_vals,
                 })
             layout = {
-                "title": f"Evolució de velocitat - {activity_type}",
-                "xaxis": {"title": "Data de finalització"},
+                "xaxis": {"title": "Data de finalització", "automargin": True},
                 "yaxis": {"title": {
                     "text": "Segons per completar<br><span style='font-size: 10px; font-weight: normal'><i>(menys és millor)</i></span>",
                     "font": {"size": 16, "color": "black"}
-                }},
+                }, "automargin": True},
+                "legend": self.LEGEND_BELOW,
+                "margin": {
+                    "l": 130,
+                    "r": 70,
+                    "t": 80,
+                    "b": 80,
+                },
             }
             figures[f"speed_{activity_type}"] = {"data": traces, "layout": layout}
 
@@ -193,8 +225,15 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                     }
                 ],
                 "layout": {
-                    "xaxis": {"title": "Data"},
-                    "yaxis": {"title": "Eficiència (0-1, més alt és millor)", "range": [0, 1]},
+                    "xaxis": {"title": "Data", "automargin": True},
+                    "yaxis": {"title": "Eficiència<br><span style='font-size: 10px; font-weight: normal'><i>(més alt és millor)</i></span>", "range": [0, 1], "automargin": True},
+                    "legend": self.LEGEND_BELOW,
+                    "margin": {
+                        "l": 130,
+                        "r": 70,
+                        "t": 60,
+                        "b": 70,
+                    },
                 },
             }
         return figures
@@ -237,7 +276,6 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
             return figures
         traces = []
         for metric, points in metrics_map.items():
-            self.logger.debug(f"Building trace for metric '{metric}' with {len(points)} points", module="SimplePlotlyAdapter")
             pts_sorted = sorted(points, key=lambda x: x[0])
             x_vals = [p[0].isoformat() for p in pts_sorted]
             y_vals = [p[1] for p in pts_sorted]
@@ -249,8 +287,15 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 "y": y_vals,
             })
         layout = {
-            "xaxis": {"title": "Data de resposta"},
-            "yaxis": {"title": "Valor de la mètrica"},
+            "xaxis": {"title": "Data de resposta", "automargin": True},
+            "yaxis": {"title": "Valor de la mètrica", "automargin": True},
+            "legend": self.LEGEND_BELOW,
+            "margin": {
+                "l": 100,
+                "r": 70,
+                "t": 60,
+                "b": 150,
+            },
         }
         figures["question_metrics"] = {"data": traces, "layout": layout}
         return figures
