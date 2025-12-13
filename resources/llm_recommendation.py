@@ -1,29 +1,15 @@
-from flask import Response, jsonify
+from flask import jsonify
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
-from sqlalchemy.exc import IntegrityError
 from flask_jwt_extended import get_jwt_identity
 
-from db import db
 from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
 from helpers.enums.user_role import UserRole
-from helpers.exceptions.question_exceptions import (
-    QuestionCreationException,
-    QuestionNotFoundException,
-    QuestionUpdateException,
-)
-from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
 from helpers.exceptions.user_exceptions import UserNotFoundException
 from schemas import (
     LlmRecommendationResponse,
-    QuestionBulkCreateSchema,
-    QuestionIdSchema,
-    QuestionPartialUpdateSchema,
-    QuestionQuerySchema,
-    QuestionResponseSchema,
-    QuestionUpdateSchema,
 )
 
 blp = Blueprint('llm-recommendation', __name__, description="Endpoints per a obtenir recomanacions per un pacient fent servir un LLM.")
