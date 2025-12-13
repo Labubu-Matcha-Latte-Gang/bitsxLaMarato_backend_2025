@@ -7,6 +7,7 @@ from helpers.debugger.logger import AbstractLogger
 from helpers.decorators import roles_required
 from helpers.enums.user_role import UserRole
 from application.container import ServiceFactory
+from helpers.exceptions.llm_exceptions import LLMException
 from helpers.exceptions.user_exceptions import UserNotFoundException
 from schemas import (
     LlmRecommendationResponse,
@@ -54,6 +55,13 @@ class LlmRecommendationResource(MethodView):
             recommendation_service = factory.build_recommendation_service()
             recommendation = recommendation_service.get_recommendation_for_patient(patient_data)
 
+            if isinstance(recommendation, dict) and "error" in recommendation:
+                self.logger.error(
+                    "Error en obtenir recomanació del LLM",
+                    module="LlmRecommendationResource",
+                    metadata={"patient_email": email},
+                )
+                raise LLMException(recommendation["error"])
             return jsonify(recommendation), 200
         except UserNotFoundException as e:
             self.logger.error(
@@ -63,6 +71,14 @@ class LlmRecommendationResource(MethodView):
                 error=e,
             )
             abort(404, message=str(e))
+        except LLMException as e:
+            self.logger.error(
+                "Error del LLM en generar recomanació",
+                module="LlmRecommendationResource",
+                metadata={"patient_email": email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error en generar la recomanació: {str(e)}")
         except Exception as e:
             self.logger.error("Error inesperat en recuperar recomanacions", module="LlmRecommendationResource", error=e)
             abort(500, message=f"S'ha produït un error inesperat en generar la recomanació: {str(e)}")
