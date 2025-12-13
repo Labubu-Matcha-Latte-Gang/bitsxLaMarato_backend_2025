@@ -1,7 +1,7 @@
 from marshmallow import Schema, fields, validate
 from helpers.enums.gender import Gender
 from helpers.enums.qr_code_format import QRCodeFormat
-from helpers.enums.question_types import QuestionType
+from helpers.enums.question_types import QuestionType, CognitiveArea
 
 GENDER_VALUES = [gender.value for gender in Gender]
 GENDER_DESCRIPTION = f"Gènere del pacient. Valors acceptats: {', '.join(GENDER_VALUES)}."
@@ -10,6 +10,8 @@ QUESTION_TYPE_DESCRIPTION = f"Tipus de pregunta. Valors acceptats: {', '.join(QU
 ACTIVITY_TYPE_DESCRIPTION = f"Tipus d'activitat. Valors acceptats: {', '.join(QUESTION_TYPE_VALUES)}."
 QR_CODE_FORMAT_VALUES = [format.value for format in QRCodeFormat]
 QR_CODE_FORMAT_DESCRIPTION = f"Format del codi QR. Valors acceptats: {', '.join(QR_CODE_FORMAT_VALUES)}."
+COGNITIVE_AREA_VALUES = [area.value for area in CognitiveArea]
+COGNITIVE_AREA_DESCRIPTION = f"Àrea cognitiva associada a la pregunta. Valors acceptats: {', '.join(COGNITIVE_AREA_VALUES)}."
 
 password_complexity = validate.Regexp(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
@@ -1817,4 +1819,85 @@ class QRGenerateSchema(Schema):
             "description": "Amplada de la vora del codi QR.",
             "example": 4,
         },
+    )
+
+class RecommendationAreasSchema(Schema):
+    """
+    Esquema per a les àrees cognitives de recomanació.
+    """
+
+    class Meta:
+        description = "Àrea cognitiva i el seu percentatge d'importància en la recomanació."
+        example = {
+            "area": "memory",
+            "percentage": 75.0,
+        }
+
+    area = fields.Enum(
+        CognitiveArea,
+        required=True,
+        by_value=True,
+        metadata={
+            "description": COGNITIVE_AREA_DESCRIPTION,
+            "enum": COGNITIVE_AREA_VALUES,
+            "example": "memory",
+        },
+    )
+
+    percentage = fields.Float(
+        required=True,
+        metadata={
+            "description": "Percentatge d'importància d'aquesta àrea en la recomanació.",
+            "example": 75.0,
+        },
+        validate=validate.Range(min=0.0, max=100.0)
+    )
+
+class LlmRecommendationResponse(Schema):
+    """
+    Esquema per a la resposta de recomanacions generades per LLM.
+    """
+
+    class Meta:
+        description = "Resposta amb les recomanacions generades pel model de llenguatge."
+        example = {
+            "recommendations": [
+                "Realitzar exercicis de memòria diaris.",
+                "Mantenir una dieta equilibrada rica en antioxidants.",
+                "Dormir almenys 7-8 hores cada nit.",
+            ]
+        }
+
+    recommendation = fields.String(
+        required=True,
+        metadata={
+            "description": "Recomanació generada pel model de llenguatge.",
+            "example": "Queda amb amics i preneu alguna cosa mentre parleu.",
+        },
+    )
+
+    reason = fields.String(
+        required=True,
+        metadata={
+            "description": "Raó o justificació de la recomanació proporcionada.",
+            "example": "La interacció social pot ajudar a millorar l'estat d'ànim i la funció cognitiva.",
+        },
+    )
+
+    areas = fields.List(
+        fields.Nested(RecommendationAreasSchema),
+        required=True,
+        metadata={
+            "description": "Llista d'àrees cognitives relacionades amb la recomanació i els seus percentatges d'importància.",
+            "example": [
+                {
+                    "area": "memory",
+                    "percentage": 80.0,
+                },
+                {
+                    "area": "attention",
+                    "percentage": 20.0,
+                },
+            ],
+        }
     )

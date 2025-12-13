@@ -392,6 +392,7 @@ class SQLAlchemyQuestionRepository(IQuestionRepository):
         difficulty_min = filters.get("difficulty_min")
         difficulty_max = filters.get("difficulty_max")
         question_type = filters.get("question_type")
+        different_id = filters.get("different_id")
 
         if question_id:
             query = query.filter(Question.id == question_id)
@@ -403,6 +404,8 @@ class SQLAlchemyQuestionRepository(IQuestionRepository):
             query = query.filter(Question.difficulty <= difficulty_max)
         if question_type:
             query = query.filter(Question.question_type == question_type)
+        if different_id:
+            query = query.filter(Question.id != different_id)
 
         return [self._to_domain(model) for model in query.all()]
     
