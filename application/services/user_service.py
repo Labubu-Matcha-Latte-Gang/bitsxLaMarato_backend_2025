@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime, timedelta
+import hashlib
 import json
 from pathlib import Path
 import plotly.io as pio
@@ -119,6 +120,7 @@ class UserService:
     """
 
     GRAPH_TMP_DIR = Path(__file__).resolve().parent.parent.parent / "tmp"
+    GRAPH_CACHE_DIR = Path("/tmp/bitsx_graph_cache")
 
     logger = AbstractLogger.get_instance()
 
@@ -364,39 +366,51 @@ class UserService:
 
     def _build_graph_files(self, graphs: Dict[str, dict], fmt: str = 'html') -> list[dict]:
         """
-        Persist graph figures as HTML fragments or PNG in the tmp directory and return
-        them as base64-encoded payloads. All files in the tmp directory are
-        removed once the payload is built.
+        Persist graph figures avoiding re-generation via content hashing.
+        Args:
+            graphs (Dict[str, dict]): Mapping of graph names to Plotly figure dicts.
+            fmt (str): Format of the graph files to generate ('png' or 'html').
+        Returns:
+            list[dict]: List of graph file payloads with base64-encoded content.
         """
         self.GRAPH_TMP_DIR.mkdir(parents=True, exist_ok=True)
+        self.GRAPH_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
         created_files: list[dict] = []
+
         try:
             for name, figure in graphs.items():
                 sanitized_name = name.replace(" ", "_")
-                if fmt == "png":
-                    img_bytes = pio.to_image(figure, format="png", width=800, height=400, scale=2)
-                    
-                    encoded_content = base64.b64encode(img_bytes).decode("ascii")
-                    
-                    created_files.append({
-                        "filename": f"{sanitized_name}.png",
-                        "content_type": "image/png",
-                        "content": encoded_content,
-                    })
                 
+                fig_str = json.dumps(figure.to_dict(), sort_keys=True)
+                unique_identifier = f"{fig_str}_{fmt}_scale2"
+                file_hash = hashlib.md5(unique_identifier.encode('utf-8')).hexdigest()
+                
+                cache_path = self.GRAPH_CACHE_DIR / f"{file_hash}.{fmt}"
+                
+                raw_bytes = None
+
+                if cache_path.exists():
+                    raw_bytes = cache_path.read_bytes()
                 else:
-                    file_path = self.GRAPH_TMP_DIR / f"{sanitized_name}.html"
-                    html_content = self._figure_to_html(name, figure)
-                    file_path.write_text(html_content, encoding="utf-8")
+                    if fmt == "png":
+                        raw_bytes = pio.to_image(figure, format="png", width=800, height=400, scale=2)
+                    else:
+                        html_content = self._figure_to_html(name, figure)
+                        raw_bytes = html_content.encode("utf-8")
                     
-                    encoded_content = base64.b64encode(file_path.read_bytes()).decode("ascii")
-                    
-                    created_files.append({
-                        "filename": file_path.name,
-                        "content_type": "text/html",
-                        "content": encoded_content,
-                    })
+                    cache_path.write_bytes(raw_bytes)
+
+                encoded_content = base64.b64encode(raw_bytes).decode("ascii")
+
+                content_type = "image/png" if fmt == "png" else "text/html"
+                filename = f"{sanitized_name}.{fmt}"
+
+                created_files.append({
+                    "filename": filename,
+                    "content_type": content_type,
+                    "content": encoded_content,
+                })
 
             return created_files
         finally:
