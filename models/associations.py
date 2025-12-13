@@ -81,6 +81,24 @@ class QuestionAnsweredAssociation(db.Model):
     question = db.relationship('Question', lazy=True)
     patient = db.relationship('Patient', back_populates='question_answers', lazy=True)
 
+    def to_dict(self) -> dict:
+        """
+        Convert the question to a serializable dictionary.
+        Returns:
+            dict: A dictionary representation of the question.
+        """
+        return {
+            "question": {
+                "id": str(self.question.id),
+                "text": self.question.text,
+                "question_type": self.question.question_type.value if self.question.question_type else None,
+                "difficulty": self.question.difficulty,
+            },
+            "answered_at": self.answered_at.isoformat(),
+            "analysis": self.analysis,
+            "answer_text": self.answer_text,
+        }
+
     def __repr__(self):
         return (
             f"<QuestionAnsweredAssociation Patient: {self.patient_email}, "
