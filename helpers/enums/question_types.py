@@ -11,5 +11,5 @@ class QuestionType(Enum):
 class CognitiveArea(Enum):
     ATTENTION = "attention"
     MEMORY = "memory"
-    ALTERNITY = "alternity"
+    ALTERNATING_FLUENCY = "alternating_fluency"
     SPEED = "speed"
