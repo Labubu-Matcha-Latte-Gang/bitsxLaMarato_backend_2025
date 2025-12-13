@@ -15,6 +15,7 @@ from helpers.exceptions.question_exceptions import (
 )
 from helpers.exceptions.integrity_exceptions import DataIntegrityException
 from application.container import ServiceFactory
+from helpers.exceptions.user_exceptions import UserNotFoundException
 from schemas import (
     LlmRecommendationResponse,
     QuestionBulkCreateSchema,
@@ -68,14 +69,14 @@ class LlmRecommendationResource(MethodView):
             recommendation = recommendation_service.get_recommendation_for_patient(patient_data)
 
             return jsonify(recommendation), 200
-        except QuestionNotFoundException as e:
+        except UserNotFoundException as e:
             self.logger.error(
-                "Pregunta no trobada",
-                module="DailyQuestionResource",
+                "Pacient no trobat en generar recomanació",
+                module="LlmRecommendationResource",
                 metadata={"patient_email": email},
                 error=e,
             )
             abort(404, message=str(e))
         except Exception as e:
-            self.logger.error("Error inesperat en recuperar preguntes", module="DailyQuestionResource", error=e)
-            abort(500, message=f"S'ha produït un error inesperat en recuperar la pregunta diària: {str(e)}")
+            self.logger.error("Error inesperat en recuperar recomanacions", module="LlmRecommendationResource", error=e)
+            abort(500, message=f"S'ha produït un error inesperat en generar la recomanació: {str(e)}")
