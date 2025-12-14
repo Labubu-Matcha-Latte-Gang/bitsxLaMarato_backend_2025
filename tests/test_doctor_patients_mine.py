@@ -27,7 +27,7 @@ class TestDoctorMyPatients(BaseTest):
         self.register_doctor(doctor_payload)
 
         token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
@@ -60,7 +60,7 @@ class TestDoctorMyPatients(BaseTest):
         self.register_doctor(doctor_payload)
 
         token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
@@ -75,7 +75,7 @@ class TestDoctorMyPatients(BaseTest):
         """
         Authorization test: Request without JWT returns 401 Unauthorized.
         """
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
         )
 
@@ -85,7 +85,7 @@ class TestDoctorMyPatients(BaseTest):
         """
         Authorization test: Request with invalid JWT returns 401 Unauthorized.
         """
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers("invalid.jwt.token"),
         )
@@ -107,7 +107,7 @@ class TestDoctorMyPatients(BaseTest):
 
         # Try to access endpoint as patient
         patient_token = self.login_and_get_token(patient_payload["email"], patient_payload["password"])
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(patient_token),
         )
@@ -122,7 +122,7 @@ class TestDoctorMyPatients(BaseTest):
         admin = self.create_admin()
 
         admin_token = self.generate_token(admin.email)
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(admin_token),
         )
@@ -149,7 +149,7 @@ class TestDoctorMyPatients(BaseTest):
         self.register_doctor(doctor_payload)
 
         token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
@@ -195,7 +195,7 @@ class TestDoctorMyPatients(BaseTest):
 
         # Doctor 1 should see both patients
         token_one = self.login_and_get_token(doctor_one["email"], doctor_one["password"])
-        response_one = self.client.post(
+        response_one = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token_one),
         )
@@ -208,7 +208,7 @@ class TestDoctorMyPatients(BaseTest):
 
         # Doctor 2 should see only patient_one
         token_two = self.login_and_get_token(doctor_two["email"], doctor_two["password"])
-        response_two = self.client.post(
+        response_two = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token_two),
         )
@@ -237,7 +237,7 @@ class TestDoctorMyPatients(BaseTest):
         token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
 
         # Initially, doctor should have no patients
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
@@ -254,7 +254,7 @@ class TestDoctorMyPatients(BaseTest):
         assert assign_response.status_code == 200
 
         # Now, doctor should see the assigned patients
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
@@ -285,7 +285,7 @@ class TestDoctorMyPatients(BaseTest):
         token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
 
         # Verify doctor initially has both patients
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
@@ -302,7 +302,7 @@ class TestDoctorMyPatients(BaseTest):
         assert unassign_response.status_code == 200
 
         # Now, doctor should only see patient_two
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
@@ -333,7 +333,7 @@ class TestDoctorMyPatients(BaseTest):
         self.register_doctor(doctor_payload)
 
         token = self.login_and_get_token(doctor_payload["email"], doctor_payload["password"])
-        response = self.client.post(
+        response = self.client.get(
             f"{self.api_prefix}/user/doctor/patients/mine",
             headers=self.auth_headers(token),
         )
