@@ -436,7 +436,7 @@ class DoctorMyPatients(MethodView):
     @blp.response(404, description="Metge o pacients no trobats.")
     @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
     @blp.response(500, description="Error inesperat en obtenir la llista de pacients del metge.")
-    def post(self) -> Response:
+    def get(self) -> Response:
         doctor_email: str = get_jwt_identity()
         try:
             self.logger.info(
