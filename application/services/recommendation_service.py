@@ -1,4 +1,5 @@
 import random
+import concurrent.futures
 from application.services.user_service import PatientData
 from helpers.factories.adapter_factories import AbstractAdapterFactory
 
@@ -319,14 +320,22 @@ Recordatori final:
     def get_recommendation_for_patient(self, patient_data: PatientData) -> dict:
         """
         Get a recommendation for the specified patient using an LLM.
+        If the LLM fails or times out, return a fallback recommendation.
         Args:
             patient_data (PatientData): Data of the patient to get recommendations for.
         Returns:
             dict: The generated recommendation.
         """
         llm_adapter = self.__adapter_factory.get_llm_adapter()
+
+        def _call_llm():
+            return llm_adapter.generate_recommendation(
+                patient_data, self.SYSTEM_PROMPT
+            )
+
         try:
-            llm_summary = llm_adapter.generate_recommendation(patient_data, self.SYSTEM_PROMPT)
-            return llm_summary
-        except Exception:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_call_llm)
+                return future.result(timeout=5)
+        except (concurrent.futures.TimeoutError, Exception):
             return random.choice(self.FALLBACK_RECOMMENDATIONS)
