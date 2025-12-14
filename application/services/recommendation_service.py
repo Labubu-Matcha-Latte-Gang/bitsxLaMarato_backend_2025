@@ -1,6 +1,7 @@
 import random
 import concurrent.futures
 from application.services.user_service import PatientData
+from globals import LLM_RECOMMENDATION_TIMEOUT_SECONDS
 from helpers.debugger.logger import AbstractLogger
 from helpers.factories.adapter_factories import AbstractAdapterFactory
 
@@ -344,7 +345,7 @@ Recordatori final:
             )
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(_call_llm)
-                return future.result(timeout=5)
+                return future.result(timeout=LLM_RECOMMENDATION_TIMEOUT_SECONDS)
         except (concurrent.futures.TimeoutError, Exception):
             self.logger.info(
                 "LLM recommendation failed or timed out, using deterministic fallback",
