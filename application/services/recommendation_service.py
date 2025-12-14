@@ -1,3 +1,4 @@
+import random
 from application.services.user_service import PatientData
 from helpers.factories.adapter_factories import AbstractAdapterFactory
 
@@ -6,6 +7,241 @@ class RecommendationService:
     Service to handle recommendations for patients using LLMs.
     """
     __adapter_factory: AbstractAdapterFactory
+
+    FALLBACK_RECOMMENDATIONS = [
+        {
+            "recommendation": "Surt a fer un passeig curt i fixa't en tres coses de color vermell que trobis pel camí.",
+            "reason": "Caminar activa la circulació i buscar objectes específics estimula l'atenció selectiva sense generar estrès.",
+            "areas": [
+                {"area": "atenció", "percentage": 70},
+                {"area": "velocitat de processament", "percentage": 30},
+            ],
+        },
+        {
+            "recommendation": "Prepara't una infusió o un cafè calent, centrant-te en l'aroma i en cada pas del procés.",
+            "reason": "Seguir una seqüència de passos familiars ajuda a l'organització mental i proporciona un moment de calma sensorial.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 60},
+                {"area": "velocitat de processament", "percentage": 40},
+            ],
+        },
+        {
+            "recommendation": "Truca a un amic o familiar proper per xerrar cinc minuts sobre com ha anat el dia.",
+            "reason": "La conversa espontània requereix processar informació ràpidament i formular respostes, activant la fluïdesa verbal.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 50},
+                {"area": "memòria de treball", "percentage": 30},
+                {"area": "velocitat de processament", "percentage": 20},
+            ],
+        },
+        {
+            "recommendation": "Seu còmodament prop d'una finestra i observa el moviment del carrer o la natura durant uns minuts.",
+            "reason": "L'observació passiva permet treballar l'atenció sostinguda amb una càrrega cognitiva molt baixa, ideal per moments de fatiga.",
+            "areas": [{"area": "atenció", "percentage": 100}],
+        },
+        {
+            "recommendation": "Escolta una cançó que t'agradi molt i intenta identificar tots els instruments que hi sonen.",
+            "reason": "La música millora l'estat d'ànim, i l'exercici d'identificació treballa la memòria auditiva i la concentració.",
+            "areas": [
+                {"area": "atenció", "percentage": 60},
+                {"area": "memòria de treball", "percentage": 40},
+            ],
+        },
+        {
+            "recommendation": "Fes una llista breu de quatre coses que necessitis comprar o fer demà.",
+            "reason": "Planificar i escriure ítems concrets ajuda a estructurar el pensament i exercita la recuperació de la informació.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 50},
+                {"area": "memòria de treball", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Rega les plantes de casa i treu-ne les fulles seques amb suavitat.",
+            "reason": "La cura de les plantes connecta amb l'entorn i requereix coordinació i atenció al detall en un context relaxat.",
+            "areas": [
+                {"area": "velocitat de processament", "percentage": 50},
+                {"area": "atenció", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Tria la roba que et posaràs demà i deixa-la preparada sobre una cadira.",
+            "reason": "Prendre decisions senzilles sobre seqüències lògiques ajuda a la planificació i redueix la fatiga mental del dia següent.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 70},
+                {"area": "memòria de treball", "percentage": 30},
+            ],
+        },
+        {
+            "recommendation": "Mira un àlbum de fotos antic o imatges al mòbil i recorda on es van fer.",
+            "reason": "Evocar records personals reforça la memòria episòdica i sol tenir un efecte positiu en l'estat emocional.",
+            "areas": [
+                {"area": "memòria de treball", "percentage": 80},
+                {"area": "atenció", "percentage": 20},
+            ],
+        },
+        {
+            "recommendation": "Llegeix un parell de pàgines d'un llibre o una revista que tinguis a mà.",
+            "reason": "La lectura breu ajuda a mantenir el focus i la comprensió lectora sense esgotar les reserves d'energia.",
+            "areas": [
+                {"area": "atenció", "percentage": 60},
+                {"area": "memòria de treball", "percentage": 40},
+            ],
+        },
+        {
+            "recommendation": "Prepara una macedònia o talla una peça de fruita per berenar.",
+            "reason": "Manipular aliments i utilitzar estris de cuina de forma segura implica coordinació i seguiment d'una tasca seqüencial.",
+            "areas": [
+                {"area": "velocitat de processament", "percentage": 40},
+                {"area": "atenció", "percentage": 60},
+            ],
+        },
+        {
+            "recommendation": "Organitza les teves medicines o vitamines per als propers dies utilitzant el pastiller.",
+            "reason": "Aquesta tasca és funcional i requereix classificar i verificar informació important, exercitant la memòria de treball.",
+            "areas": [
+                {"area": "memòria de treball", "percentage": 50},
+                {"area": "atenció", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Envia una nota de veu a algú explicant una cosa curiosa que has vist avui.",
+            "reason": "Narrar una petita història obliga a estructurar el discurs i mantenir el fil, treballant la fluïdesa verbal.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 40},
+                {"area": "velocitat de processament", "percentage": 60},
+            ],
+        },
+        {
+            "recommendation": "Dibuixa o gargoteja lliurement en un paper mentre escoltes la ràdio.",
+            "reason": "La multitasca suau (dibuixar i escoltar) estimula la capacitat de canviar el focus d'atenció de manera relaxada.",
+            "areas": [
+                {"area": "atenció", "percentage": 40},
+                {"area": "fluència alternant", "percentage": 60},
+            ],
+        },
+        {
+            "recommendation": "Plega la roba neta que tinguis seca, separant-la per tipus de peça.",
+            "reason": "Una activitat repetitiva i motora que permet classificar ítems mentalment amb un ritme pausat i constant.",
+            "areas": [
+                {"area": "velocitat de processament", "percentage": 70},
+                {"area": "atenció", "percentage": 30},
+            ],
+        },
+        {
+            "recommendation": "Obre el pot de les espècies o herbes aromàtiques i intenta endevinar quina és cadascuna només per l'olor.",
+            "reason": "L'estimulació olfactiva connecta directament amb la memòria i requereix atenció focalitzada sense esforç visual.",
+            "areas": [
+                {"area": "memòria de treball", "percentage": 50},
+                {"area": "atenció", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Tanca els ulls un moment i visualitza amb tot el detall possible un paisatge que t'agradi molt.",
+            "reason": "La visualització mental exercita la capacitat de mantenir imatges actives al cervell, una forma suau de memòria.",
+            "areas": [
+                {"area": "memòria de treball", "percentage": 60},
+                {"area": "atenció", "percentage": 40},
+            ],
+        },
+        {
+            "recommendation": "Fes estiraments suaus de coll i espatlles mentre comptes lentament les respiracions.",
+            "reason": "Coordinar el moviment amb el recompte de la respiració ajuda a connectar cos i ment, reduint l'ansietat.",
+            "areas": [
+                {"area": "atenció", "percentage": 70},
+                {"area": "velocitat de processament", "percentage": 30},
+            ],
+        },
+        {
+            "recommendation": "Fes un cop d'ull als titulars d'una revista o diari i llegeix només la notícia més positiva que trobis.",
+            "reason": "Cercar informació específica (escaneig visual) millora la velocitat de processament i filtra estímuls negatius.",
+            "areas": [
+                {"area": "velocitat de processament", "percentage": 60},
+                {"area": "atenció", "percentage": 40},
+            ],
+        },
+        {
+            "recommendation": "Taral·leja una melodia que coneguis bé mentre fas alguna tasca senzilla com recollir la taula.",
+            "reason": "La doble tasca (taral·lejar i moure's) estimula la fluïdesa i la coordinació sense suposar una càrrega excessiva.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 40},
+                {"area": "memòria de treball", "percentage": 60},
+            ],
+        },
+        {
+            "recommendation": "Escriu en una llibreta una cosa bona, per petita que sigui, que t'hagi passat aquesta setmana.",
+            "reason": "L'escriptura de gratitud requereix recuperar informació recent i estructurar-la en una frase coherent.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 50},
+                {"area": "memòria de treball", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Mira el cel per la finestra i intenta trobar formes conegudes als núvols durant uns minuts.",
+            "reason": "Aquest joc visual clàssic estimula la creativitat i la velocitat de processament visual en un entorn relaxant.",
+            "areas": [
+                {"area": "atenció", "percentage": 50},
+                {"area": "velocitat de processament", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Agafa una fruita o un objecte petit i descriu-ne mentalment la textura, el pes i el color.",
+            "reason": "Generar adjectius i descriptors per a un objecte físic activa l'accés al lèxic i l'atenció sensorial.",
+            "areas": [
+                {"area": "fluència alternant", "percentage": 70},
+                {"area": "atenció", "percentage": 30},
+            ],
+        },
+        {
+            "recommendation": "Ordena tres o quatre llibres o revistes que tinguis a prop segons la seva mida o color.",
+            "reason": "Categoritzar objectes físics aplicant una norma senzilla (mida/color) manté la ment ordenada i activa.",
+            "areas": [
+                {"area": "memòria de treball", "percentage": 40},
+                {"area": "velocitat de processament", "percentage": 60},
+            ],
+        },
+        {
+            "recommendation": "Posa't crema hidratant a les mans fent un massatge lent i concentrant-te només en el tacte.",
+            "reason": "L'atenció plena en una sensació física (tacte) ajuda a reduir el soroll mental i millora la concentració.",
+            "areas": [{"area": "atenció", "percentage": 100}],
+        },
+        {
+            "recommendation": "Mira un programa de televisió tranquil i intenta resumir l'argument en una sola frase quan acabi.",
+            "reason": "Sintetitzar informació complexa en una idea simple és un excel·lent exercici de comprensió i fluïdesa.",
+            "areas": [
+                {"area": "memòria de treball", "percentage": 50},
+                {"area": "fluència alternant", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Practica tres respiracions profundes, comptant fins a quatre quan agafis l'aire i quan el treguis.",
+            "reason": "El comptatge rítmic manté la memòria de treball activa mentre l'oxigenació ajuda a claredat mental.",
+            "areas": [
+                {"area": "atenció", "percentage": 60},
+                {"area": "memòria de treball", "percentage": 40},
+            ],
+        },
+        {
+            "recommendation": "Juga una partida ràpida de solitari amb cartes o fes un passatemps molt senzill.",
+            "reason": "Els jocs estructurats amb regles conegudes ajuden a la velocitat de processament i a la presa de decisions.",
+            "areas": [
+                {"area": "velocitat de processament", "percentage": 50},
+                {"area": "memòria de treball", "percentage": 50},
+            ],
+        },
+        {
+            "recommendation": "Beu un got d'aigua a glops petits, sentint la temperatura i el recorregut del líquid.",
+            "reason": "Centrar-se exclusivament en l'acte de beure elimina distraccions i focalitza l'atenció en el present.",
+            "areas": [{"area": "atenció", "percentage": 100}],
+        },
+        {
+            "recommendation": "Surt un moment al balcó o jardí i intenta identificar tres sons diferents que sentis al carrer.",
+            "reason": "Discriminar estímuls auditius en un entorn obert treballa l'atenció selectiva i la velocitat de percepció.",
+            "areas": [
+                {"area": "atenció", "percentage": 70},
+                {"area": "velocitat de processament", "percentage": 30},
+            ],
+        },
+    ]
 
     SYSTEM_PROMPT = """Ets un assistent clínic de suport (no substitueixes cap professional sanitari) especialitzat en recomanacions d’activitats per a persones amb càncer que poden presentar dificultats cognitives derivades del tractament i/o de la malaltia.
 
@@ -83,5 +319,8 @@ Recordatori final:
             dict: The generated recommendation.
         """
         llm_adapter = self.__adapter_factory.get_llm_adapter()
-        llm_summary = llm_adapter.generate_recommendation(patient_data, self.SYSTEM_PROMPT)
-        return llm_summary
+        try:
+            llm_summary = llm_adapter.generate_recommendation(patient_data, self.SYSTEM_PROMPT)
+            return llm_summary
+        except Exception:
+            return random.choice(self.FALLBACK_RECOMMENDATIONS)
