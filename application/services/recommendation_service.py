@@ -1,6 +1,7 @@
 import random
 import concurrent.futures
 from application.services.user_service import PatientData
+from helpers.debugger.logger import AbstractLogger
 from helpers.factories.adapter_factories import AbstractAdapterFactory
 
 class RecommendationService:
@@ -314,6 +315,8 @@ Recordatori final:
 - Percentatges que sumin 100.0 exactes.
 """
 
+    logger = AbstractLogger.get_instance()
+
     def __init__(self, adapter_factory: AbstractAdapterFactory | None = None) -> None:
         self.__adapter_factory = adapter_factory or AbstractAdapterFactory.get_instance()
 
@@ -334,8 +337,18 @@ Recordatori final:
             )
 
         try:
+            self.logger.info(
+                "Calling LLM for patient recommendation",
+                module="RecommendationService",
+                metadata={"patient_email": patient_data['patient']['email']},
+            )
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(_call_llm)
                 return future.result(timeout=5)
         except (concurrent.futures.TimeoutError, Exception):
+            self.logger.info(
+                "LLM recommendation failed or timed out, using deterministic fallback",
+                module="RecommendationService",
+                metadata={"patient_email": patient_data['patient']['email']},
+            )
             return random.choice(self.FALLBACK_RECOMMENDATIONS)
