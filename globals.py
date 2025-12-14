@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-VERSION = '1.1.2'
+VERSION = '1.1.3'
 
 DEFAULT_VERSION_ENDPOINT = '/api/version'
 
@@ -11,6 +11,7 @@ DEFAULT_SWAGGER_URL = '/api-docs'
 DEFAULT_DEBUG = False
 DEFAULT_PORT = 5000
 DEFAULT_DB_PORT = 5432
+FAVICON_PATH = 'static/favicon.ico'
 
 #------------------------------
 
