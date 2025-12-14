@@ -148,7 +148,10 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
         }
         if type_scores:
             ordered_labels = [qt.value for qt in QuestionType if qt.value in type_scores]
-            self.logger.debug("Ordered question type labels for score graph", metadata={"ordered_labels": ordered_labels})
+            display_labels = [
+                labels_map.get(label, label)
+                for label in ordered_labels
+            ]
             # Preserve any unknowns at the end
             for label in type_scores.keys():
                 if label not in ordered_labels:
@@ -159,7 +162,7 @@ class SimplePlotlyAdapter(AbstractGraphicAdapter):
                 "data": [
                     {
                         "type": "bar",
-                        "x": ordered_labels,
+                        "x": display_labels,
                         "y": avg_scores,
                         "marker": {"color": "#1f77b4"},
                     }

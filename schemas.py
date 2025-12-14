@@ -199,6 +199,7 @@ class QuestionAnswerWithAnalysisSchema(Schema):
                 "question_type": "concentration",
                 "difficulty": 1.0,
             },
+            "answer_text": "Set.",
             "answered_at": "2024-01-20T09:15:00",
             "analysis": {
                 "pronoun_noun_ratio": 0.4,
@@ -227,6 +228,13 @@ class QuestionAnswerWithAnalysisSchema(Schema):
         metadata={
             "description": "Mètriques derivades del text (coherència, densitat lèxica, etc.).",
             "example": {"pronoun_noun_ratio": 0.4, "idea_density": 0.6},
+        },
+    )
+    answer_text = fields.String(
+        required=True,
+        metadata={
+            "description": "Text de la resposta de l'usuari.",
+            "example": "Set.",
         },
     )
 
