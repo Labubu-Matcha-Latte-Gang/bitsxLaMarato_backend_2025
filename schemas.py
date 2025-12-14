@@ -123,6 +123,129 @@ class UserResponseSchema(Schema):
         },
     )
 
+class PatientRoleSchema(Schema):
+    """
+    Esquema amb les dades específiques del rol de pacient.
+    """
+    class Meta:
+        description = "Dades específiques del rol de pacient."
+        example = {
+            "ailments": "Càncer de mama",
+            "treatments": "Quimioteràpia",
+            "gender": "female",
+            "age": 42,
+            "height_cm": 168.5,
+            "weight_kg": 64.3,
+        }
+
+    ailments = fields.String(
+        required=True,
+        metadata={
+            "description": "Patologies o malalties del pacient.",
+            "example": "Càncer de pulmó",
+        },
+    )
+
+    treatments = fields.String(
+        required=True,
+        metadata={
+            "description": "Tractaments del pacient.",
+            "example": "Quimioteràpia",
+        },
+    )
+
+    gender = fields.Enum(
+        Gender,
+        required=True,
+        by_value=True,
+        metadata={
+            "description": GENDER_DESCRIPTION,
+            "enum": GENDER_VALUES,
+            "example": "female",
+        },
+    )
+
+    age = fields.Integer(
+        required=True,
+        metadata={
+            "description": "Edat del pacient.",
+            "example": 42,
+        },
+    )
+
+    weight_kg = fields.Float(
+        required=True,
+        metadata={
+            "description": "Pes del pacient en quilograms.",
+            "example": 64.3,
+        },
+    )
+
+    height_cm = fields.Float(
+        required=True,
+        metadata={
+            "description": "Alçada del pacient en centímetres.",
+            "example": 168.5,
+        },
+    )
+
+class DoctorPatientResponseSchema(Schema):
+    """
+    Resposta amb la llista de pacients associats a un metge.
+    """
+
+    class Meta:
+        description = "Llista de pacients associats al metge autenticat."
+        example = {
+            "email": "jane.doe@example.com",
+            "name": "Jane",
+            "surname": "Doe",
+            "role": {
+                "ailments": "Càncer de mama",
+                "treatments": "Quimioteràpia",
+                "gender": "female",
+                "age": 42,
+                "height_cm": 168.5,
+                "weight_kg": 64.3,
+            }
+        }
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Correu electrònic de l'usuari.",
+            "example": "jane.doe@example.com",
+        },
+    )
+
+    name = fields.String(
+        required=True,
+        metadata={
+            "description": "Nom de l'usuari.",
+            "example": "Jane",
+        },
+    )
+
+    surname = fields.String(
+        required=True,
+        metadata={
+            "description": "Cognoms de l'usuari.",
+            "example": "Doe",
+        },
+    )
+
+    role = fields.Nested(PatientRoleSchema, required=True, metadata={
+            "description": "Dades específiques del rol de pacient.",
+            "example": {
+                "ailments": "Càncer de mama",
+                "treatments": "Quimioteràpia",
+                "gender": "female",
+                "age": 42,
+                "height_cm": 168.5,
+                "weight_kg": 64.3,
+            }
+        }
+    )
 
 class ScoreSummarySchema(Schema):
     """
