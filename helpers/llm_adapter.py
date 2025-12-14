@@ -11,6 +11,7 @@ from google.generativeai.types import GenerationConfig
 
 from helpers.debugger.logger import AbstractLogger
 from helpers.enums.question_types import CognitiveArea
+from helpers.exceptions.llm_exceptions import LLMException
 
 if TYPE_CHECKING:
     from application.services.user_service import PatientData
@@ -279,4 +280,4 @@ class GeminiAdapter(AbstractLlmAdapter):
             return output
         except Exception as e:
             self.logger.error(f"Error generating recommendation in GeminiAdapter: {str(e)}", module="GeminiAdapter", error=e)
-            return {"error": "No s'ha pogut generar la recomanació (Error del servei Gemini)."}
+            raise LLMException("No s'ha pogut generar la recomanació (Error del servei Gemini).")
