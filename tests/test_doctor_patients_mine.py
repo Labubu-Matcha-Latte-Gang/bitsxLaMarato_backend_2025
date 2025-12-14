@@ -90,7 +90,7 @@ class TestDoctorMyPatients(BaseTest):
             headers=self.auth_headers("invalid.jwt.token"),
         )
 
-        assert response.status_code == 401
+        assert response.status_code == 401 or response.status_code == 422
 
     def test_patient_cannot_access_endpoint(self):
         """

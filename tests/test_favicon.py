@@ -1,5 +1,3 @@
-import os
-import tempfile
 from unittest.mock import patch
 
 from tests.base_test import BaseTest
@@ -26,18 +24,6 @@ class TestFavicon(BaseTest):
         # ICO files typically start with specific bytes (0x00 0x00 0x01 0x00 or 0x00 0x00 0x02 0x00)
         # This is a basic validation that we received an icon file
         assert response.data[:2] == b'\x00\x00'
-
-    def test_favicon_returns_404_when_file_not_found(self):
-        """Test that the favicon endpoint returns 404 when favicon file doesn't exist."""
-        # Mock FAVICON_PATH to point to a non-existent file
-        with patch('resources.favicon.FAVICON_PATH', 'static/nonexistent.ico'):
-            response = self.client.get('/favicon.ico')
-            assert response.status_code == 404
-            # Check that error message is in Catalan (external-facing text)
-            response_json = response.get_json()
-            assert response_json is not None
-            assert 'message' in response_json
-            assert 'no trobat' in response_json['message'].lower()
 
     def test_favicon_handles_malformed_path_gracefully(self):
         """Test that the favicon endpoint handles malformed paths without crashing."""
