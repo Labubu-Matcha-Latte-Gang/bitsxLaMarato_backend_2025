@@ -188,6 +188,20 @@ class DoctorService:
             self.uow.commit()
 
         return doctor
+    
+    def get_patients_associated_with_doctor(self, doctor_email: str) -> list[Patient]:
+        """
+        Retrieve all patients associated with a doctor.
+        Args:
+            doctor_email (str): The email of the doctor.
+        Returns:
+            list[Patient]: List of patients associated with the doctor.
+        Raises:
+            UserNotFoundException: If the doctor does not exist.
+        """
+        doctor = self.get_doctor(doctor_email)
+        patients = doctor.patients or []
+        return patients
 
     @staticmethod
     def _normalize_emails(emails: list[str] | None) -> list[str]:

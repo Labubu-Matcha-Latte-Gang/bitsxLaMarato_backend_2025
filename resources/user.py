@@ -27,6 +27,7 @@ from infrastructure.sqlalchemy.unit_of_work import map_integrity_error
 from helpers.enums.user_role import UserRole
 from application.container import ServiceFactory
 from schemas import (
+    DoctorPatientResponseSchema,
     PatientRegisterSchema,
     DoctorRegisterSchema,
     DoctorPatientBulkSchema,
@@ -403,6 +404,72 @@ class DoctorPatientUnassign(MethodView):
                 error=e,
             )
             abort(500, message=f"S'ha produït un error inesperat en eliminar pacients: {str(e)}")
+
+@blp.route('/doctor/patients/mine')
+class DoctorMyPatients(MethodView):
+    """
+    Endpoint perquè els metges obtinguin la llista de pacients associats.
+    """
+
+    logger = AbstractLogger.get_instance()
+
+    @classmethod
+    def __normalize_patients(cls, patients: list['Patient']) -> list[dict]:
+        """
+        Normalitza la llista de pacients eliminant camps innecessaris.
+        """
+        normalized = []
+        for patient in patients:
+            patient_dict: dict[str, str | dict] = patient.to_dict()
+            patient_dict['role'].pop('doctors')
+            normalized.append(patient_dict)
+        return normalized
+
+    @roles_required([UserRole.DOCTOR])
+    @blp.doc(
+        summary="Obtenir la llista de pacients del metge autenticat",
+        description="Retorna la llista de pacients associats amb el metge autenticat.",
+    )
+    @blp.response(200, schema=DoctorPatientResponseSchema(many=True), description="Llista de pacients retornada correctament.")
+    @blp.response(401, description="Falta o és invàlid el JWT.")
+    @blp.response(403, description="L'usuari autenticat no té rol de metge.")
+    @blp.response(404, description="Metge o pacients no trobats.")
+    @blp.response(422, description="El cos de la sol·licitud no ha superat la validació.")
+    @blp.response(500, description="Error inesperat en obtenir la llista de pacients del metge.")
+    def post(self) -> Response:
+        doctor_email: str = get_jwt_identity()
+        try:
+            self.logger.info(
+                "Removing patients from doctor",
+                module="DoctorMyPatients",
+                metadata={"doctor_email": doctor_email},
+            )
+
+            service_factory = ServiceFactory.get_instance()
+            doctor_service = service_factory.build_doctor_service()
+
+            patients = doctor_service.get_patients_associated_with_doctor(doctor_email)
+            patients_payload = self.__normalize_patients(patients)
+
+            return jsonify(patients_payload), 200
+        except UserNotFoundException as e:
+            self.logger.error(
+                "Retrieval failed: Doctor not found",
+                module="DoctorMyPatients",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(404, message=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error while retrieving patients",
+                module="DoctorMyPatients",
+                metadata={"doctor_email": doctor_email},
+                error=e,
+            )
+            abort(500, message=f"S'ha produït un error inesperat en recuperar pacients: {str(e)}")
 
 @blp.route('/login')
 class UserLogin(MethodView):
