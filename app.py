@@ -78,9 +78,14 @@ def create_app(settings_module: str = 'globals') -> Flask:
             "ssl": {"ca": DB_SSL_CA}
         }
         
+    allowed_origins = [
+        "https://neurosight.kire.ovh",
+        "http://localhost:3000",
+    ]
+
     CORS(
        app,
-       resources={r"/api/*": {"origins": "*"}},
+       resources={r"/api/*": {"origins": allowed_origins}},
        allow_headers=["Content-Type", "Authorization"],
        supports_credentials=True
     )
